@@ -23,7 +23,7 @@ export const DEFAULT_ACCOUNTS: AdminAccount[] = [
   {
     id: 'acc-teacher',
     username: 'teacher',
-    displayName: '主日学主班教务老师',
+    displayName: '主日学上课老师',
     role: 'teacher',
     password: 'bethel123',
     createdAt: '2026-01-01'

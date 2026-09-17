@@ -172,6 +172,6 @@ export const initialSystemConfig: SystemConfig = {
 // Preset Admin Accounts for Bethel Church
 export const initialAdminAccounts: ServerAdminAccount[] = [
   { id: 'acc-admin', username: 'admin', displayName: '伯特利教会 • 总管理员', role: 'superadmin', password: 'bethel2026', createdAt: '2026-01-01' },
-  { id: 'acc-teacher', username: 'teacher', displayName: '主日学主班教务老师', role: 'teacher', password: 'bethel123', createdAt: '2026-01-01' },
+  { id: 'acc-teacher', username: 'teacher', displayName: '主日学上课老师', role: 'teacher', password: 'bethel123', createdAt: '2026-01-01' },
   { id: 'acc-fellowship', username: 'fellowship', displayName: '团契带领同工', role: 'fellowship_leader', password: 'fellowship123', createdAt: '2026-01-01' }
 ];

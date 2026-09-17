@@ -688,7 +688,7 @@ apiRouter.post('/classes', (req: Request, res: Response) => {
       name,
       ageRange: ageRange || '自选年龄段',
       teacher: teacher || '班级负责人',
-      subjectTeacher: subjectTeacher || '任课老师',
+      subjectTeacher: subjectTeacher || '上课老师',
       classroom: classroom || '主堂教室',
       color: color || 'bg-amber-500',
       groupType: groupType || 'sunday_school',

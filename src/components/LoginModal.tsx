@@ -169,7 +169,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   }}
                   className="px-2 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-[11px] font-semibold text-center transition-colors cursor-pointer"
                 >
-                  📖 任课教师
+                  📖 上课老师
                 </button>
                 <button
                   type="button"

@@ -211,7 +211,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                     </div>
                     {cls.subjectTeacher && (
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">任课老师：</span>
+                        <span className="text-slate-400">上课老师：</span>
                         <span className="font-semibold text-slate-800">{cls.subjectTeacher}</span>
                       </div>
                     )}

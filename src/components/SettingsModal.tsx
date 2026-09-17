@@ -673,7 +673,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <p className="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
                 按照系统权限配置：<strong>除了总管理员之外，其他账号只有管理签到权限，没有添加/删除班级与学生的权限。</strong>
-                如需新增班级、编辑班级与任课信息、批量录入学员或移出学员，请切换使用总管理员账号登录。
+                如需新增班级、编辑班级与上课老师信息、批量录入学员或移出学员，请切换使用总管理员账号登录。
               </p>
             </div>
           </div>
@@ -778,13 +778,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* SUB-TAB 1: CLASSES MANAGEMENT (自定义班级名称与班级负责、任课老师) */}
+      {/* SUB-TAB 1: CLASSES MANAGEMENT (自定义班级名称与班级负责、上课老师) */}
       {/* ========================================================================= */}
       {activeSubTab === 'classes' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-xs text-slate-500">
-              共配置 <span className="font-bold text-slate-900">{classes.length}</span> 个班级/团契。可随时查看班名、班级负责、任课老师与活动课室。
+              共配置 <span className="font-bold text-slate-900">{classes.length}</span> 个班级/团契。可随时查看班名、班级负责、上课老师与活动课室。
             </div>
             {isSuperAdmin ? (
               <button
@@ -884,7 +884,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <span className="font-semibold text-slate-800">{cls.teacher}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">任课老师:</span>
+                        <span className="text-slate-400">上课老师:</span>
                         <span className="font-semibold text-slate-800">{cls.subjectTeacher || '未设定'}</span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -1348,7 +1348,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                支持总管理员、主日学任课教师、团契负责人账号的新建、修改资料、重置密码与删除。修改即刻多端同步生效。
+                支持总管理员、主日学上课老师、团契负责人账号的新建、修改资料、重置密码与删除。修改即刻多端同步生效。
               </p>
             </div>
 
@@ -1627,7 +1627,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <div className="bg-white/70 p-3 rounded-xl border border-amber-200/60">
                 <div className="font-bold text-slate-900 flex items-center gap-1 mb-1">
-                  <span>📖 主日学任课教师 (teacher)</span>
+                  <span>📖 主日学上课老师 (teacher)</span>
                 </div>
                 <p>
                   专职负责主日学生点名考勤、金句背诵打卡与出勤统计。受安全保护，无权擅自删除班级或移除在册学员，确保教会资产档案安全无虞。
@@ -2050,7 +2050,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* EDIT / NEW CLASS MODAL (自定义班级名称、班级负责与任课老师弹窗) */}
+      {/* EDIT / NEW CLASS MODAL (自定义班级名称、班级负责与上课老师弹窗) */}
       {/* ========================================================================= */}
       {isClassModalOpen && editingClass && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -2062,7 +2062,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {editingClass.id ? '编辑班级/团契信息' : '创建新班级 / 团契'}
                 </h3>
                 <p className="text-xs text-amber-200 mt-0.5">
-                  自定义班级名称、班级性质、班级负责、任课老师与活动课室
+                  自定义班级名称、班级性质、班级负责、上课老师与活动课室
                 </p>
               </div>
               <button
@@ -2139,7 +2139,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    任课老师
+                    上课老师
                   </label>
                   <input
                     type="text"
@@ -2552,7 +2552,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   required
                   value={accountDisplayName}
                   onChange={e => setAccountDisplayName(e.target.value)}
-                  placeholder="例如: 李老师 (高小班任课) 或 王执事"
+                  placeholder="例如: 李老师 (高小班上课) 或 王执事"
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
@@ -2566,7 +2566,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={e => setAccountRole(e.target.value as any)}
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white"
                 >
-                  <option value="teacher">主日学任课教师 (仅限日常签到点名，无增删班级/学员权限)</option>
+                  <option value="teacher">主日学上课老师 (仅限日常签到点名，无增删班级/学员权限)</option>
                   <option value="fellowship_leader">团契负责人/同工 (仅限日常团契点名，无增删班级/学员权限)</option>
                   <option value="superadmin">总管理员 (拥有最高权限：增删班级、增删学员、管理所有账号)</option>
                 </select>

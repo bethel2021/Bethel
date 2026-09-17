@@ -25,7 +25,7 @@ export interface ClassGroup {
   name: string;
   ageRange: string;
   teacher: string; // 班级负责
-  subjectTeacher?: string; // 任课老师
+  subjectTeacher?: string; // 上课老师
   classroom: string; // 活动课室
   color: string;
   groupType?: GroupType; // 班级性质: 主日学 或 团契
