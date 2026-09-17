@@ -9,6 +9,7 @@ import {
   Filter, 
   Check, 
   X, 
+  Trash2,
   AlertCircle,
   Phone,
   ChevronDown,
@@ -507,8 +508,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* Status Badge */}
-                <div>
+                {/* Status Badge - Constant Height Container */}
+                <div className="h-9 flex flex-col items-end justify-center shrink-0">
                   {record ? (
                     <div className="text-right">
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
@@ -525,7 +526,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                           {record.status === 'present' ? '已准时签到' : record.status === 'late' ? '迟到打卡' : '已请假'}
                         </span>
                       </span>
-                      <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                      <div className="text-[10px] text-slate-400 mt-0.5 font-mono leading-none">
                         ⏰ {record.timeStr}
                       </div>
                     </div>
@@ -539,64 +540,69 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
               {/* Notes row if present */}
               {record && record.notes && (
-                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
                   <span className="text-slate-500 text-[10px] truncate max-w-full" title={record.notes}>
                     备注: {record.notes}
                   </span>
                 </div>
               )}
 
-              {/* Teacher Quick Action Buttons */}
-              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1">
+              {/* Teacher Quick Action Buttons - Fixed 4-Column Grid to prevent layout jumping */}
+              <div className="mt-3 pt-2.5 border-t border-slate-100 grid grid-cols-4 gap-1.5 items-center">
                 <button
                   disabled={isLoading}
                   onClick={() => handleQuickStatus(student.id, 'present')}
-                  className={`text-[11px] font-medium px-2 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                     record?.status === 'present'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600'
                   }`}
                 >
-                  <Check className="w-3 h-3" />
+                  <Check className="w-3 h-3 shrink-0" />
                   <span>到校</span>
                 </button>
 
                 <button
                   disabled={isLoading}
                   onClick={() => handleQuickStatus(student.id, 'late')}
-                  className={`text-[11px] font-medium px-2 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                     record?.status === 'late'
-                      ? 'bg-amber-600 text-white'
+                      ? 'bg-amber-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-600'
                   }`}
                 >
-                  <Clock className="w-3 h-3" />
+                  <Clock className="w-3 h-3 shrink-0" />
                   <span>迟到</span>
                 </button>
 
                 <button
                   disabled={isLoading}
                   onClick={() => handleOpenExcuseModal(student)}
-                  className={`text-[11px] font-medium px-2 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                     record?.status === 'excused'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-slate-600'
                   }`}
                 >
-                  <FileText className="w-3 h-3" />
+                  <FileText className="w-3 h-3 shrink-0" />
                   <span>请假</span>
                 </button>
 
-                {record && (
+                {record ? (
                   <button
                     disabled={isLoading}
                     onClick={() => handleQuickStatus(student.id, 'absent')}
-                    className="text-xs text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center shrink-0"
-                    title="撤销签到：点击回到未打卡状态"
-                    aria-label="撤销签到回到未打卡状态"
+                    className="text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 bg-slate-100 hover:bg-red-100 hover:text-red-700 text-slate-500"
+                    title="删除/清除签到记录，恢复为未打卡状态"
+                    aria-label="删除考勤记录"
                   >
-                    <X className="w-4 h-4" />
+                    <Trash2 className="w-3 h-3 shrink-0" />
+                    <span>删除</span>
                   </button>
+                ) : (
+                  <div className="w-full text-center text-[10px] text-slate-300 py-1 font-medium select-none">
+                    未打卡
+                  </div>
                 )}
               </div>
 

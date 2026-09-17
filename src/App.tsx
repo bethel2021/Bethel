@@ -610,7 +610,19 @@ export default function App() {
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         setIsServerAvailable(true);
-        await loadState(false);
+        const result = await res.json();
+        if (result && result.record) {
+          setRecords(prev => {
+            const existingIdx = prev.findIndex(r => r.studentId === result.record.studentId && r.date === result.record.date);
+            if (existingIdx !== -1) {
+              const clone = [...prev];
+              clone[existingIdx] = result.record;
+              saveLocalData({ records: clone });
+              return clone;
+            }
+            return prev;
+          });
+        }
         notifyCrossTabSync();
       }
     } catch {
