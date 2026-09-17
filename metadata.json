@@ -1,0 +1,6 @@
+{
+  "name": "伯特利教会主日学与团契签到管理系统",
+  "description": "伯特利教会主日学与团契出勤签到、后台管理、自定义班级人数、学员出生年月与年龄自动推算及月度年度报告系统",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
