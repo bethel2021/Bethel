@@ -142,49 +142,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             </div>
 
-            {/* Quick Demo Credentials */}
-            <div className="pt-1">
-              <div className="text-[11px] font-medium text-slate-500 mb-1.5 flex items-center justify-between">
-                <span>快速填充测试账号：</span>
-                <span className="text-[10px] text-amber-700">点击自动填入</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername('admin');
-                    setPassword('bethel2026');
-                    setErrorMsg('');
-                  }}
-                  className="px-2 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-[11px] font-semibold text-center transition-colors cursor-pointer"
-                >
-                  👑 总管理员
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername('teacher');
-                    setPassword('bethel123');
-                    setErrorMsg('');
-                  }}
-                  className="px-2 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-[11px] font-semibold text-center transition-colors cursor-pointer"
-                >
-                  📖 上课老师
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername('fellowship');
-                    setPassword('fellowship123');
-                    setErrorMsg('');
-                  }}
-                  className="px-2 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-900 text-[11px] font-semibold text-center transition-colors cursor-pointer"
-                >
-                  🤝 团契同工
-                </button>
-              </div>
-            </div>
-
             {/* Buttons: 取消 and 立即登入 */}
             <div className="flex items-center gap-3 pt-2">
               <button
