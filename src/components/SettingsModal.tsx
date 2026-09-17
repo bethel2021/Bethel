@@ -155,6 +155,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Default Options State (Syncs with config)
   const [optionsState, setOptionsState] = useState({
+    testMode: config.testMode ?? false,
     enableMemoryVerseOption: config.enableMemoryVerseOption ?? true,
     defaultMemoryVerseChecked: config.defaultMemoryVerseChecked ?? true,
     enableOfferingOption: config.enableOfferingOption ?? true,
@@ -162,7 +163,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     enableLateRule: config.enableLateRule ?? true,
     lateThresholdTime: config.lateThresholdTime || '09:30',
     enableExcusedNote: config.enableExcusedNote ?? true,
-    enableCheckinPopup: config.enableCheckinPopup ?? true,
   });
 
   // System & Church info state
@@ -550,7 +550,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setOptionsState(updated);
     try {
       await onSaveConfig({ [key]: val });
-      showNotice('success', '默认选项已即时更新生效！');
+      if (key === 'testMode') {
+        showNotice('success', val ? '已开启全天候测试模式！当前允许在任意时间进行打卡与点名测试。' : '已关闭测试模式！系统恢复为仅星期天指定时间段开放签到。');
+      } else {
+        showNotice('success', '默认选项与功能设置已即时更新生效！');
+      }
     } catch (err: any) {
       showNotice('error', err.message || '更新失败');
     }
@@ -1664,6 +1668,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* 0. 全天候测试模式 (专供总管理员) */}
+            <div className={`p-4.5 rounded-2xl border transition-all md:col-span-2 ${
+              optionsState.testMode 
+                ? 'border-blue-300 bg-blue-50/80 shadow-xs' 
+                : 'border-slate-200 bg-slate-50/60'
+            }`}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-7 h-7 rounded-xl font-bold text-xs flex items-center justify-center shrink-0 ${
+                      optionsState.testMode ? 'bg-blue-600 text-white shadow-xs' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      🧪
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                      <span>全天候测试模式 (仅限总管理员开关)</span>
+                      {optionsState.testMode ? (
+                        <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                          测试模式已开启 (任意时间可打卡)
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold">
+                          正常模式 (仅主日限定时间可打卡)
+                        </span>
+                      )}
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                    <strong>开启测试模式：</strong>突破【仅限星期天限定时间段】限制，允许总管理员与教师在任意星期、任意时间自由执行打卡与点名测试；<br />
+                    <strong>关闭测试模式：</strong>恢复正常模式，仅在<strong>星期天指定时段（{config.checkinStartTime || '08:30'} ~ {config.checkinEndTime || '12:30'}）</strong>开放签到。非主日时间段首页显示“请等待下一个主日”并拦截点名操作。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleOption('testMode', !optionsState.testMode)}
+                  disabled={!isSuperAdmin}
+                  className={`shrink-0 ${!isSuperAdmin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  title={isSuperAdmin ? '切换测试模式' : '权限锁定：仅总管理员可开启/关闭测试模式'}
+                >
+                  {optionsState.testMode ? (
+                    <ToggleRight className="w-10 h-10 text-blue-600" />
+                  ) : (
+                    <ToggleLeft className="w-10 h-10 text-slate-300" />
+                  )}
+                </button>
+              </div>
+            </div>
             
             {/* 1. 迟到判定规则开关与时刻 */}
             <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-3">

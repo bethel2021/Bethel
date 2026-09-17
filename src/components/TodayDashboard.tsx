@@ -18,7 +18,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../types';
-import { formatChineseDate } from '../utils/dateUtils';
+import { formatChineseDate, checkIsWithinSundayWindow } from '../utils/dateUtils';
 import { calculateAge, formatBirthDate } from '../utils/studentUtils';
 
 interface TodayDashboardProps {
@@ -102,6 +102,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         memoryVerseCompleted: false,
         offeringCompleted: false,
       });
+    } catch (err: any) {
+      alert(err.message || '签到打卡失败');
     } finally {
       setLoadingStudentId(null);
     }
@@ -126,6 +128,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         notes: excuseReason,
       });
       setExcuseModalStudent(null);
+    } catch (err: any) {
+      alert(err.message || '请假登记失败');
     } finally {
       setLoadingStudentId(null);
     }
@@ -255,9 +259,56 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     );
   }
 
+  const windowStatus = checkIsWithinSundayWindow(
+    new Date(),
+    config.checkinStartTime,
+    config.checkinEndTime,
+    config.testMode
+  );
+
   return (
     <div className="space-y-6">
       
+      {/* Test Mode / Non-Sunday Notice Banner */}
+      {!windowStatus.isAllowed && (
+        <div className="bg-amber-50 border border-amber-300/80 text-amber-900 px-4 py-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-200">
+              <Lock className="w-4 h-4 text-amber-700" />
+            </div>
+            <div>
+              <span className="font-bold text-slate-900 text-xs sm:text-sm">主日签到暂未开放 (请等待下一个主日)</span>
+              <p className="text-[11px] text-amber-800 mt-0.5">
+                当前非主日（周日）或超出限定签到时段（{config.checkinStartTime || '08:30'}~{config.checkinEndTime || '12:30'}）。如需测试模拟，总管理员可在后台开启「测试模式」。
+              </p>
+            </div>
+          </div>
+          {currentUser?.role === 'superadmin' && (
+            <button
+              onClick={onOpenLogin}
+              className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs self-start sm:self-auto"
+            >
+              后台开启测试模式
+            </button>
+          )}
+        </div>
+      )}
+
+      {config.testMode && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+            <div>
+              <span className="font-bold">🧪 全天候测试模式运行中：</span>
+              <span className="text-[11px] text-blue-800 ml-1">已突破主日及时间限制，允许在任意时间进行打卡点名与考勤测试。</span>
+            </div>
+          </div>
+          <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2.5 py-0.5 rounded-md font-mono font-bold shrink-0">
+            TEST MODE
+          </span>
+        </div>
+      )}
+
       {/* Top Banner & Statistics Grid */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">

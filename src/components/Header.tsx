@@ -61,7 +61,8 @@ export const Header: React.FC<HeaderProps> = ({
   const windowStatus = checkIsWithinSundayWindow(
     currentTime,
     config.checkinStartTime,
-    config.checkinEndTime
+    config.checkinEndTime,
+    config.testMode
   );
 
   const timeString = currentTime.toLocaleTimeString('zh-CN', {
@@ -120,13 +121,28 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Sunday Status Badge */}
-            <div className="text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-emerald-300 bg-emerald-50 text-emerald-800 shadow-2xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-emerald-400"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span>主日签到开放中</span>
-            </div>
+            {windowStatus.isAllowed ? (
+              <div className={`text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-medium shadow-2xs ${
+                config.testMode 
+                  ? 'border border-blue-300 bg-blue-50 text-blue-900' 
+                  : 'border border-emerald-300 bg-emerald-50 text-emerald-800'
+              }`}>
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    config.testMode ? 'bg-blue-400' : 'bg-emerald-400'
+                  }`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                    config.testMode ? 'bg-blue-500' : 'bg-emerald-500'
+                  }`}></span>
+                </span>
+                <span>{windowStatus.statusMsg}</span>
+              </div>
+            ) : (
+              <div className="text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-amber-300/80 bg-amber-50 text-amber-900 shadow-2xs">
+                <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                <span>请等待下一个主日</span>
+              </div>
+            )}
 
             {/* Cloud Real-Time Sync Status */}
             {onManualSync && (

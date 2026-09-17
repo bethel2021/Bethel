@@ -25,7 +25,7 @@ import {
   exportLocalBackup,
   importLocalBackup
 } from './utils/localStore';
-import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts } from './utils/dateUtils';
+import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts, checkIsWithinSundayWindow } from './utils/dateUtils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'today' | 'monthly' | 'annual' | 'settings'>('today');
@@ -515,6 +515,20 @@ export default function App() {
     if (!currentUser) {
       setIsLoginModalOpen(true);
       throw new Error('请先登录教师或管理员账号后再进行签到打卡操作');
+    }
+
+    const windowStatus = checkIsWithinSundayWindow(
+      new Date(),
+      config.checkinStartTime,
+      config.checkinEndTime,
+      config.testMode
+    );
+
+    if (!windowStatus.isAllowed) {
+      const msg = '非主日签到开放时段，请等待下一个主日！(总管理员可在后台开启「测试模式」解封)';
+      setNewCheckinAlert(`⚠️ ${msg}`);
+      setTimeout(() => setNewCheckinAlert(null), 4000);
+      throw new Error(msg);
     }
 
     const updateLocally = () => {

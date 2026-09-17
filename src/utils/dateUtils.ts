@@ -126,16 +126,60 @@ export function getDayOfWeekName(date: Date): string {
 }
 
 export function checkIsWithinSundayWindow(
-  now: Date,
-  checkinStartTime: string,
-  checkinEndTime: string
+  now: Date = new Date(),
+  checkinStartTime: string = '08:30',
+  checkinEndTime: string = '12:30',
+  testMode: boolean = false
 ): { isAllowed: boolean; statusMsg: string; isSunday: boolean } {
+  if (testMode) {
+    return {
+      isAllowed: true,
+      statusMsg: '主日签到开放中 (测试模式)',
+      isSunday: true,
+    };
+  }
+
   const rome = getRomeTimeParts(now);
   const isSunday = rome.dayOfWeek === 0;
 
+  if (!isSunday) {
+    return {
+      isAllowed: false,
+      statusMsg: '请等待下一个主日',
+      isSunday: false,
+    };
+  }
+
+  let startMinutes = 8 * 60 + 30;
+  let endMinutes = 12 * 60 + 30;
+
+  if (checkinStartTime) {
+    const [sh, sm] = checkinStartTime.split(':').map(Number);
+    if (!isNaN(sh) && !isNaN(sm)) {
+      startMinutes = sh * 60 + sm;
+    }
+  }
+
+  if (checkinEndTime) {
+    const [eh, em] = checkinEndTime.split(':').map(Number);
+    if (!isNaN(eh) && !isNaN(em)) {
+      endMinutes = eh * 60 + em;
+    }
+  }
+
+  const currentMinutes = rome.hour * 60 + rome.minute;
+
+  if (currentMinutes < startMinutes || currentMinutes > endMinutes) {
+    return {
+      isAllowed: false,
+      statusMsg: '请等待下一个主日',
+      isSunday: true,
+    };
+  }
+
   return {
     isAllowed: true,
-    statusMsg: '主日学与团契签到开放中',
-    isSunday,
+    statusMsg: '主日签到开放中',
+    isSunday: true,
   };
 }

@@ -419,9 +419,59 @@ apiRouter.post('/login', (req: Request, res: Response) => {
   }
 });
 
+function isServerCheckinAllowed(now: Date = new Date()): { isAllowed: boolean; message?: string } {
+  if (systemConfig.testMode) {
+    return { isAllowed: true };
+  }
+
+  const romeTime = getRomeTimeParts(now);
+  const isSunday = romeTime.dayOfWeek === 0;
+
+  if (!isSunday) {
+    return {
+      isAllowed: false,
+      message: '今天不是星期天，非主日签到开放时间，请等待下一个主日！(总管理员可在后台开启「测试模式」)'
+    };
+  }
+
+  let startMinutes = 8 * 60 + 30; // 08:30
+  let endMinutes = 12 * 60 + 30; // 12:30
+
+  if (systemConfig.checkinStartTime) {
+    const [sh, sm] = systemConfig.checkinStartTime.split(':').map(Number);
+    if (!isNaN(sh) && !isNaN(sm)) {
+      startMinutes = sh * 60 + sm;
+    }
+  }
+
+  if (systemConfig.checkinEndTime) {
+    const [eh, em] = systemConfig.checkinEndTime.split(':').map(Number);
+    if (!isNaN(eh) && !isNaN(em)) {
+      endMinutes = eh * 60 + em;
+    }
+  }
+
+  const currentMinutes = romeTime.hour * 60 + romeTime.minute;
+
+  if (currentMinutes < startMinutes || currentMinutes > endMinutes) {
+    return {
+      isAllowed: false,
+      message: `当前不在主日签到开放时间段（${systemConfig.checkinStartTime || '08:30'}~${systemConfig.checkinEndTime || '12:30'}），请等待下一个主日！(总管理员可在后台开启「测试模式」)`
+    };
+  }
+
+  return { isAllowed: true };
+}
+
 // 3. Student / Member check-in (WeChat scan / mobile QR / quick attendance)
 apiRouter.post('/checkin', (req: Request, res: Response) => {
   try {
+    const now = new Date();
+    const check = isServerCheckinAllowed(now);
+    if (!check.isAllowed) {
+      return res.status(400).json({ error: check.message });
+    }
+
     const { studentId, memoryVerseCompleted, offeringCompleted, notes = '' } = req.body;
     
     if (!studentId) {
@@ -433,7 +483,6 @@ apiRouter.post('/checkin', (req: Request, res: Response) => {
       return res.status(404).json({ error: '未在伯特利教会名册中找到该学员，请联系老师登记' });
     }
 
-    const now = new Date();
     const targetDate = getActiveSundayDate();
     const existing = records.find(r => r.studentId === studentId && r.date === targetDate);
     if (existing) {
@@ -508,6 +557,11 @@ apiRouter.post('/checkin', (req: Request, res: Response) => {
 // 4. Manual checkin / excuse / absent
 apiRouter.post('/manual-checkin', (req: Request, res: Response) => {
   try {
+    const check = isServerCheckinAllowed();
+    if (!check.isAllowed) {
+      return res.status(400).json({ error: check.message });
+    }
+
     const { studentId, date, status, memoryVerseCompleted, offeringCompleted, notes } = req.body;
     const student = students.find(s => s.id === studentId);
     if (!student) {
@@ -589,6 +643,11 @@ apiRouter.post('/manual-checkin', (req: Request, res: Response) => {
 // 5. Batch Check-in
 apiRouter.post('/batch-checkin', (req: Request, res: Response) => {
   try {
+    const check = isServerCheckinAllowed();
+    if (!check.isAllowed) {
+      return res.status(400).json({ error: check.message });
+    }
+
     const { classId, date, status = 'present' } = req.body;
     const targetDate = date || getActiveSundayDate();
     const now = new Date();
