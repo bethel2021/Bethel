@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Users, 
   CheckCircle2, 
@@ -55,6 +55,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   const [excuseModalStudent, setExcuseModalStudent] = useState<Student | null>(null);
   const [excuseReason, setExcuseReason] = useState<string>('');
   const [loadingStudentId, setLoadingStudentId] = useState<string | null>(null);
+  const processingRef = useRef<Set<string>>(new Set());
 
   // Today's records
   const todayRecords = records.filter(r => r.date === activeSunday);
@@ -94,6 +95,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     studentId: string,
     status: 'present' | 'late' | 'excused' | 'absent'
   ) => {
+    if (processingRef.current.has(studentId)) return;
+    processingRef.current.add(studentId);
     setLoadingStudentId(studentId);
     try {
       await onManualUpdate({
@@ -106,6 +109,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     } catch (err: any) {
       alert(err.message || '签到打卡失败');
     } finally {
+      processingRef.current.delete(studentId);
       setLoadingStudentId(null);
     }
   };
@@ -156,7 +160,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               {config.churchName} {config.schoolTitle}
             </h2>
             <p className="text-xs sm:text-sm text-amber-100/90 max-w-3xl leading-relaxed">
-              为保护主日学未成年孩童与团契成员的隐私安全，学生姓名、出生年月及考勤点名功能仅对本堂主日学教师及同工开放。访客可在此查阅各班级与团契基本设置。
+              为保护主日学未成年孩童与团契成员的隐私安全，学生姓名、出生年月及考勤点名功能仅对本堂主日学教师及同工开放。访客仅可查看各班级与团契基本情况。
             </p>
           </div>
         </div>
@@ -550,7 +554,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               {/* Teacher Quick Action Buttons - Fixed 4-Column Grid to prevent layout jumping */}
               <div className="mt-3 pt-2.5 border-t border-slate-100 grid grid-cols-4 gap-1.5 items-center">
                 <button
-                  disabled={isLoading}
+                  type="button"
                   onClick={() => handleQuickStatus(student.id, 'present')}
                   className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                     record?.status === 'present'
@@ -563,7 +567,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 </button>
 
                 <button
-                  disabled={isLoading}
+                  type="button"
                   onClick={() => handleQuickStatus(student.id, 'late')}
                   className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                     record?.status === 'late'
@@ -576,7 +580,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 </button>
 
                 <button
-                  disabled={isLoading}
+                  type="button"
                   onClick={() => handleOpenExcuseModal(student)}
                   className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                     record?.status === 'excused'
@@ -590,7 +594,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
                 {record ? (
                   <button
-                    disabled={isLoading}
+                    type="button"
                     onClick={() => handleQuickStatus(student.id, 'absent')}
                     className="text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 bg-slate-100 hover:bg-red-100 hover:text-red-700 text-slate-500"
                     title="删除/清除签到记录，恢复为未打卡状态"

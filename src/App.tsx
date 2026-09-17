@@ -27,6 +27,18 @@ import {
 } from './utils/localStore';
 import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts, checkIsWithinSundayWindow } from './utils/dateUtils';
 
+const TAB_ID = Math.random().toString(36).substring(2, 9);
+
+function isDataEqual(a: any, b: any): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'today' | 'monthly' | 'annual' | 'settings'>('today');
   const [loading, setLoading] = useState(true);
@@ -89,6 +101,7 @@ export default function App() {
 
   const previousRecordsCountRef = useRef<number>(0);
   const syncVersionRef = useRef<number>(0);
+  const pendingMutationsRef = useRef<Set<string>>(new Set());
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [serverRuntime, setServerRuntime] = useState<string | null>(null);
@@ -97,10 +110,10 @@ export default function App() {
   const notifyCrossTabSync = () => {
     try {
       if (typeof window !== 'undefined') {
-        localStorage.setItem('bethel_sync_ping', Date.now().toString());
+        localStorage.setItem('bethel_sync_ping', JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
         if ('BroadcastChannel' in window) {
           const bc = new BroadcastChannel('bethel_sync_channel');
-          bc.postMessage({ type: 'SYNC_STATE', timestamp: Date.now() });
+          bc.postMessage({ type: 'SYNC_STATE', tabId: TAB_ID, timestamp: Date.now() });
           bc.close();
         }
       }
@@ -112,20 +125,69 @@ export default function App() {
     if (!data || !data.config) return;
     setIsServerAvailable(true);
     if (data.runtime) setServerRuntime(data.runtime);
+
     if (typeof data.syncVersion === 'number') {
+      if (!isInitial && data.syncVersion < syncVersionRef.current) {
+        return;
+      }
       syncVersionRef.current = data.syncVersion;
     }
 
-    setConfig(data.config);
-    if (Array.isArray(data.classes)) setClasses(data.classes);
-    if (Array.isArray(data.students)) setStudents(data.students);
+    // Smart diffing updates to prevent unnecessary re-renders & page flickering
+    setConfig(prev => isDataEqual(prev, data.config) ? prev : data.config);
+
+    if (Array.isArray(data.classes)) {
+      setClasses(prev => isDataEqual(prev, data.classes) ? prev : data.classes);
+    }
+
+    if (Array.isArray(data.students)) {
+      setStudents(prev => isDataEqual(prev, data.students) ? prev : data.students);
+    }
+
     if (data.accounts && Array.isArray(data.accounts) && data.accounts.length > 0) {
-      setAccounts(data.accounts);
-    } else {
+      setAccounts(prev => isDataEqual(prev, data.accounts) ? prev : data.accounts);
+    } else if (!data.accounts) {
       setAccounts(getLocalAccounts());
     }
-    if (data.activeSunday) setActiveSunday(data.activeSunday);
-    if (Array.isArray(data.records)) setRecords(data.records);
+
+    if (data.activeSunday) {
+      setActiveSunday(prev => prev === data.activeSunday ? prev : data.activeSunday);
+    }
+
+    if (Array.isArray(data.records)) {
+      setRecords(prev => {
+        let incomingRecords: AttendanceRecord[] = data.records;
+
+        // Preserve optimistic local updates if mutations are currently in flight
+        if (pendingMutationsRef.current.size > 0) {
+          const preservedMap = new Map<string, AttendanceRecord | null>();
+          pendingMutationsRef.current.forEach(key => {
+            const [sId, dStr] = key.split('_KEY_SPLIT_');
+            const optRec = prev.find(r => r.studentId === sId && r.date === dStr);
+            preservedMap.set(key, optRec || null);
+          });
+
+          const merged = [...incomingRecords];
+          preservedMap.forEach((optRec, key) => {
+            const [sId, dStr] = key.split('_KEY_SPLIT_');
+            const idx = merged.findIndex(r => r.studentId === sId && r.date === dStr);
+            if (optRec) {
+              if (idx !== -1) merged[idx] = optRec;
+              else merged.push(optRec);
+            } else {
+              if (idx !== -1) merged.splice(idx, 1);
+            }
+          });
+          incomingRecords = merged;
+        }
+
+        if (isDataEqual(prev, incomingRecords)) {
+          return prev;
+        }
+        return incomingRecords;
+      });
+    }
+
     setLastSyncTime(getCurrentRomeFullTimeStr());
 
     // Keep local cache synced as authoritative backup
@@ -381,7 +443,8 @@ export default function App() {
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         bc = new BroadcastChannel('bethel_sync_channel');
-        bc.onmessage = () => {
+        bc.onmessage = (e) => {
+          if (e.data?.tabId === TAB_ID) return; // Ignore self-triggered sync messages
           if (isMounted) loadState(false);
         };
       }
@@ -389,7 +452,11 @@ export default function App() {
 
     // 7. Storage event for multi-tab sync
     const onStorage = (e: StorageEvent) => {
-      if (e.key && e.key.startsWith('bethel_') && isMounted) {
+      if (e.key === 'bethel_sync_ping' && isMounted) {
+        try {
+          const parsed = JSON.parse(e.newValue || '{}');
+          if (parsed.tabId === TAB_ID) return; // Ignore self
+        } catch {}
         loadState(false);
       }
     };
@@ -594,8 +661,10 @@ export default function App() {
         saveLocalData({ records: updated });
         return updated;
       });
-      notifyCrossTabSync();
     };
+
+    const mutationKey = `${data.studentId}_KEY_SPLIT_${data.date}`;
+    pendingMutationsRef.current.add(mutationKey);
 
     // 1. Optimistically update local state for instantaneous UI response
     updateLocally();
@@ -614,19 +683,28 @@ export default function App() {
         if (result && result.record) {
           setRecords(prev => {
             const existingIdx = prev.findIndex(r => r.studentId === result.record.studentId && r.date === result.record.date);
+            let updated: AttendanceRecord[];
             if (existingIdx !== -1) {
-              const clone = [...prev];
-              clone[existingIdx] = result.record;
-              saveLocalData({ records: clone });
-              return clone;
+              updated = prev.map((r, i) => i === existingIdx ? result.record : r);
+            } else {
+              updated = [...prev, result.record];
             }
-            return prev;
+            saveLocalData({ records: updated });
+            return updated;
+          });
+        } else if (result && result.success && data.status === 'absent') {
+          setRecords(prev => {
+            const updated = prev.filter(r => !(r.studentId === data.studentId && r.date === data.date));
+            saveLocalData({ records: updated });
+            return updated;
           });
         }
-        notifyCrossTabSync();
       }
     } catch {
       // Offline fallback: already updated locally in step 1
+    } finally {
+      pendingMutationsRef.current.delete(mutationKey);
+      notifyCrossTabSync();
     }
   };
 
