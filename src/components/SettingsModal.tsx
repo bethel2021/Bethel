@@ -1739,34 +1739,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            {/* 3. 大屏悬浮弹窗喜报开关 */}
-            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-                    3
-                  </span>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    大屏实时签到悬浮喜报
-                  </h4>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  当在大堂或教室开启大屏点名看板时，有学员打卡签到将以弹出气泡祝贺到堂。
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggleOption('enableCheckinPopup', !optionsState.enableCheckinPopup)}
-                className="cursor-pointer shrink-0"
-              >
-                {optionsState.enableCheckinPopup ? (
-                  <ToggleRight className="w-9 h-9 text-amber-700" />
-                ) : (
-                  <ToggleLeft className="w-9 h-9 text-slate-300" />
-                )}
-              </button>
-            </div>
-
           </div>
         </div>
       )}

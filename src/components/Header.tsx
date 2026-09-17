@@ -138,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isServerAvailable === false ? 'text-amber-600' : 'text-emerald-600'} ${isSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
                 <span className="hidden sm:inline">
-                  {isSyncing ? '正在同步...' : isServerAvailable === false ? '本地离线' : (serverRuntime === 'vercel-serverless' ? 'Vercel 云端动态' : '云端动态已连接')}
+                  {isSyncing ? '正在同步...' : isServerAvailable === false ? '本地离线' : '实时更新'}
                 </span>
                 {lastSyncTime && <span className="text-[10px] text-slate-400 hidden md:inline">{lastSyncTime}</span>}
               </button>

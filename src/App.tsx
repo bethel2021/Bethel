@@ -41,7 +41,11 @@ export default function App() {
       const saved = localStorage.getItem('bethel_admin_user');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const user = JSON.parse(saved);
+          if (user && (user.role === 'superadmin' || user.username === 'admin')) {
+            user.displayName = '总管理员';
+          }
+          return user;
         } catch {
           return null;
         }
@@ -134,14 +138,6 @@ export default function App() {
       accounts: data.accounts || accounts
     });
 
-    // Detect new real-time check-in
-    if (!isInitial && Array.isArray(data.records) && data.records.length > previousRecordsCountRef.current) {
-      const newest = data.records[data.records.length - 1];
-      if (newest && newest.date === (data.activeSunday || activeSunday) && (data.config || config).enableCheckinPopup !== false) {
-        setNewCheckinAlert(`🎉 实时签到：【${newest.studentName}】刚刚完成了主日签到！`);
-        setTimeout(() => setNewCheckinAlert(null), 4000);
-      }
-    }
     if (Array.isArray(data.records)) {
       previousRecordsCountRef.current = data.records.length;
     }
@@ -438,17 +434,21 @@ export default function App() {
 
   // Login & Logout Handlers
   const handleLoginSuccess = (user: AdminUser) => {
-    setCurrentUser(user);
+    let finalUser = user;
+    if (user.role === 'superadmin' || user.username === 'admin') {
+      finalUser = { ...user, displayName: '总管理员' };
+    }
+    setCurrentUser(finalUser);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('bethel_admin_user', JSON.stringify(user));
+      localStorage.setItem('bethel_admin_user', JSON.stringify(finalUser));
     }
     // Only superadmin enters the backend settings tab; teachers/coworkers return directly to front office
-    if (user.role === 'superadmin') {
+    if (finalUser.role === 'superadmin') {
       setActiveTab('settings');
-      setNewCheckinAlert(`🔐 登录成功：欢迎总管理员 ${user.displayName} 进入后台综合管理系统！`);
+      setNewCheckinAlert(`🔐 登录成功：欢迎 ${finalUser.displayName} 进入后台综合管理系统！`);
     } else {
       setActiveTab('today');
-      setNewCheckinAlert(`✨ 登录成功：欢迎 ${user.displayName} 老师，已直接返回主日签到前台！`);
+      setNewCheckinAlert(`✨ 登录成功：欢迎 ${finalUser.displayName} 老师，已直接返回主日签到前台！`);
     }
     setTimeout(() => setNewCheckinAlert(null), 3500);
   };
@@ -484,10 +484,6 @@ export default function App() {
       return updated;
     });
     notifyCrossTabSync();
-    if (config.enableCheckinPopup !== false) {
-      setNewCheckinAlert(`🎉 签到成功：【${student.name}】主日蒙福！`);
-      setTimeout(() => setNewCheckinAlert(null), 4000);
-    }
   };
 
   // Auth headers helper
@@ -1155,7 +1151,7 @@ export default function App() {
             <span className="text-[11px] text-slate-400">
               {isServerAvailable === false 
                 ? '静态离线/本地存储模式' 
-                : (serverRuntime === 'vercel-serverless' ? '🟢 Vercel 云端动态服务运行中' : '🟢 实时动态服务已连接')}
+                : '🟢 实时更新'}
             </span>
           </p>
         </div>

@@ -143,7 +143,7 @@ export const MultiDeviceSyncModal: React.FC<MultiDeviceSyncModalProps> = ({
                   <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isServerAvailable === false ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
                 </span>
                 <span className="font-semibold text-sm text-slate-900">
-                  {isServerAvailable === false ? '静态存储/离线模式' : (serverRuntime === 'vercel-serverless' ? 'Vercel 云端动态服务运行中' : '动态交互服务已就绪')}
+                  {isServerAvailable === false ? '静态存储/离线模式' : '实时更新服务已就绪'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500">

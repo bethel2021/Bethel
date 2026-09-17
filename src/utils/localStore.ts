@@ -15,7 +15,7 @@ export const DEFAULT_ACCOUNTS: AdminAccount[] = [
   {
     id: 'acc-admin',
     username: 'admin',
-    displayName: '伯特利教会 • 总管理员',
+    displayName: '总管理员',
     role: 'superadmin',
     password: 'bethel2026',
     createdAt: '2026-01-01'
@@ -341,7 +341,7 @@ export function localLogin(username: string, password: string): AdminUser | null
   if (cleanU === 'admin' && (cleanP === adminPass || cleanP === 'bethel2026')) {
     return {
       username: 'admin',
-      displayName: '伯特利教会 • 总管理员',
+      displayName: '总管理员',
       role: 'superadmin',
       token: 'local-admin-token'
     };

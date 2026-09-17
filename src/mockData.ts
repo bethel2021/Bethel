@@ -138,7 +138,7 @@ export const initialSystemConfig: SystemConfig = {
 };
 
 export const presetAdmins: AdminUser[] = [
-  { username: 'admin', displayName: '伯特利教会 • 总管理员', role: 'superadmin' },
+  { username: 'admin', displayName: '总管理员', role: 'superadmin' },
   { username: 'teacher', displayName: '主日学上课老师', role: 'teacher' },
   { username: 'fellowship', displayName: '团契带领同工', role: 'fellowship_leader' }
 ];
