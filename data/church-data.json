@@ -40,14 +40,14 @@
     {
       "id": "class-2",
       "name": "小班",
+      "isHiddenFromHome": false,
       "ageRange": "7-8岁",
       "teacher": "秋娟 老师",
       "subjectTeacher": "雪峰、勤洁、贴柔 老师",
       "classroom": "5号教室",
       "color": "bg-teal-500",
       "groupType": "sunday_school",
-      "description": "「学习圣经品格，培养敬畏顺服」引导孩童朗读圣经话语、认识造物主作为，在团契生活中建立诚实、友爱与顺服的基督徒好品行。",
-      "isHiddenFromHome": false
+      "description": "「学习圣经品格，培养敬畏顺服」引导孩童朗读圣经话语、认识造物主作为，在团契生活中建立诚实、友爱与顺服的基督徒好品行。"
     },
     {
       "id": "class-3",
@@ -3634,9 +3634,9 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 81,
+  "syncVersion": 90,
   "hiddenClassIds": [
     "class-1"
   ],
-  "updatedAt": "2026-09-18T13:41:24.548Z"
+  "updatedAt": "2026-09-18T15:07:52.350Z"
 }

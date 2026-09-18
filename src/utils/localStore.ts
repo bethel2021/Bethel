@@ -203,6 +203,7 @@ export function getLocalData() {
     });
     if (hasUpdatedClasses) {
       localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
+      saveLocalHiddenClassIds(classes.filter(c => !!c.isHiddenFromHome).map(c => c.id));
     }
 
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);

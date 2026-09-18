@@ -252,8 +252,13 @@ apiRouter.get('/health', (req: Request, res: Response) => {
 apiRouter.get('/state', async (req: Request, res: Response) => {
   await initOrLoadDataAsync();
   const currentSunday = getActiveSundayDate();
+  const hiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
   res.json({
-    config: systemConfig,
+    config: {
+      ...systemConfig,
+      hiddenClassIds: hiddenIds
+    },
+    hiddenClassIds: hiddenIds,
     classes: classes.map(c => ({
       ...c,
       isHiddenFromHome: !!c.isHiddenFromHome

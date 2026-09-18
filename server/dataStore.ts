@@ -511,9 +511,11 @@ export function mergeClientData(payload: SyncPayload): {
         changed = true;
       } else {
         const existing = classMap.get(c.id)!;
-        // Server's authoritative class configuration (including isHiddenFromHome) must be preserved
-        // against non-admin background sync payload overwrites
-        const authoritativeHidden = existing.isHiddenFromHome === true || diskHiddenSet.has(c.id);
+        // Server's authoritative class configuration (including isHiddenFromHome) is preserved,
+        // but explicit client boolean value takes precedence if provided
+        const authoritativeHidden = c.isHiddenFromHome !== undefined
+          ? !!c.isHiddenFromHome
+          : (existing.isHiddenFromHome === true || diskHiddenSet.has(c.id));
         const mergedClass: ClassGroup = {
           ...c,
           ...existing,
