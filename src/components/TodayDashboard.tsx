@@ -156,9 +156,6 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 当前主日：{formatChineseDate(activeSunday)}
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold font-serif">
-              {config.churchName} {config.schoolTitle}
-            </h2>
             <p className="text-xs sm:text-sm text-amber-100/90 max-w-3xl leading-relaxed">
               为保护主日学未成年孩童与团契成员的隐私安全，学生姓名、出生年月及考勤点名功能仅对本堂主日学教师及同工开放。访客仅可查看各班级与团契基本情况。
             </p>
@@ -273,31 +270,6 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      
-      {/* Test Mode / Non-Sunday Notice Banner */}
-      {!windowStatus.isAllowed && (
-        <div className="bg-amber-50 border border-amber-300/80 text-amber-900 px-4 py-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
-          <div className="flex items-start sm:items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-200">
-              <Lock className="w-4 h-4 text-amber-700" />
-            </div>
-            <div>
-              <span className="font-bold text-slate-900 text-xs sm:text-sm">主日签到暂未开放 (请等待下一个主日)</span>
-              <p className="text-[11px] text-amber-800 mt-0.5">
-                当前非主日（周日）或超出限定签到时段（{config.checkinStartTime || '08:30'}~{config.checkinEndTime || '12:30'}）。如需测试模拟，总管理员可在后台开启「测试模式」。
-              </p>
-            </div>
-          </div>
-          {currentUser?.role === 'superadmin' && (
-            <button
-              onClick={onOpenLogin}
-              className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs self-start sm:self-auto"
-            >
-              后台开启测试模式
-            </button>
-          )}
-        </div>
-      )}
 
       {config.testMode && (
         <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-2xs">
