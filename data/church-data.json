@@ -301,6 +301,66 @@
       "joinDate": "2023-03-01"
     },
     {
+      "id": "s-604",
+      "name": "任品瑞 (Giovanna)",
+      "gender": "girl",
+      "birthDate": "2010-01-03",
+      "age": 16,
+      "classId": "class-6",
+      "parentName": "林伟珍",
+      "parentPhone": "3501945801",
+      "memberCode": "BTL-17",
+      "joinDate": "2024-09-01"
+    },
+    {
+      "id": "s-605",
+      "name": "陈瑞涵 (Sadero)",
+      "gender": "boy",
+      "birthDate": "2010-04-27",
+      "age": 16,
+      "classId": "class-6",
+      "parentName": "家长",
+      "parentPhone": "3756763723",
+      "memberCode": "BTL-18",
+      "joinDate": "2024-09-01"
+    },
+    {
+      "id": "s-606",
+      "name": "张金睿 (Diana)",
+      "gender": "girl",
+      "birthDate": "2010-06-17",
+      "age": 16,
+      "classId": "class-6",
+      "parentName": "家长",
+      "parentPhone": "3242887180",
+      "memberCode": "BTL-19",
+      "joinDate": "2024-09-01"
+    },
+    {
+      "id": "s-607",
+      "name": "涂意豪",
+      "gender": "boy",
+      "birthDate": "2010-07-08",
+      "age": 16,
+      "classId": "class-6",
+      "parentName": "戴少萍",
+      "parentPhone": "3312696885",
+      "memberCode": "BTL-20",
+      "joinDate": "2024-09-01"
+    },
+    {
+      "id": "s-608",
+      "name": "高雅诗",
+      "gender": "girl",
+      "birthDate": "2010-09-15",
+      "age": 16,
+      "classId": "class-6",
+      "parentName": "郑向美",
+      "parentPhone": "3500082336",
+      "memberCode": "BTL-21",
+      "joinDate": "2024-09-01"
+    },
+    {
       "id": "s-701",
       "name": "何保罗 (Paul)",
       "gender": "boy",
@@ -309,7 +369,7 @@
       "classId": "class-7",
       "parentName": "本人",
       "parentPhone": "18900891100",
-      "memberCode": "BTL-17",
+      "memberCode": "BTL-22",
       "joinDate": "2024-03-01"
     },
     {
@@ -321,7 +381,7 @@
       "classId": "class-7",
       "parentName": "本人",
       "parentPhone": "13700902233",
-      "memberCode": "BTL-18",
+      "memberCode": "BTL-23",
       "joinDate": "2022-09-01"
     }
   ],
@@ -3571,9 +3631,7 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 63,
-  "hiddenClassIds": [
-    "class-1"
-  ],
-  "updatedAt": "2026-09-18T11:54:47.080Z"
+  "syncVersion": 65,
+  "hiddenClassIds": [],
+  "updatedAt": "2026-09-18T12:17:27.922Z"
 }

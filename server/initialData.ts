@@ -144,10 +144,15 @@ export const initialStudents: Student[] = [
   { id: 's-601', name: '林哲瀚', gender: 'boy', birthDate: '2009-11-01', age: 16, classId: 'class-6', parentName: '显美', parentPhone: '3778364620', memberCode: 'BTL-14', joinDate: '2023-09-01' },
   { id: 's-602', name: '王凌鹏 (David)', gender: 'boy', birthDate: '2010-02-16', age: 16, classId: 'class-6', parentName: '陈蓓思', parentPhone: '3332659108', memberCode: 'BTL-15', joinDate: '2023-09-01' },
   { id: 's-603', name: '邵熙辰 (Oscar)', gender: 'boy', birthDate: '2010-02-27', age: 16, classId: 'class-6', parentName: '亚非', parentPhone: '3939393922', memberCode: 'BTL-16', joinDate: '2023-03-01' },
+  { id: 's-604', name: '任品瑞 (Giovanna)', gender: 'girl', birthDate: '2010-01-03', age: 16, classId: 'class-6', parentName: '林伟珍', parentPhone: '3501945801', memberCode: 'BTL-17', joinDate: '2024-09-01' },
+  { id: 's-605', name: '陈瑞涵 (Sadero)', gender: 'boy', birthDate: '2010-04-27', age: 16, classId: 'class-6', parentName: '家长', parentPhone: '3756763723', memberCode: 'BTL-18', joinDate: '2024-09-01' },
+  { id: 's-606', name: '张金睿 (Diana)', gender: 'girl', birthDate: '2010-06-17', age: 16, classId: 'class-6', parentName: '家长', parentPhone: '3242887180', memberCode: 'BTL-19', joinDate: '2024-09-01' },
+  { id: 's-607', name: '涂意豪', gender: 'boy', birthDate: '2010-07-08', age: 16, classId: 'class-6', parentName: '戴少萍', parentPhone: '3312696885', memberCode: 'BTL-20', joinDate: '2024-09-01' },
+  { id: 's-608', name: '高雅诗', gender: 'girl', birthDate: '2010-09-15', age: 16, classId: 'class-6', parentName: '郑向美', parentPhone: '3500082336', memberCode: 'BTL-21', joinDate: '2024-09-01' },
 
   // 以斯拉团契 (18-35岁青年)
-  { id: 's-701', name: '何保罗 (Paul)', gender: 'boy', birthDate: '2001-08-21', age: 25, classId: 'class-7', parentName: '本人', parentPhone: '18900891100', memberCode: 'BTL-17', joinDate: '2024-03-01' },
-  { id: 's-702', name: '梁迦勒 (Caleb Jr)', gender: 'boy', birthDate: '1998-05-12', age: 28, classId: 'class-7', parentName: '本人', parentPhone: '13700902233', memberCode: 'BTL-18', joinDate: '2022-09-01' }
+  { id: 's-701', name: '何保罗 (Paul)', gender: 'boy', birthDate: '2001-08-21', age: 25, classId: 'class-7', parentName: '本人', parentPhone: '18900891100', memberCode: 'BTL-22', joinDate: '2024-03-01' },
+  { id: 's-702', name: '梁迦勒 (Caleb Jr)', gender: 'boy', birthDate: '1998-05-12', age: 28, classId: 'class-7', parentName: '本人', parentPhone: '13700902233', memberCode: 'BTL-23', joinDate: '2022-09-01' }
 ];
 
 // System Config for Bethel Church
