@@ -416,15 +416,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       {/* Filter & Operations Bar - All Classes Fully Visible Without Horizontal Scroll */}
       <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5">
         
-        {/* Class Tabs Header & Wrapped Chips */}
+        {/* Class Tabs Header & 3-Column Grid Layout */}
         <div>
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2.5">
-            <Church className="w-4 h-4 text-amber-700" />
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 mb-2.5">
+            <Church className="w-4 h-4 text-amber-700 shrink-0" />
             <span>班级与团契快速切换</span>
           </div>
 
-          {/* Classes & Fellowships wrapped */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* 3 items per row Grid Layout, perfectly aligned */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
             {visibleClasses.map(cls => {
               const clsStudentCount = students.filter(s => s.classId === cls.id).length;
               const clsPresentCount = todayRecords.filter(r => r.classId === cls.id && (r.status === 'present' || r.status === 'late')).length;
@@ -434,15 +434,17 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 <button
                   key={cls.id}
                   onClick={() => setSelectedClassId(cls.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  className={`w-full py-2 px-1.5 sm:px-3 rounded-xl transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 shadow-2xs min-w-0 ${
                     isSelected
-                      ? 'bg-amber-700 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
+                      ? 'bg-amber-700 text-white shadow-xs ring-2 ring-amber-700/25'
+                      : 'bg-slate-100 text-slate-800 hover:bg-slate-200/90 hover:text-slate-900'
                   }`}
                 >
-                  <span>{cls.name.split(' ')[0]}</span>
-                  <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                    isSelected ? 'bg-amber-800 text-amber-100' : 'bg-slate-200/80 text-slate-600'
+                  <span className="text-xs sm:text-sm font-bold tracking-tight truncate max-w-full">
+                    {cls.name.split(' ')[0]}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs font-semibold shrink-0 ${
+                    isSelected ? 'bg-amber-800 text-amber-100' : 'bg-slate-200/90 text-slate-600'
                   }`}>
                     {clsPresentCount}/{clsStudentCount}人
                   </span>
