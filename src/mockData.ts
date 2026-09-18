@@ -10,7 +10,8 @@ export const initialClasses: ClassGroup[] = [
     classroom: '7号教室', 
     color: 'bg-emerald-500',
     groupType: 'sunday_school',
-    description: '小小班启蒙，圣经故事与赞美诗律动'
+    description: '小小班启蒙，圣经故事与赞美诗律动',
+    isHiddenFromHome: false
   },
   { 
     id: 'class-2', 
@@ -21,7 +22,8 @@ export const initialClasses: ClassGroup[] = [
     classroom: '5号教室', 
     color: 'bg-teal-500',
     groupType: 'sunday_school',
-    description: '幼儿诗歌、圣经小品格与常规模范'
+    description: '幼儿诗歌、圣经小品格与常规模范',
+    isHiddenFromHome: false
   },
   { 
     id: 'class-3', 
@@ -32,7 +34,8 @@ export const initialClasses: ClassGroup[] = [
     classroom: '6号教室', 
     color: 'bg-amber-500',
     groupType: 'sunday_school',
-    description: '主日学中班，研读神造万物与感恩顺服'
+    description: '主日学中班，研读神造万物与感恩顺服',
+    isHiddenFromHome: false
   },
   { 
     id: 'class-4', 
@@ -43,7 +46,8 @@ export const initialClasses: ClassGroup[] = [
     classroom: '3号教室', 
     color: 'bg-orange-500',
     groupType: 'sunday_school',
-    description: '幼小衔接班，研读圣经品格与敬拜学习'
+    description: '幼小衔接班，研读圣经品格与敬拜学习',
+    isHiddenFromHome: false
   },
   { 
     id: 'class-5', 
@@ -54,7 +58,8 @@ export const initialClasses: ClassGroup[] = [
     classroom: '1号教室', 
     color: 'bg-blue-500',
     groupType: 'sunday_school',
-    description: '初中学生班，圣经真理根基、门徒训练与少年团契'
+    description: '初中学生班，圣经真理根基、门徒训练与少年团契',
+    isHiddenFromHome: false
   },
   { 
     id: 'class-6', 
@@ -65,7 +70,8 @@ export const initialClasses: ClassGroup[] = [
     classroom: '2号教室', 
     color: 'bg-indigo-500',
     groupType: 'sunday_school',
-    description: '高中门徒，圣经世界观、信仰思辨与基督徒侍奉实践'
+    description: '高中门徒，圣经世界观、信仰思辨与基督徒侍奉实践',
+    isHiddenFromHome: false
   },
   { 
     id: 'class-7', 
@@ -76,7 +82,8 @@ export const initialClasses: ClassGroup[] = [
     classroom: '大堂', 
     color: 'bg-purple-500',
     groupType: 'fellowship',
-    description: '青年团契，职场得胜见证、诗歌敬拜与专案服侍'
+    description: '青年团契，职场得胜见证、诗歌敬拜与专案服侍',
+    isHiddenFromHome: false
   }
 ];
 

@@ -137,7 +137,18 @@ export default function App() {
     setConfig(prev => isDataEqual(prev, data.config) ? prev : data.config);
 
     if (Array.isArray(data.classes)) {
-      setClasses(prev => isDataEqual(prev, data.classes) ? prev : data.classes);
+      const local = getLocalData();
+      const localClassesMap = new Map(local.classes.map(c => [c.id, c]));
+      const mergedClasses = data.classes.map((c: any) => {
+        const localClass = localClassesMap.get(c.id);
+        return {
+          ...c,
+          isHiddenFromHome: c.isHiddenFromHome !== undefined 
+            ? !!c.isHiddenFromHome 
+            : (localClass ? !!localClass.isHiddenFromHome : false)
+        };
+      });
+      setClasses(prev => isDataEqual(prev, mergedClasses) ? prev : mergedClasses);
     }
 
     if (Array.isArray(data.students)) {
