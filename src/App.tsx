@@ -1362,6 +1362,7 @@ export default function App() {
             records={records}
             activeSunday={activeSunday}
             currentUser={currentUser}
+            isSyncing={isSyncing}
             onOpenLogin={() => setIsLoginModalOpen(true)}
             onManualUpdate={handleManualUpdate}
           />

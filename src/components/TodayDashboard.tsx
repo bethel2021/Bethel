@@ -29,6 +29,7 @@ interface TodayDashboardProps {
   records: AttendanceRecord[];
   activeSunday: string;
   currentUser: AdminUser | null;
+  isSyncing?: boolean;
   onOpenLogin: () => void;
   onManualUpdate: (data: {
     studentId: string;
@@ -47,6 +48,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   records,
   activeSunday,
   currentUser,
+  isSyncing = false,
   onOpenLogin,
   onManualUpdate,
 }) => {
@@ -353,122 +355,164 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
       {/* Top Banner & Statistics Card */}
       <div className="today-dashboard-card bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 sm:p-4.5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-amber-700" />
-                <span>今日主日学实时签到看板</span>
-              </h2>
-              {currentSelectedClass && (
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200/80">
-                  {currentSelectedClass.name}
-                </span>
-              )}
+        {isSyncing ? (
+          /* Skeleton Loading Screen for .today-dashboard-card */
+          <div className="space-y-3 py-0.5" aria-label="数据正在同步中...">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full skeleton-bone shrink-0"></div>
+                  <div className="h-5 w-44 sm:w-56 skeleton-bone rounded-lg"></div>
+                  <div className="h-4 w-16 skeleton-bone rounded-md"></div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <div className="h-3.5 w-28 skeleton-bone rounded"></div>
+                  <div className="h-3.5 w-24 skeleton-bone rounded"></div>
+                  <div className="h-3.5 w-20 skeleton-bone rounded"></div>
+                  <div className="h-3.5 w-24 skeleton-bone rounded"></div>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <span>当前主日：{formatChineseDate(activeSunday)}</span>
-              <span className="text-slate-300">•</span>
-              <span>应到总人数：<strong className="text-slate-900 font-bold">{totalCount}</strong> 人</span>
-              <span className="text-slate-300">•</span>
-              <span>请假：<strong className="text-blue-700 font-bold">{excusedCount}</strong> 人</span>
-              <span className="text-slate-300">•</span>
-              <span>综合到勤率：<strong className="text-emerald-700 font-bold">{attendanceRate}%</strong></span>
-            </p>
+
+            {/* 3 Horizontal Skeleton Cards matching today-dashboard-stats-row */}
+            <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row flex-nowrap items-stretch gap-2.5 sm:gap-4 pt-2.5 border-t border-slate-100 w-full">
+              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-2">
+                <div className="h-3.5 w-16 skeleton-bone rounded"></div>
+                <div className="h-7 sm:h-8 w-12 skeleton-bone rounded-md my-0.5"></div>
+                <div className="h-3 w-14 skeleton-bone rounded"></div>
+              </div>
+              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-2">
+                <div className="h-3.5 w-16 skeleton-bone rounded"></div>
+                <div className="h-7 sm:h-8 w-10 skeleton-bone rounded-md my-0.5"></div>
+                <div className="h-3 w-14 skeleton-bone rounded"></div>
+              </div>
+              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-2">
+                <div className="h-3.5 w-16 skeleton-bone rounded"></div>
+                <div className="h-7 sm:h-8 w-12 skeleton-bone rounded-md my-0.5"></div>
+                <div className="h-3 w-14 skeleton-bone rounded"></div>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-amber-700" />
+                    <span>今日主日学实时签到看板</span>
+                  </h2>
+                  {currentSelectedClass && (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200/80">
+                      {currentSelectedClass.name}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span>当前主日：{formatChineseDate(activeSunday)}</span>
+                  <span className="text-slate-300">•</span>
+                  <span>应到总人数：<strong className="text-slate-900 font-bold">{totalCount}</strong> 人</span>
+                  <span className="text-slate-300">•</span>
+                  <span>请假：<strong className="text-blue-700 font-bold">{excusedCount}</strong> 人</span>
+                  <span className="text-slate-300">•</span>
+                  <span>综合到勤率：<strong className="text-emerald-700 font-bold">{attendanceRate}%</strong></span>
+                </p>
+              </div>
+            </div>
 
-        {/* 3 Horizontal Equal-Width Statistics via Flex Layout */}
-        <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row flex-nowrap items-stretch gap-2.5 sm:gap-4 pt-2.5 border-t border-slate-100 w-full">
-          
-          {/* Stat 1: 已签到 */}
-          <button
-            type="button"
-            onClick={() => handleStatClick('checked_in')}
-            title="点击筛选查看已签到学员列表"
-            className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
-              statusFilter === 'checked_in'
-                ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-500/50 shadow-xs'
-                : 'bg-emerald-50/70 hover:bg-emerald-100/80 active:bg-emerald-200/80 border-emerald-200/90 shadow-2xs'
-            }`}
-          >
-            <span className="text-[11px] sm:text-xs font-bold text-emerald-800 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
-              <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-200/80 border border-emerald-400/90 shrink-0" aria-hidden="true">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-              </span>
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>已签到</span>
-            </span>
-            <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
-              <span className="text-2xl sm:text-3xl md:text-4xl font-black text-emerald-700 font-mono tracking-tight">
-                {checkedInTotal}
-              </span>
-              <span className="text-[10px] sm:text-xs font-semibold text-emerald-600">人</span>
-            </div>
-            <div className="text-[10px] sm:text-[11px] text-emerald-700/80 truncate flex items-center justify-center gap-1">
-              <span>准时 {presentCount}</span>
-            </div>
-          </button>
+            {/* 3 Horizontal Equal-Width Statistics via Flex Layout */}
+            <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row flex-nowrap items-stretch gap-2.5 sm:gap-4 pt-2.5 border-t border-slate-100 w-full">
+              
+              {/* Stat 1: 已签到 */}
+              <button
+                type="button"
+                onClick={() => handleStatClick('checked_in')}
+                title="点击筛选查看已签到学员列表"
+                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+                  statusFilter === 'checked_in'
+                    ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-500/50 shadow-xs'
+                    : 'bg-emerald-50/70 hover:bg-emerald-100/80 active:bg-emerald-200/80 border-emerald-200/90 shadow-2xs'
+                }`}
+              >
+                <span className="text-[11px] sm:text-xs font-bold text-emerald-800 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
+                  <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-200/80 border border-emerald-400/90 shrink-0" aria-hidden="true">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                  </span>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>已签到</span>
+                </span>
+                <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
+                  <span className="text-2xl sm:text-3xl md:text-4xl font-black text-emerald-700 font-mono tracking-tight">
+                    {checkedInTotal}
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-semibold text-emerald-600">人</span>
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-emerald-700/80 truncate flex items-center justify-center gap-1">
+                  <span>准时 {presentCount}</span>
+                </div>
+              </button>
 
-          {/* Stat 2: 未签到 */}
-          <button
-            type="button"
-            onClick={() => handleStatClick('uncheck_in')}
-            title="点击筛选查看未签到学员列表"
-            className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
-              statusFilter === 'uncheck_in'
-                ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-400/50 shadow-xs'
-                : 'bg-slate-50/90 hover:bg-slate-100/90 active:bg-slate-200/80 border-slate-200/90 shadow-2xs'
-            }`}
-          >
-            <span className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
-              <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-200/80 border border-slate-400/90 shrink-0" aria-hidden="true">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-              </span>
-              <UserX className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-              <span>未签到</span>
-            </span>
-            <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
-              <span className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-800 font-mono tracking-tight">
-                {absentCount > 0 ? absentCount : 0}
-              </span>
-              <span className="text-[10px] sm:text-xs font-semibold text-slate-500">人</span>
-            </div>
-            <div className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center justify-center gap-1">
-              <span>{excusedCount > 0 ? `请假 ${excusedCount} 人` : '等待打卡'}</span>
-            </div>
-          </button>
+              {/* Stat 2: 未签到 */}
+              <button
+                type="button"
+                onClick={() => handleStatClick('uncheck_in')}
+                title="点击筛选查看未签到学员列表"
+                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+                  statusFilter === 'uncheck_in'
+                    ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-400/50 shadow-xs'
+                    : 'bg-slate-50/90 hover:bg-slate-100/90 active:bg-slate-200/80 border-slate-200/90 shadow-2xs'
+                }`}
+              >
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
+                  <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-200/80 border border-slate-400/90 shrink-0" aria-hidden="true">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                  </span>
+                  <UserX className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span>未签到</span>
+                </span>
+                <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
+                  <span className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-800 font-mono tracking-tight">
+                    {absentCount > 0 ? absentCount : 0}
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-semibold text-slate-500">人</span>
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center justify-center gap-1">
+                  <span>{excusedCount > 0 ? `请假 ${excusedCount} 人` : '等待打卡'}</span>
+                </div>
+              </button>
 
-          {/* Stat 3: 迟到 */}
-          <button
-            type="button"
-            onClick={() => handleStatClick('late')}
-            title="点击筛选查看迟到学员列表"
-            className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
-              statusFilter === 'late'
-                ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-500/50 shadow-xs'
-                : 'bg-amber-50/70 hover:bg-amber-100/80 active:bg-amber-200/80 border-amber-200/90 shadow-2xs'
-            }`}
-          >
-            <span className="text-[11px] sm:text-xs font-bold text-amber-800 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
-              <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-200/80 border border-amber-400/90 shrink-0" aria-hidden="true">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
-              </span>
-              <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>迟到</span>
-            </span>
-            <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
-              <span className="text-2xl sm:text-3xl md:text-4xl font-black text-amber-800 font-mono tracking-tight">
-                {lateCount}
-              </span>
-              <span className="text-[10px] sm:text-xs font-semibold text-amber-700">人</span>
-            </div>
-            <div className="text-[10px] sm:text-[11px] text-amber-700/80 truncate flex items-center justify-center gap-1">
-              <span>迟到打卡</span>
-            </div>
-          </button>
+              {/* Stat 3: 迟到 */}
+              <button
+                type="button"
+                onClick={() => handleStatClick('late')}
+                title="点击筛选查看迟到学员列表"
+                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+                  statusFilter === 'late'
+                    ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-500/50 shadow-xs'
+                    : 'bg-amber-50/70 hover:bg-amber-100/80 active:bg-amber-200/80 border-amber-200/90 shadow-2xs'
+                }`}
+              >
+                <span className="text-[11px] sm:text-xs font-bold text-amber-800 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
+                  <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-200/80 border border-amber-400/90 shrink-0" aria-hidden="true">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                  </span>
+                  <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                  <span>迟到</span>
+                </span>
+                <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
+                  <span className="text-2xl sm:text-3xl md:text-4xl font-black text-amber-800 font-mono tracking-tight">
+                    {lateCount}
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-semibold text-amber-700">人</span>
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-amber-700/80 truncate flex items-center justify-center gap-1">
+                  <span>迟到打卡</span>
+                </div>
+              </button>
 
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Filter & Operations Bar - All Classes Fully Visible Without Horizontal Scroll */}

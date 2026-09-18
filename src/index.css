@@ -130,34 +130,15 @@
 .today-dashboard-card {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #ffffff 0%, #fefdfb 60%, #faf8f5 100%);
-  animation: todayCardFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  background: #ffffff;
+  animation: todayCardFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transition: box-shadow 0.25s ease, border-color 0.25s ease;
-}
-
-.today-dashboard-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    115deg,
-    transparent 0%,
-    rgba(217, 119, 6, 0.03) 30%,
-    rgba(251, 191, 36, 0.08) 50%,
-    rgba(217, 119, 6, 0.03) 70%,
-    transparent 100%
-  );
-  background-size: 250% 100%;
-  animation: todayCardShimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) 1 forwards;
-  pointer-events: none;
-  z-index: 1;
 }
 
 @keyframes todayCardFadeIn {
   0% {
-    opacity: 0.3;
-    transform: translateY(4px);
+    opacity: 0.4;
+    transform: translateY(2px);
   }
   100% {
     opacity: 1;
@@ -165,17 +146,19 @@
   }
 }
 
-@keyframes todayCardShimmer {
+/* Skeleton Loading Screen Shimmer styling */
+.today-dashboard-card .skeleton-bone {
+  background: linear-gradient(90deg, rgba(241, 245, 249, 0.8) 25%, rgba(226, 232, 240, 0.9) 50%, rgba(241, 245, 249, 0.8) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s infinite ease-in-out;
+}
+
+@keyframes skeletonShimmer {
   0% {
     background-position: 200% 0;
-    opacity: 0;
-  }
-  25% {
-    opacity: 1;
   }
   100% {
-    background-position: -150% 0;
-    opacity: 0;
+    background-position: -200% 0;
   }
 }
 
