@@ -336,30 +336,30 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-3.5">
 
       {config.testMode && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-2xs">
-          <div className="flex items-center gap-2.5">
+        <div className="bg-blue-50 border border-blue-200 text-blue-900 px-3.5 py-2 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
             <div>
               <span className="font-bold">🧪 全天候测试模式运行中：</span>
               <span className="text-[11px] text-blue-800 ml-1">已突破主日及时间限制，允许在任意时间进行打卡点名与考勤测试。</span>
             </div>
           </div>
-          <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2.5 py-0.5 rounded-md font-mono font-bold shrink-0">
+          <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded-md font-mono font-bold shrink-0">
             TEST MODE
           </span>
         </div>
       )}
 
       {/* Top Banner & Statistics Card */}
-      <div className="today-dashboard-card bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 sm:p-4.5">
+      <div className="today-dashboard-card bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-2.5 sm:p-3.5">
         {isSyncing ? (
           /* Skeleton Loading Screen for .today-dashboard-card */
-          <div className="space-y-3 py-0.5" aria-label="数据正在同步中...">
+          <div className="space-y-2.5 py-0.5" aria-label="数据正在同步中...">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 rounded-full skeleton-bone shrink-0"></div>
                   <div className="h-5 w-44 sm:w-56 skeleton-bone rounded-lg"></div>
@@ -375,40 +375,40 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
             </div>
 
             {/* 3 Horizontal Skeleton Cards matching today-dashboard-stats-row */}
-            <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row flex-nowrap items-stretch gap-2.5 sm:gap-4 pt-2.5 border-t border-slate-100 w-full">
-              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-2">
+            <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row flex-nowrap items-stretch gap-2 sm:gap-3 pt-2 border-t border-slate-100 w-full">
+              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-2.5 sm:p-3 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-1.5">
                 <div className="h-3.5 w-16 skeleton-bone rounded"></div>
-                <div className="h-7 sm:h-8 w-12 skeleton-bone rounded-md my-0.5"></div>
+                <div className="h-6 sm:h-7 w-12 skeleton-bone rounded-md my-0.5"></div>
                 <div className="h-3 w-14 skeleton-bone rounded"></div>
               </div>
-              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-2">
+              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-2.5 sm:p-3 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-1.5">
                 <div className="h-3.5 w-16 skeleton-bone rounded"></div>
-                <div className="h-7 sm:h-8 w-10 skeleton-bone rounded-md my-0.5"></div>
+                <div className="h-6 sm:h-7 w-10 skeleton-bone rounded-md my-0.5"></div>
                 <div className="h-3 w-14 skeleton-bone rounded"></div>
               </div>
-              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-2">
+              <div className="today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-2.5 sm:p-3 text-center bg-slate-50 border border-slate-100/80 flex flex-col items-center justify-center space-y-1.5">
                 <div className="h-3.5 w-16 skeleton-bone rounded"></div>
-                <div className="h-7 sm:h-8 w-12 skeleton-bone rounded-md my-0.5"></div>
+                <div className="h-6 sm:h-7 w-12 skeleton-bone rounded-md my-0.5"></div>
                 <div className="h-3 w-14 skeleton-bone rounded"></div>
               </div>
             </div>
           </div>
         ) : (
           <>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-amber-700" />
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-1.5">
+                    <Users className="w-4.5 h-4.5 text-amber-700" />
                     <span>今日主日学实时签到看板</span>
                   </h2>
                   {currentSelectedClass && (
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200/80">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200/80">
                       {currentSelectedClass.name}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span>当前主日：{formatChineseDate(activeSunday)}</span>
                   <span className="text-slate-300">•</span>
                   <span>应到总人数：<strong className="text-slate-900 font-bold">{totalCount}</strong> 人</span>
@@ -421,14 +421,14 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
             </div>
 
             {/* 3 Horizontal Equal-Width Statistics via Flex Layout */}
-            <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row flex-nowrap items-stretch gap-2.5 sm:gap-4 pt-2.5 border-t border-slate-100 w-full">
+            <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row flex-nowrap items-stretch gap-2 sm:gap-3 pt-2 border-t border-slate-100 w-full">
               
               {/* Stat 1: 已签到 */}
               <button
                 type="button"
                 onClick={() => handleStatClick('checked_in')}
                 title="点击筛选查看已签到学员列表"
-                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-2.5 sm:p-3 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
                   statusFilter === 'checked_in'
                     ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-500/50 shadow-xs'
                     : 'bg-emerald-50/70 hover:bg-emerald-100/80 active:bg-emerald-200/80 border-emerald-200/90 shadow-2xs'
@@ -441,8 +441,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span>已签到</span>
                 </span>
-                <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
-                  <span className="text-2xl sm:text-3xl md:text-4xl font-black text-emerald-700 font-mono tracking-tight">
+                <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+                  <span className="text-2xl sm:text-3xl md:text-3.5xl font-black text-emerald-700 font-mono tracking-tight">
                     {checkedInTotal}
                   </span>
                   <span className="text-[10px] sm:text-xs font-semibold text-emerald-600">人</span>
@@ -457,7 +457,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 type="button"
                 onClick={() => handleStatClick('uncheck_in')}
                 title="点击筛选查看未签到学员列表"
-                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-2.5 sm:p-3 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
                   statusFilter === 'uncheck_in'
                     ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-400/50 shadow-xs'
                     : 'bg-slate-50/90 hover:bg-slate-100/90 active:bg-slate-200/80 border-slate-200/90 shadow-2xs'
@@ -470,8 +470,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                   <UserX className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                   <span>未签到</span>
                 </span>
-                <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
-                  <span className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-800 font-mono tracking-tight">
+                <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+                  <span className="text-2xl sm:text-3xl md:text-3.5xl font-black text-slate-800 font-mono tracking-tight">
                     {absentCount > 0 ? absentCount : 0}
                   </span>
                   <span className="text-[10px] sm:text-xs font-semibold text-slate-500">人</span>
@@ -486,7 +486,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 type="button"
                 onClick={() => handleStatClick('late')}
                 title="点击筛选查看迟到学员列表"
-                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+                className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-2.5 sm:p-3 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
                   statusFilter === 'late'
                     ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-500/50 shadow-xs'
                     : 'bg-amber-50/70 hover:bg-amber-100/80 active:bg-amber-200/80 border-amber-200/90 shadow-2xs'
@@ -499,8 +499,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                   <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                   <span>迟到</span>
                 </span>
-                <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
-                  <span className="text-2xl sm:text-3xl md:text-4xl font-black text-amber-800 font-mono tracking-tight">
+                <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+                  <span className="text-2xl sm:text-3xl md:text-3.5xl font-black text-amber-800 font-mono tracking-tight">
                     {lateCount}
                   </span>
                   <span className="text-[10px] sm:text-xs font-semibold text-amber-700">人</span>
@@ -516,17 +516,17 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       </div>
 
       {/* Filter & Operations Bar - All Classes Fully Visible Without Horizontal Scroll */}
-      <div ref={rosterRef} className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5 scroll-mt-4">
+      <div ref={rosterRef} className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5 scroll-mt-4">
         
         {/* Class Tabs Header & 3-Column Grid Layout */}
         <div>
-          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 mb-2.5">
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
             <Church className="w-4 h-4 text-amber-700 shrink-0" />
             <span>班级与团契快速切换</span>
           </div>
 
           {/* 3 items per row Grid Layout, perfectly aligned */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {visibleClasses.map(cls => {
               const clsStudentCount = students.filter(s => s.classId === cls.id).length;
               const clsPresentCount = todayRecords.filter(r => r.classId === cls.id && (r.status === 'present' || r.status === 'late')).length;
@@ -536,7 +536,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 <button
                   key={cls.id}
                   onClick={() => setSelectedClassId(cls.id)}
-                  className={`w-full py-2 px-1.5 sm:px-3 rounded-xl transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 shadow-2xs min-w-0 ${
+                  className={`w-full py-1.5 px-1.5 sm:px-2.5 rounded-xl transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 shadow-2xs min-w-0 ${
                     isSelected
                       ? 'bg-amber-700 text-white shadow-xs ring-2 ring-amber-700/25'
                       : 'bg-slate-100 text-slate-800 hover:bg-slate-200/90 hover:text-slate-900'
@@ -557,7 +557,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         </div>
 
         {/* Search Input & Quick Batch Action */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
           <div className="relative flex-1 max-w-md">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -565,7 +565,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               value={searchKeyword}
               onChange={e => setSearchKeyword(e.target.value)}
               placeholder="搜索学员资料…"
-              className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500 bg-slate-50 focus:bg-white transition-all"
+              className="w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500 bg-slate-50 focus:bg-white transition-all"
             />
           </div>
 
@@ -595,7 +595,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       </div>
 
       {/* Students Roster Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
         {filteredStudents.map(student => {
           const record = todayRecords.find(r => r.studentId === student.id);
           const classGroup = classes.find(c => c.id === student.classId);
@@ -604,7 +604,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
           return (
             <div
               key={student.id}
-              className={`bg-white rounded-xl border p-4 shadow-2xs transition-all relative ${
+              className={`bg-white rounded-xl border p-3 sm:p-3.5 shadow-2xs transition-all relative ${
                 record?.status === 'present'
                   ? 'border-emerald-200/90 ring-1 ring-emerald-500/20'
                   : record?.status === 'late'
@@ -675,7 +675,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               )}
 
               {/* Teacher Quick Action Buttons - Fixed 4-Column Grid to prevent layout jumping */}
-              <div className="mt-3 pt-2.5 border-t border-slate-100 grid grid-cols-4 gap-1.5 items-center">
+              <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-4 gap-1.5 items-center">
                 <button
                   type="button"
                   onClick={() => handleQuickStatus(student.id, 'present')}
