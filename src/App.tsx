@@ -27,6 +27,7 @@ import {
   getLocalHiddenClassIds,
   saveLocalHiddenClassIds
 } from './utils/localStore';
+import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords } from './mockData';
 import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts, checkIsWithinSundayWindow } from './utils/dateUtils';
 
 const TAB_ID = Math.random().toString(36).substring(2, 9);
@@ -70,36 +71,44 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 
-  // App Data (Initialized for Bethel Church)
-  const [config, setConfig] = useState<SystemConfig>({
-    churchName: '伯特利教会',
-    schoolTitle: '主日学与团契',
-    allowedDayOfWeek: 0,
-    checkinStartTime: '08:30',
-    checkinEndTime: '12:30',
-    testMode: true,
-    currentYear: 2026,
-    currentSemester: '2026年秋季学期',
-    weeklyMemoryVerse: '雅各就给那地方起名叫伯特利。他说：这地方何等可畏！这不是别的，乃是神的殿，也是天的门。',
-    memoryVerseReference: '创世记 28:17,19',
-    qrSecretToken: 'BETHEL_SUNDAY_2026_TOKEN',
-
-    enableMemoryVerseOption: true,
-    defaultMemoryVerseChecked: true,
-    enableOfferingOption: false,
-    defaultOfferingChecked: false,
-    enableLateRule: true,
-    lateThresholdTime: '09:30',
-    enableExcusedNote: true,
-    enableCheckinPopup: true,
-    adminPassword: 'bethel2026',
+  // App Data (Synchronously initialized from local cache to prevent refresh flicker)
+  const [config, setConfig] = useState<SystemConfig>(() => {
+    if (typeof window !== 'undefined') {
+      const local = getLocalData();
+      return local.config || initialSystemConfig;
+    }
+    return initialSystemConfig;
   });
 
-  const [classes, setClasses] = useState<ClassGroup[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [classes, setClasses] = useState<ClassGroup[]>(() => {
+    if (typeof window !== 'undefined') {
+      const local = getLocalData();
+      return local.classes || initialClasses;
+    }
+    return initialClasses;
+  });
+  const [students, setStudents] = useState<Student[]>(() => {
+    if (typeof window !== 'undefined') {
+      const local = getLocalData();
+      return local.students || initialStudents;
+    }
+    return initialStudents;
+  });
+  const [records, setRecords] = useState<AttendanceRecord[]>(() => {
+    if (typeof window !== 'undefined') {
+      const local = getLocalData();
+      return local.records || generateInitialRecords();
+    }
+    return generateInitialRecords();
+  });
   const [accounts, setAccounts] = useState<AdminAccount[]>(() => getLocalAccounts());
-  const [activeSunday, setActiveSunday] = useState<string>('2026-09-13');
+  const [activeSunday, setActiveSunday] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const local = getLocalData();
+      return local.activeSunday || '2026-09-13';
+    }
+    return '2026-09-13';
+  });
 
   const previousRecordsCountRef = useRef<number>(0);
   const syncVersionRef = useRef<number>(0);

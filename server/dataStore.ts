@@ -493,11 +493,7 @@ export function mergeClientData(payload: SyncPayload): {
     records = Array.from(recordMap.values());
   }
 
-  // 4. Merge system config
-  if (payload.config && typeof payload.config === 'object') {
-    systemConfig = { ...systemConfig, ...payload.config };
-    changed = true;
-  }
+  // 4. System config & classes are server-authoritative and master-managed via /api/config & /api/classes
 
   if (payload.activeSunday) {
     activeSunday = payload.activeSunday;

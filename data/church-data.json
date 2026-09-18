@@ -3571,7 +3571,9 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 57,
-  "hiddenClassIds": [],
-  "updatedAt": "2026-09-18T11:30:48.138Z"
+  "syncVersion": 63,
+  "hiddenClassIds": [
+    "class-1"
+  ],
+  "updatedAt": "2026-09-18T11:54:47.080Z"
 }

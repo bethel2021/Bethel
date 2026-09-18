@@ -127,7 +127,7 @@ export const initialSystemConfig: SystemConfig = {
   allowedDayOfWeek: 0,
   checkinStartTime: '08:30',
   checkinEndTime: '12:30',
-  testMode: true,
+  testMode: false,
   currentYear: 2026,
   currentSemester: '2026年秋季学期',
   weeklyMemoryVerse: '雅各就给那地方起名叫伯特利。他说：这地方何等可畏！这不是别的，乃是神的殿，也是天的门。',
