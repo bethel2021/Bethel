@@ -222,7 +222,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-amber-100/90 max-w-3xl leading-relaxed">
-              为保护主日学未成年孩童与团契成员的隐私安全，学生姓名、出生年月及考勤点名功能仅对本堂主日学教师及同工开放。访客仅可查看各班级与团契基本情况。
+              为保护主日学儿童与团契成员的隐私安全，学员资料及考勤点名功能仅对本堂主日学教师及同工开放。访客仅可查看各班级与团契基本情况。
             </p>
           </div>
         </div>
