@@ -189,7 +189,7 @@ export function getLocalData() {
     let hasUpdatedClasses = false;
     const hiddenSet = getLocalHiddenClassIds();
     classes = classes.map(c => {
-      const isHidden = hiddenSet.has(c.id) || !!c.isHiddenFromHome;
+      const isHidden = c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : hiddenSet.has(c.id);
       if (!c.subjectTeacher || c.isHiddenFromHome !== isHidden) {
         hasUpdatedClasses = true;
         const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);

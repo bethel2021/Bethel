@@ -162,7 +162,7 @@ export default function App() {
         const serverHidden = c.isHiddenFromHome;
         const finalHidden = serverHidden !== undefined 
           ? !!serverHidden 
-          : (localClass ? !!localClass.isHiddenFromHome : localHiddenSet.has(c.id));
+          : (localClass && localClass.isHiddenFromHome !== undefined ? !!localClass.isHiddenFromHome : localHiddenSet.has(c.id));
 
         return {
           ...c,
@@ -171,7 +171,7 @@ export default function App() {
       });
 
       // Synchronize persistent hidden class IDs with authoritative server result
-      const newHiddenSet = new Set(mergedClasses.filter(c => !!c.isHiddenFromHome).map(c => c.id));
+      const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => !!c.isHiddenFromHome).map((c: any) => c.id as string));
       saveLocalHiddenClassIds(newHiddenSet);
 
       mergedClassesForCache = mergedClasses;

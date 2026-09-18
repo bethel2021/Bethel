@@ -267,7 +267,7 @@ export function loadFromDisk(): boolean {
         const hiddenSet = new Set(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []);
         classes = data.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: hiddenSet.has(c.id) || !!c.isHiddenFromHome
+          isHiddenFromHome: c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
       }
       if (Array.isArray(data.students) && data.students.length > 0) students = data.students;
@@ -439,10 +439,9 @@ export function mergeClientData(payload: SyncPayload): {
         const mergedClass: ClassGroup = {
           ...existing,
           ...c,
-          // CRITICAL: Protect isHiddenFromHome from being accidentally unhidden by unauthenticated background sync payloads!
-          isHiddenFromHome: existing.isHiddenFromHome === true 
-            ? true 
-            : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : (existing.isHiddenFromHome ?? false))
+          isHiddenFromHome: c.isHiddenFromHome !== undefined 
+            ? !!c.isHiddenFromHome 
+            : (existing.isHiddenFromHome ?? false)
         };
         if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {
           classMap.set(c.id, mergedClass);
