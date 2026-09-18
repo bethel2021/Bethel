@@ -59,11 +59,20 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     return firstVisible ? firstVisible.id : '';
   });
   const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'checked_in' | 'uncheck_in' | 'late'>('all');
   const [excuseModalStudent, setExcuseModalStudent] = useState<Student | null>(null);
   const [excuseReason, setExcuseReason] = useState<string>('');
   const [loadingStudentId, setLoadingStudentId] = useState<string | null>(null);
   const [noticeDialog, setNoticeDialog] = useState<{ title: string; content: string } | null>(null);
   const processingRef = useRef<Set<string>>(new Set());
+  const rosterRef = useRef<HTMLDivElement>(null);
+
+  const handleStatClick = (type: 'checked_in' | 'uncheck_in' | 'late') => {
+    setStatusFilter(prev => prev === type ? 'all' : type);
+    if (rosterRef.current) {
+      rosterRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const showCheckinErrorDialog = (err: any) => {
     const isNonWindow = err.message?.includes('非主日') || err.message?.includes('开放时段') || err.message?.includes('开放时间') || err.message?.includes('请等待下一个主日');
@@ -109,9 +118,22 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         student.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
         student.parentPhone.includes(searchKeyword) ||
         student.parentName.includes(searchKeyword);
-      return matchClass && matchSearch;
+      
+      if (!matchClass || !matchSearch) return false;
+
+      if (statusFilter === 'all') return true;
+
+      const record = todayRecords.find(r => r.studentId === student.id);
+      if (statusFilter === 'checked_in') {
+        return record?.status === 'present' || record?.status === 'late';
+      } else if (statusFilter === 'uncheck_in') {
+        return !record || record.status === 'absent';
+      } else if (statusFilter === 'late') {
+        return record?.status === 'late';
+      }
+      return true;
     });
-  }, [students, visibleClassIdSet, selectedClassId, searchKeyword]);
+  }, [students, visibleClassIdSet, selectedClassId, searchKeyword, statusFilter, todayRecords]);
 
   // Calculate statistics (scoped to the currently selected class on home page)
   const activeScopeStudents = useMemo(() => {
@@ -357,64 +379,100 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         </div>
 
         {/* 3 Horizontal Equal-Width Statistics via Flex Layout */}
-        <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row items-stretch gap-4 pt-2.5 border-t border-slate-100">
+        <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row flex-nowrap items-stretch gap-2.5 sm:gap-4 pt-2.5 border-t border-slate-100 w-full">
           
           {/* Stat 1: 已签到 */}
-          <div className="today-dashboard-stat-item flex-1 min-w-0 bg-emerald-50/70 border border-emerald-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
-            <span className="text-[11px] sm:text-xs font-bold text-emerald-800 flex items-center justify-center gap-1 truncate">
+          <button
+            type="button"
+            onClick={() => handleStatClick('checked_in')}
+            title="点击筛选查看已签到学员列表"
+            className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+              statusFilter === 'checked_in'
+                ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-500/50 shadow-xs'
+                : 'bg-emerald-50/70 hover:bg-emerald-100/80 active:bg-emerald-200/80 border-emerald-200/90 shadow-2xs'
+            }`}
+          >
+            <span className="text-[11px] sm:text-xs font-bold text-emerald-800 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
+              <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-200/80 border border-emerald-400/90 shrink-0" aria-hidden="true">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+              </span>
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>已签到</span>
             </span>
-            <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+            <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
               <span className="text-2xl sm:text-3xl md:text-4xl font-black text-emerald-700 font-mono tracking-tight">
                 {checkedInTotal}
               </span>
               <span className="text-[10px] sm:text-xs font-semibold text-emerald-600">人</span>
             </div>
-            <div className="text-[10px] sm:text-[11px] text-emerald-700/80 truncate">
-              准时 {presentCount}
+            <div className="text-[10px] sm:text-[11px] text-emerald-700/80 truncate flex items-center justify-center gap-1">
+              <span>准时 {presentCount}</span>
             </div>
-          </div>
+          </button>
 
           {/* Stat 2: 未签到 */}
-          <div className="today-dashboard-stat-item flex-1 min-w-0 bg-slate-50/90 border border-slate-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center justify-center gap-1 truncate">
+          <button
+            type="button"
+            onClick={() => handleStatClick('uncheck_in')}
+            title="点击筛选查看未签到学员列表"
+            className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+              statusFilter === 'uncheck_in'
+                ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-400/50 shadow-xs'
+                : 'bg-slate-50/90 hover:bg-slate-100/90 active:bg-slate-200/80 border-slate-200/90 shadow-2xs'
+            }`}
+          >
+            <span className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
+              <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-200/80 border border-slate-400/90 shrink-0" aria-hidden="true">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+              </span>
               <UserX className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>未签到</span>
             </span>
-            <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+            <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
               <span className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-800 font-mono tracking-tight">
                 {absentCount > 0 ? absentCount : 0}
               </span>
               <span className="text-[10px] sm:text-xs font-semibold text-slate-500">人</span>
             </div>
-            <div className="text-[10px] sm:text-[11px] text-slate-500 truncate">
-              {excusedCount > 0 ? `请假 ${excusedCount} 人` : '等待打卡'}
+            <div className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center justify-center gap-1">
+              <span>{excusedCount > 0 ? `请假 ${excusedCount} 人` : '等待打卡'}</span>
             </div>
-          </div>
+          </button>
 
           {/* Stat 3: 迟到 */}
-          <div className="today-dashboard-stat-item flex-1 min-w-0 bg-amber-50/70 border border-amber-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
-            <span className="text-[11px] sm:text-xs font-bold text-amber-800 flex items-center justify-center gap-1 truncate">
+          <button
+            type="button"
+            onClick={() => handleStatClick('late')}
+            title="点击筛选查看迟到学员列表"
+            className={`today-dashboard-stat-item flex-1 basis-0 min-w-0 rounded-2xl p-3 sm:p-4.5 text-center flex flex-col justify-center cursor-pointer transition-all duration-150 select-none border text-left active:scale-[0.97] focus:outline-hidden ${
+              statusFilter === 'late'
+                ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-500/50 shadow-xs'
+                : 'bg-amber-50/70 hover:bg-amber-100/80 active:bg-amber-200/80 border-amber-200/90 shadow-2xs'
+            }`}
+          >
+            <span className="text-[11px] sm:text-xs font-bold text-amber-800 flex items-center justify-center gap-1 sm:gap-1.5 truncate">
+              <span className="inline-flex items-center justify-center w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-200/80 border border-amber-400/90 shrink-0" aria-hidden="true">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+              </span>
               <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
               <span>迟到</span>
             </span>
-            <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+            <div className="my-1 sm:my-1.5 flex items-baseline justify-center gap-0.5">
               <span className="text-2xl sm:text-3xl md:text-4xl font-black text-amber-800 font-mono tracking-tight">
                 {lateCount}
               </span>
               <span className="text-[10px] sm:text-xs font-semibold text-amber-700">人</span>
             </div>
-            <div className="text-[10px] sm:text-[11px] text-amber-700/80 truncate">
-              迟到打卡
+            <div className="text-[10px] sm:text-[11px] text-amber-700/80 truncate flex items-center justify-center gap-1">
+              <span>迟到打卡</span>
             </div>
-          </div>
+          </button>
 
         </div>
       </div>
 
       {/* Filter & Operations Bar - All Classes Fully Visible Without Horizontal Scroll */}
-      <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5">
+      <div ref={rosterRef} className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5 scroll-mt-4">
         
         {/* Class Tabs Header & 3-Column Grid Layout */}
         <div>
@@ -468,6 +526,18 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {statusFilter !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 active:scale-95 cursor-pointer transition-all shadow-2xs"
+              >
+                <span>
+                  已筛选：{statusFilter === 'checked_in' ? '已签到' : statusFilter === 'uncheck_in' ? '未签到' : '迟到'}
+                </span>
+                <X className="w-3.5 h-3.5 text-amber-800 shrink-0" />
+              </button>
+            )}
             <span className="text-xs text-slate-500">
               {searchKeyword.trim() ? (
                 <>搜索结果：<strong className="text-amber-800">{filteredStudents.length}</strong> 位学员</>
