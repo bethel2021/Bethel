@@ -10,7 +10,7 @@ export const initialClasses: ClassGroup[] = [
     classroom: '7号教室', 
     color: 'bg-emerald-500',
     groupType: 'sunday_school',
-    description: '小小班启蒙，圣经故事与赞美诗律动',
+    description: '「播撒真光幼苗，感受基督大爱」藉着诗歌律动与生动圣经故事，在温馨陪伴中建立安全感与敬拜初体验，让主爱从小扎根于幼小心田。',
     isHiddenFromHome: false
   },
   { 
@@ -22,7 +22,7 @@ export const initialClasses: ClassGroup[] = [
     classroom: '5号教室', 
     color: 'bg-teal-500',
     groupType: 'sunday_school',
-    description: '幼儿诗歌、圣经小品格与常规模范',
+    description: '「学习圣经品格，培养敬畏顺服」引导孩童朗读圣经话语、认识造物主作为，在团契生活中建立诚实、友爱与顺服的基督徒好品行。',
     isHiddenFromHome: false
   },
   { 
@@ -34,7 +34,7 @@ export const initialClasses: ClassGroup[] = [
     classroom: '6号教室', 
     color: 'bg-amber-500',
     groupType: 'sunday_school',
-    description: '主日学中班，研读神造万物与感恩顺服',
+    description: '「扎根圣经真理，常存感恩相爱」研读圣经救赎故事与信心榜样，学习凡事谢恩、彼此相顾，在家庭与学校日常中活出神喜悦的样式。',
     isHiddenFromHome: false
   },
   { 
@@ -46,7 +46,7 @@ export const initialClasses: ClassGroup[] = [
     classroom: '3号教室', 
     color: 'bg-orange-500',
     groupType: 'sunday_school',
-    description: '幼小衔接班，研读圣经品格与敬拜学习',
+    description: '「建立个人信仰，结出品行果子」帮助学生养成自主灵修与祷告习惯，明辨是非真理，预备身心灵步入少年期，勇于在校园中为主发光。',
     isHiddenFromHome: false
   },
   { 
@@ -58,7 +58,7 @@ export const initialClasses: ClassGroup[] = [
     classroom: '1号教室', 
     color: 'bg-blue-500',
     groupType: 'sunday_school',
-    description: '初中学生班，圣经真理根基、门徒训练与少年团契',
+    description: '「筑牢真理根基，作主无畏门徒」引导青少年在成长困惑与思潮中坚立信仰世界观，操练团契扶持，不从世俗，总在言语行为上作榜样。',
     isHiddenFromHome: false
   },
   { 
@@ -70,7 +70,7 @@ export const initialClasses: ClassGroup[] = [
     classroom: '2号教室', 
     color: 'bg-indigo-500',
     groupType: 'sunday_school',
-    description: '高中门徒，圣经世界观、信仰思辨与基督徒侍奉实践',
+    description: '「深化信仰思辨，操练侍奉见证」引导高中门徒将真理融入学业与未来异象，积极参与教会服侍与福音见证，成长为有基督生命担当的青年。',
     isHiddenFromHome: false
   },
   { 
@@ -82,7 +82,7 @@ export const initialClasses: ClassGroup[] = [
     classroom: '大堂', 
     color: 'bg-purple-500',
     groupType: 'fellowship',
-    description: '青年团契，职场得胜见证、诗歌敬拜与专案服侍',
+    description: '「定志考究神道，立志行道教导」效法以斯拉专心考究遵行神律法的心志，在大学、职场与社会中作得胜见证，同心服侍教会、传承信仰使命。',
     isHiddenFromHome: false
   }
 ];
