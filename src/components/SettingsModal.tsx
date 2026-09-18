@@ -662,14 +662,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <ShieldAlert className="w-4 h-4 text-sky-600 shrink-0" />
                 )}
                 <span className="font-semibold">{currentUser.displayName}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                  isSuperAdmin
-                    ? 'bg-amber-200/80 text-amber-950'
-                    : 'bg-sky-200/80 text-sky-950 flex items-center gap-0.5'
-                }`}>
-                  {!isSuperAdmin && <Lock className="w-2.5 h-2.5" />}
-                  {isSuperAdmin ? '总管理员 (全部权限)' : '仅签到权限'}
-                </span>
+                {!isSuperAdmin && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-sky-200/80 text-sky-950 flex items-center gap-0.5">
+                    <Lock className="w-2.5 h-2.5" />
+                    <span>仅签到权限</span>
+                  </span>
+                )}
               </div>
               {!isSuperAdmin && (
                 <button

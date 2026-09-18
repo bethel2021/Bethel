@@ -50,7 +50,14 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   onOpenLogin,
   onManualUpdate,
 }) => {
-  const [selectedClassId, setSelectedClassId] = useState<string>('all');
+  const visibleClasses = useMemo(() => classes.filter(c => !c.isHiddenFromHome), [classes]);
+  const visibleClassIdSet = useMemo(() => new Set(visibleClasses.map(c => c.id)), [visibleClasses]);
+  const homeStudents = useMemo(() => students.filter(s => visibleClassIdSet.has(s.classId)), [students, visibleClassIdSet]);
+
+  const [selectedClassId, setSelectedClassId] = useState<string>(() => {
+    const firstVisible = classes.find(c => !c.isHiddenFromHome);
+    return firstVisible ? firstVisible.id : '';
+  });
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const [excuseModalStudent, setExcuseModalStudent] = useState<Student | null>(null);
   const [excuseReason, setExcuseReason] = useState<string>('');
@@ -76,26 +83,29 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   // Today's records
   const todayRecords = records.filter(r => r.date === activeSunday);
 
-  // Filter visible classes for the home page (respects isHiddenFromHome)
-  const visibleClasses = useMemo(() => classes.filter(c => !c.isHiddenFromHome), [classes]);
-  const visibleClassIdSet = useMemo(() => new Set(visibleClasses.map(c => c.id)), [visibleClasses]);
-  const homeStudents = useMemo(() => students.filter(s => visibleClassIdSet.has(s.classId)), [students, visibleClassIdSet]);
-
-  // If selectedClassId points to a class that was just hidden, automatically revert to 'all'
+  // If selectedClassId points to a class that is invalid or hidden, automatically select first visible class
   useEffect(() => {
-    if (selectedClassId !== 'all' && !visibleClassIdSet.has(selectedClassId)) {
-      setSelectedClassId('all');
+    if (visibleClasses.length > 0) {
+      if (!selectedClassId || !visibleClassIdSet.has(selectedClassId)) {
+        setSelectedClassId(visibleClasses[0].id);
+      }
     }
-  }, [selectedClassId, visibleClassIdSet]);
+  }, [selectedClassId, visibleClasses, visibleClassIdSet]);
+
+  // Current selected class group
+  const currentSelectedClass = useMemo(() => {
+    return visibleClasses.find(c => c.id === selectedClassId) || visibleClasses[0] || null;
+  }, [visibleClasses, selectedClassId]);
 
   // Filter students (never leak hidden classes on home page)
   const filteredStudents = useMemo(() => {
+    const isSearching = searchKeyword.trim() !== '';
     return students.filter(student => {
       const inVisibleClass = visibleClassIdSet.has(student.classId);
-      const matchClass = selectedClassId === 'all' 
-        ? inVisibleClass 
+      const matchClass = isSearching
+        ? inVisibleClass
         : (student.classId === selectedClassId && inVisibleClass);
-      const matchSearch = searchKeyword.trim() === '' || 
+      const matchSearch = !isSearching || 
         student.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
         student.parentPhone.includes(searchKeyword) ||
         student.parentName.includes(searchKeyword);
@@ -103,10 +113,16 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     });
   }, [students, visibleClassIdSet, selectedClassId, searchKeyword]);
 
-  // Calculate statistics (scoped to visible classes on home page)
-  const activeScopeStudents = selectedClassId === 'all' 
-    ? homeStudents 
-    : students.filter(s => s.classId === selectedClassId);
+  // Calculate statistics (scoped to the currently selected class on home page)
+  const activeScopeStudents = useMemo(() => {
+    if (selectedClassId) {
+      return students.filter(s => s.classId === selectedClassId && visibleClassIdSet.has(s.classId));
+    }
+    return visibleClasses.length > 0
+      ? students.filter(s => s.classId === visibleClasses[0].id)
+      : [];
+  }, [students, selectedClassId, visibleClassIdSet, visibleClasses]);
+
   const totalCount = activeScopeStudents.length;
   const activeScopeStudentIds = new Set(activeScopeStudents.map(s => s.id));
   const scopedTodayRecords = todayRecords.filter(r => activeScopeStudentIds.has(r.studentId));
@@ -313,80 +329,84 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         </div>
       )}
 
-      {/* Top Banner & Statistics Grid */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+      {/* Top Banner & Statistics Card */}
+      <div className="today-dashboard-card bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 sm:p-4.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-700" />
-              <span>今日主日学实时签到看板</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              当前主日：{formatChineseDate(activeSunday)} • 学生实时出勤统计
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-amber-700" />
+                <span>今日主日学实时签到看板</span>
+              </h2>
+              {currentSelectedClass && (
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200/80">
+                  {currentSelectedClass.name}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span>当前主日：{formatChineseDate(activeSunday)}</span>
+              <span className="text-slate-300">•</span>
+              <span>应到总人数：<strong className="text-slate-900 font-bold">{totalCount}</strong> 人</span>
+              <span className="text-slate-300">•</span>
+              <span>请假：<strong className="text-blue-700 font-bold">{excusedCount}</strong> 人</span>
+              <span className="text-slate-300">•</span>
+              <span>综合到勤率：<strong className="text-emerald-700 font-bold">{attendanceRate}%</strong></span>
             </p>
           </div>
         </div>
 
-        {/* 5 Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* 3 Horizontal Equal-Width Statistics via Flex Layout */}
+        <div className="flex flex-row items-stretch gap-2 sm:gap-3.5 pt-2.5 border-t border-slate-100">
           
-          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
-            <span className="text-xs text-slate-500 font-medium">应到总人数</span>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-slate-900">{totalCount}</span>
-              <span className="text-xs text-slate-400">人</span>
-            </div>
-          </div>
-
-          <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200/80 shadow-2xs">
-            <span className="text-xs text-emerald-700 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>准时出勤</span>
+          {/* Stat 1: 已签到 */}
+          <div className="flex-1 min-w-0 bg-emerald-50/70 border border-emerald-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
+            <span className="text-[11px] sm:text-xs font-bold text-emerald-800 flex items-center justify-center gap-1 truncate">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>已签到</span>
             </span>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-emerald-700">{presentCount}</span>
-              <span className="text-xs text-emerald-600 font-medium">人</span>
+            <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+              <span className="text-2xl sm:text-3xl md:text-4xl font-black text-emerald-700 font-mono tracking-tight">
+                {checkedInTotal}
+              </span>
+              <span className="text-[10px] sm:text-xs font-semibold text-emerald-600">人</span>
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-emerald-700/80 truncate">
+              准时 {presentCount}
             </div>
           </div>
 
-          <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200/80 shadow-2xs">
-            <span className="text-xs text-amber-800 font-medium flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-amber-700" />
-              <span>迟到人数</span>
+          {/* Stat 2: 未签到 */}
+          <div className="flex-1 min-w-0 bg-slate-50/90 border border-slate-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center justify-center gap-1 truncate">
+              <UserX className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span>未签到</span>
             </span>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-amber-800">{lateCount}</span>
-              <span className="text-xs text-amber-700 font-medium">人</span>
+            <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+              <span className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-800 font-mono tracking-tight">
+                {absentCount > 0 ? absentCount : 0}
+              </span>
+              <span className="text-[10px] sm:text-xs font-semibold text-slate-500">人</span>
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-500 truncate">
+              {excusedCount > 0 ? `请假 ${excusedCount} 人` : '等待打卡'}
             </div>
           </div>
 
-          <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-200/80 shadow-2xs">
-            <span className="text-xs text-blue-700 font-medium flex items-center gap-1">
-              <FileText className="w-3.5 h-3.5 text-blue-600" />
-              <span>请假人数</span>
+          {/* Stat 3: 迟到 */}
+          <div className="flex-1 min-w-0 bg-amber-50/70 border border-amber-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
+            <span className="text-[11px] sm:text-xs font-bold text-amber-800 flex items-center justify-center gap-1 truncate">
+              <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>迟到</span>
             </span>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-blue-700">{excusedCount}</span>
-              <span className="text-xs text-blue-600 font-medium">人</span>
+            <div className="my-0.5 sm:my-1 flex items-baseline justify-center gap-0.5">
+              <span className="text-2xl sm:text-3xl md:text-4xl font-black text-amber-800 font-mono tracking-tight">
+                {lateCount}
+              </span>
+              <span className="text-[10px] sm:text-xs font-semibold text-amber-700">人</span>
             </div>
-          </div>
-
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
-            <span className="text-xs text-slate-600 font-medium flex items-center gap-1">
-              <UserX className="w-3.5 h-3.5 text-slate-400" />
-              <span>暂未到校</span>
-            </span>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-slate-700">{absentCount > 0 ? absentCount : 0}</span>
-              <span className="text-xs text-slate-400">人</span>
-            </div>
-          </div>
-
-          <div className="bg-linear-to-br from-amber-700 to-amber-800 p-3.5 rounded-xl text-white shadow-xs">
-            <span className="text-xs text-amber-100 font-medium">今日到勤率</span>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-bold">{attendanceRate}%</span>
-              <span className="text-[10px] text-amber-200">已到 {checkedInTotal} 人</span>
+            <div className="text-[10px] sm:text-[11px] text-amber-700/80 truncate">
+              迟到打卡
             </div>
           </div>
 
@@ -403,24 +423,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
             <span>班级与团契快速切换</span>
           </div>
 
-          {/* All classes wrapped */}
+          {/* Classes & Fellowships wrapped */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setSelectedClassId('all')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-                selectedClassId === 'all'
-                  ? 'bg-amber-700 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
-              }`}
-            >
-              <span>全部班级</span>
-              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                selectedClassId === 'all' ? 'bg-amber-800 text-amber-100' : 'bg-slate-200/80 text-slate-600'
-              }`}>
-                {todayRecords.filter(r => (r.status === 'present' || r.status === 'late') && visibleClassIdSet.has(r.classId)).length}/{homeStudents.length}人
-              </span>
-            </button>
-
             {visibleClasses.map(cls => {
               const clsStudentCount = students.filter(s => s.classId === cls.id).length;
               const clsPresentCount = todayRecords.filter(r => r.classId === cls.id && (r.status === 'present' || r.status === 'late')).length;
@@ -463,7 +467,11 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs text-slate-500">
-              当前名单：<strong className="text-slate-900">{filteredStudents.length}</strong> 位学员
+              {searchKeyword.trim() ? (
+                <>搜索结果：<strong className="text-amber-800">{filteredStudents.length}</strong> 位学员</>
+              ) : (
+                <>{currentSelectedClass ? `${currentSelectedClass.name}：` : '当前班级：'}<strong className="text-slate-900">{filteredStudents.length}</strong> 位学员</>
+              )}
             </span>
           </div>
         </div>
