@@ -14,10 +14,10 @@ export const initialClasses: ClassGroup[] = [
   { 
     id: 'class-1', 
     name: '小小班', 
-    ageRange: '2-3岁', 
-    teacher: '李路得 老师', 
-    subjectTeacher: '陈约瑟 老师',
-    classroom: '副堂101课室', 
+    ageRange: '1-6岁', 
+    teacher: '春来 老师', 
+    subjectTeacher: '洁如、彩霞 老师',
+    classroom: '7号教室', 
     color: 'bg-emerald-500',
     groupType: 'sunday_school',
     description: '小小班启蒙，圣经故事与赞美诗律动'
@@ -25,10 +25,10 @@ export const initialClasses: ClassGroup[] = [
   { 
     id: 'class-2', 
     name: '小班', 
-    ageRange: '3-4岁', 
-    teacher: '张爱华 老师', 
-    subjectTeacher: '王信实 老师',
-    classroom: '副堂102课室', 
+    ageRange: '7-8岁', 
+    teacher: '秋娟 老师', 
+    subjectTeacher: '雪峰、勤洁、贴柔 老师',
+    classroom: '5号教室', 
     color: 'bg-teal-500',
     groupType: 'sunday_school',
     description: '幼儿诗歌、圣经小品格与常规模范'
@@ -36,10 +36,10 @@ export const initialClasses: ClassGroup[] = [
   { 
     id: 'class-3', 
     name: '中班', 
-    ageRange: '4-5岁', 
-    teacher: '王恩典 老师', 
-    subjectTeacher: '刘喜乐 老师',
-    classroom: '副堂201课室', 
+    ageRange: '9-10岁', 
+    teacher: '若雪 老师', 
+    subjectTeacher: '约斯、怡欣、佩帆 老师',
+    classroom: '6号教室', 
     color: 'bg-amber-500',
     groupType: 'sunday_school',
     description: '主日学中班，研读神造万物与感恩顺服'
@@ -47,10 +47,10 @@ export const initialClasses: ClassGroup[] = [
   { 
     id: 'class-4', 
     name: '大班', 
-    ageRange: '5-6岁', 
-    teacher: '张大卫 老师', 
-    subjectTeacher: '周和平 老师',
-    classroom: '副堂202课室', 
+    ageRange: '11-12岁', 
+    teacher: '上好 老师', 
+    subjectTeacher: '琴玲、依蕾、恩溢 老师',
+    classroom: '3号教室', 
     color: 'bg-orange-500',
     groupType: 'sunday_school',
     description: '幼小衔接班，研读圣经品格与敬拜学习'
@@ -58,10 +58,10 @@ export const initialClasses: ClassGroup[] = [
   { 
     id: 'class-5', 
     name: '初中班', 
-    ageRange: '12-14岁', 
-    teacher: '王提摩太 传道', 
-    subjectTeacher: '赵忍耐 老师',
-    classroom: '宣教楼301室', 
+    ageRange: '13-14岁', 
+    teacher: '雪成 老师', 
+    subjectTeacher: '金若、洋洋、督军 老师',
+    classroom: '1号教室', 
     color: 'bg-blue-500',
     groupType: 'sunday_school',
     description: '初中学生班，圣经真理根基、门徒训练与少年团契'
@@ -69,10 +69,10 @@ export const initialClasses: ClassGroup[] = [
   { 
     id: 'class-6', 
     name: '高中班', 
-    ageRange: '15-17岁', 
-    teacher: '陈保罗 同工', 
-    subjectTeacher: '孙恩慈 老师',
-    classroom: '宣教楼302室', 
+    ageRange: '15-16岁', 
+    teacher: '志安 老师', 
+    subjectTeacher: '陈师母、显美、周妹 老师',
+    classroom: '2号教室', 
     color: 'bg-indigo-500',
     groupType: 'sunday_school',
     description: '高中门徒，圣经世界观、信仰思辨与基督徒侍奉实践'
@@ -80,10 +80,10 @@ export const initialClasses: ClassGroup[] = [
   { 
     id: 'class-7', 
     name: '以斯拉团契', 
-    ageRange: '18-35岁', 
-    teacher: '林腓利 同工', 
-    subjectTeacher: '钱良善 老师',
-    classroom: '多功能青年活动厅', 
+    ageRange: '16-20岁', 
+    teacher: '东丽 老师', 
+    subjectTeacher: '陈海伟牧师，来俊、张国 老师',
+    classroom: '大堂', 
     color: 'bg-purple-500',
     groupType: 'fellowship',
     description: '青年团契，职场得胜见证、诗歌敬拜与专案服侍'

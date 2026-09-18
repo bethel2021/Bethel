@@ -592,7 +592,7 @@ export default function App() {
     );
 
     if (!windowStatus.isAllowed) {
-      const msg = '非主日签到开放时段，请等待下一个主日！(总管理员可在后台开启「测试模式」解封)';
+      const msg = '非主日签到开放时段，请等待下一个主日！（可联系管理员开启｛测试模式｝）';
       setNewCheckinAlert(`⚠️ ${msg}`);
       setTimeout(() => setNewCheckinAlert(null), 4000);
       throw new Error(msg);

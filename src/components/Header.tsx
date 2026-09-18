@@ -121,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Sunday Status Badge */}
-            {windowStatus.isAllowed ? (
+            {windowStatus.isAllowed && (
               <div className={`text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-medium shadow-2xs ${
                 config.testMode 
                   ? 'border border-blue-300 bg-blue-50 text-blue-900' 
@@ -136,11 +136,6 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}></span>
                 </span>
                 <span>{windowStatus.statusMsg}</span>
-              </div>
-            ) : (
-              <div className="text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-amber-300/80 bg-amber-50 text-amber-900 shadow-2xs">
-                <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                <span>请等待下一个主日</span>
               </div>
             )}
 

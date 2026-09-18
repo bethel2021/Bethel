@@ -430,7 +430,7 @@ function isServerCheckinAllowed(now: Date = new Date()): { isAllowed: boolean; m
   if (!isSunday) {
     return {
       isAllowed: false,
-      message: '今天不是星期天，非主日签到开放时间，请等待下一个主日！(总管理员可在后台开启「测试模式」)'
+      message: '非主日签到开放时段，请等待下一个主日！（可联系管理员开启｛测试模式｝）'
     };
   }
 
@@ -456,7 +456,7 @@ function isServerCheckinAllowed(now: Date = new Date()): { isAllowed: boolean; m
   if (currentMinutes < startMinutes || currentMinutes > endMinutes) {
     return {
       isAllowed: false,
-      message: `当前不在主日签到开放时间段（${systemConfig.checkinStartTime || '08:30'}~${systemConfig.checkinEndTime || '12:30'}），请等待下一个主日！(总管理员可在后台开启「测试模式」)`
+      message: '非主日签到开放时段，请等待下一个主日！（可联系管理员开启｛测试模式｝）'
     };
   }
 

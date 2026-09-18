@@ -55,7 +55,23 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   const [excuseModalStudent, setExcuseModalStudent] = useState<Student | null>(null);
   const [excuseReason, setExcuseReason] = useState<string>('');
   const [loadingStudentId, setLoadingStudentId] = useState<string | null>(null);
+  const [noticeDialog, setNoticeDialog] = useState<{ title: string; content: string } | null>(null);
   const processingRef = useRef<Set<string>>(new Set());
+
+  const showCheckinErrorDialog = (err: any) => {
+    const isNonWindow = err.message?.includes('非主日') || err.message?.includes('开放时段') || err.message?.includes('开放时间') || err.message?.includes('请等待下一个主日');
+    if (isNonWindow) {
+      setNoticeDialog({
+        title: '温馨提醒',
+        content: '非主日签到开放时段，请等待下一个主日！\n（可联系管理员开启｛测试模式｝）',
+      });
+    } else {
+      setNoticeDialog({
+        title: '温馨提醒',
+        content: err.message || '签到打卡失败',
+      });
+    }
+  };
 
   // Today's records
   const todayRecords = records.filter(r => r.date === activeSunday);
@@ -107,7 +123,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         offeringCompleted: false,
       });
     } catch (err: any) {
-      alert(err.message || '签到打卡失败');
+      showCheckinErrorDialog(err);
     } finally {
       processingRef.current.delete(studentId);
       setLoadingStudentId(null);
@@ -134,7 +150,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       });
       setExcuseModalStudent(null);
     } catch (err: any) {
-      alert(err.message || '请假登记失败');
+      showCheckinErrorDialog(err);
     } finally {
       setLoadingStudentId(null);
     }
@@ -170,7 +186,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               <span>主日学与团契班级总览（共 {visibleClasses.length} 个班级）</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              各年龄段班级宗旨、适龄标准、活动教室与负责同工介绍
+              各班级宗旨、适龄标准、上课教室与老师介绍
             </p>
           </div>
         </div>
@@ -618,6 +634,45 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white cursor-pointer shadow-xs"
               >
                 确认登记请假
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Notice Dialog */}
+      {noticeDialog && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-amber-200 shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-amber-50/80 p-4.5 border-b border-amber-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold shrink-0 border border-amber-200/50">
+                  <ShieldAlert className="w-5 h-5 text-amber-700 animate-bounce" />
+                </div>
+                <h3 className="text-base sm:text-lg font-extrabold text-amber-950 font-serif">
+                  {noticeDialog.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setNoticeDialog(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold whitespace-pre-line">
+                {noticeDialog.content}
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setNoticeDialog(null)}
+                className="px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+              >
+                我知道了
               </button>
             </div>
           </div>
