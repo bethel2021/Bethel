@@ -125,3 +125,21 @@
     padding-top: 8px !important;
   }
 }
+
+/* Responsive breakpoint styling for .today-dashboard-card on mobile screens */
+@media (max-width: 640px) {
+  .today-dashboard-card .today-dashboard-stats,
+  .today-dashboard-card .today-dashboard-stats-row {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 1rem !important; /* gap-4 (16px) */
+    align-items: stretch !important;
+    width: 100% !important;
+  }
+
+  .today-dashboard-card .today-dashboard-stat-item {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+  }
+}
+

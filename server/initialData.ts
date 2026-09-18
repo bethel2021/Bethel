@@ -140,10 +140,10 @@ export const initialStudents: Student[] = [
   { id: 's-502', name: '冯司提反 (Stephen)', gender: 'boy', birthDate: '2012-11-06', age: 14, classId: 'class-5', parentName: '冯伟民', parentPhone: '15800459090', memberCode: 'BTL-12', joinDate: '2025-09-01' },
   { id: 's-503', name: '郑路得 (Ruth)', gender: 'girl', birthDate: '2014-02-19', age: 12, classId: 'class-5', parentName: '郑晓春', parentPhone: '13400347788', memberCode: 'BTL-13', joinDate: '2024-09-01' },
 
-  // 高中班 (15-17岁)
-  { id: 's-601', name: '朱以赛亚 (Isaiah)', gender: 'boy', birthDate: '2010-07-17', age: 16, classId: 'class-6', parentName: '朱明礼', parentPhone: '13900562233', memberCode: 'BTL-14', joinDate: '2023-09-01' },
-  { id: 's-602', name: '钱以斯帖 (Esther)', gender: 'girl', birthDate: '2009-09-28', age: 17, classId: 'class-6', parentName: '钱桂英', parentPhone: '13800676611', memberCode: 'BTL-15', joinDate: '2023-09-01' },
-  { id: 's-603', name: '许约瑟 (Joseph)', gender: 'boy', birthDate: '2011-03-03', age: 15, classId: 'class-6', parentName: '许德盛', parentPhone: '13600785522', memberCode: 'BTL-16', joinDate: '2023-03-01' },
+  // 高中班 (15-16岁)
+  { id: 's-601', name: '林哲瀚', gender: 'boy', birthDate: '2009-11-01', age: 16, classId: 'class-6', parentName: '显美', parentPhone: '3778364620', memberCode: 'BTL-14', joinDate: '2023-09-01' },
+  { id: 's-602', name: '王凌鹏 (David)', gender: 'boy', birthDate: '2010-02-16', age: 16, classId: 'class-6', parentName: '陈蓓思', parentPhone: '3332659108', memberCode: 'BTL-15', joinDate: '2023-09-01' },
+  { id: 's-603', name: '邵熙辰 (Oscar)', gender: 'boy', birthDate: '2010-02-27', age: 16, classId: 'class-6', parentName: '亚非', parentPhone: '3939393922', memberCode: 'BTL-16', joinDate: '2023-03-01' },
 
   // 以斯拉团契 (18-35岁青年)
   { id: 's-701', name: '何保罗 (Paul)', gender: 'boy', birthDate: '2001-08-21', age: 25, classId: 'class-7', parentName: '本人', parentPhone: '18900891100', memberCode: 'BTL-17', joinDate: '2024-03-01' },

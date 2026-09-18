@@ -266,37 +266,37 @@
     },
     {
       "id": "s-601",
-      "name": "朱以赛亚 (Isaiah)",
+      "name": "林哲瀚",
       "gender": "boy",
-      "birthDate": "2010-07-17",
+      "birthDate": "2009-11-01",
       "age": 16,
       "classId": "class-6",
-      "parentName": "朱明礼",
-      "parentPhone": "13900562233",
+      "parentName": "显美",
+      "parentPhone": "3778364620",
       "memberCode": "BTL-14",
       "joinDate": "2023-09-01"
     },
     {
       "id": "s-602",
-      "name": "钱以斯帖 (Esther)",
-      "gender": "girl",
-      "birthDate": "2009-09-28",
-      "age": 17,
+      "name": "王凌鹏 (David)",
+      "gender": "boy",
+      "birthDate": "2010-02-16",
+      "age": 16,
       "classId": "class-6",
-      "parentName": "钱桂英",
-      "parentPhone": "13800676611",
+      "parentName": "陈蓓思",
+      "parentPhone": "3332659108",
       "memberCode": "BTL-15",
       "joinDate": "2023-09-01"
     },
     {
       "id": "s-603",
-      "name": "许约瑟 (Joseph)",
+      "name": "邵熙辰 (Oscar)",
       "gender": "boy",
-      "birthDate": "2011-03-03",
-      "age": 15,
+      "birthDate": "2010-02-27",
+      "age": 16,
       "classId": "class-6",
-      "parentName": "许德盛",
-      "parentPhone": "13600785522",
+      "parentName": "亚非",
+      "parentPhone": "3939393922",
       "memberCode": "BTL-16",
       "joinDate": "2023-03-01"
     },
@@ -486,7 +486,7 @@
     {
       "id": "rec-2026-06-07-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-06-07",
       "timestamp": "2026-06-07T08:58:00.000Z",
@@ -499,7 +499,7 @@
     {
       "id": "rec-2026-06-07-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-06-07",
       "timestamp": "2026-06-07T08:57:00.000Z",
@@ -512,7 +512,7 @@
     {
       "id": "rec-2026-06-07-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-06-07",
       "timestamp": "2026-06-07T08:56:00.000Z",
@@ -721,7 +721,7 @@
     {
       "id": "rec-2026-06-14-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-06-14",
       "timestamp": "2026-06-14T08:49:00.000Z",
@@ -734,7 +734,7 @@
     {
       "id": "rec-2026-06-14-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-06-14",
       "timestamp": "2026-06-14T09:49:00.000Z",
@@ -929,7 +929,7 @@
     {
       "id": "rec-2026-06-21-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-06-21",
       "timestamp": "2026-06-21T08:52:00.000Z",
@@ -943,7 +943,7 @@
     {
       "id": "rec-2026-06-21-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-06-21",
       "timestamp": "2026-06-21T08:51:00.000Z",
@@ -956,7 +956,7 @@
     {
       "id": "rec-2026-06-21-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-06-21",
       "timestamp": "2026-06-21T08:50:00.000Z",
@@ -1152,7 +1152,7 @@
     {
       "id": "rec-2026-06-28-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-06-28",
       "timestamp": "2026-06-28T08:57:00.000Z",
@@ -1165,7 +1165,7 @@
     {
       "id": "rec-2026-06-28-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-06-28",
       "timestamp": "2026-06-28T08:56:00.000Z",
@@ -1178,7 +1178,7 @@
     {
       "id": "rec-2026-06-28-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-06-28",
       "timestamp": "2026-06-28T08:55:00.000Z",
@@ -1374,7 +1374,7 @@
     {
       "id": "rec-2026-07-05-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-07-05",
       "timestamp": "2026-07-05T08:48:00.000Z",
@@ -1387,7 +1387,7 @@
     {
       "id": "rec-2026-07-05-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-07-05",
       "timestamp": "2026-07-05T08:47:00.000Z",
@@ -1400,7 +1400,7 @@
     {
       "id": "rec-2026-07-05-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-07-05",
       "timestamp": "2026-07-05T08:46:00.000Z",
@@ -1609,7 +1609,7 @@
     {
       "id": "rec-2026-07-12-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-07-12",
       "timestamp": "2026-07-12T08:53:00.000Z",
@@ -1622,7 +1622,7 @@
     {
       "id": "rec-2026-07-12-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-07-12",
       "timestamp": "2026-07-12T08:52:00.000Z",
@@ -1635,7 +1635,7 @@
     {
       "id": "rec-2026-07-12-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-07-12",
       "timestamp": "2026-07-12T08:51:00.000Z",
@@ -1831,7 +1831,7 @@
     {
       "id": "rec-2026-07-19-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-07-19",
       "timestamp": "2026-07-19T08:58:00.000Z",
@@ -1844,7 +1844,7 @@
     {
       "id": "rec-2026-07-19-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-07-19",
       "timestamp": "2026-07-19T08:57:00.000Z",
@@ -1857,7 +1857,7 @@
     {
       "id": "rec-2026-07-19-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-07-19",
       "timestamp": "2026-07-19T08:54:00.000Z",
@@ -2066,7 +2066,7 @@
     {
       "id": "rec-2026-07-26-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-07-26",
       "timestamp": "2026-07-26T09:50:00.000Z",
@@ -2079,7 +2079,7 @@
     {
       "id": "rec-2026-07-26-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-07-26",
       "timestamp": "2026-07-26T08:45:00.000Z",
@@ -2289,7 +2289,7 @@
     {
       "id": "rec-2026-08-02-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-08-02",
       "timestamp": "2026-08-02T08:52:00.000Z",
@@ -2302,7 +2302,7 @@
     {
       "id": "rec-2026-08-02-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-08-02",
       "timestamp": "2026-08-02T08:51:00.000Z",
@@ -2315,7 +2315,7 @@
     {
       "id": "rec-2026-08-02-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-08-02",
       "timestamp": "2026-08-02T08:50:00.000Z",
@@ -2510,7 +2510,7 @@
     {
       "id": "rec-2026-08-09-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-08-09",
       "timestamp": "2026-08-09T08:57:00.000Z",
@@ -2523,7 +2523,7 @@
     {
       "id": "rec-2026-08-09-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-08-09",
       "timestamp": "2026-08-09T08:56:00.000Z",
@@ -2536,7 +2536,7 @@
     {
       "id": "rec-2026-08-09-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-08-09",
       "timestamp": "2026-08-09T08:55:00.000Z",
@@ -2732,7 +2732,7 @@
     {
       "id": "rec-2026-08-16-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-08-16",
       "timestamp": "2026-08-16T08:48:00.000Z",
@@ -2745,7 +2745,7 @@
     {
       "id": "rec-2026-08-16-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-08-16",
       "timestamp": "2026-08-16T08:47:00.000Z",
@@ -2758,7 +2758,7 @@
     {
       "id": "rec-2026-08-16-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-08-16",
       "timestamp": "2026-08-16T08:46:00.000Z",
@@ -2954,7 +2954,7 @@
     {
       "id": "rec-2026-08-23-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-08-23",
       "timestamp": "2026-08-23T08:53:00.000Z",
@@ -2967,7 +2967,7 @@
     {
       "id": "rec-2026-08-23-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-08-23",
       "timestamp": "2026-08-23T08:52:00.000Z",
@@ -2980,7 +2980,7 @@
     {
       "id": "rec-2026-08-23-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-08-23",
       "timestamp": "2026-08-23T08:49:00.000Z",
@@ -3190,7 +3190,7 @@
     {
       "id": "rec-2026-08-30-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-08-30",
       "timestamp": "2026-08-30T08:58:00.000Z",
@@ -3203,7 +3203,7 @@
     {
       "id": "rec-2026-08-30-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-08-30",
       "timestamp": "2026-08-30T09:45:00.000Z",
@@ -3216,7 +3216,7 @@
     {
       "id": "rec-2026-08-30-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-08-30",
       "timestamp": "2026-08-30T08:54:00.000Z",
@@ -3411,7 +3411,7 @@
     {
       "id": "rec-2026-09-06-s-601",
       "studentId": "s-601",
-      "studentName": "朱以赛亚 (Isaiah)",
+      "studentName": "林哲瀚",
       "classId": "class-6",
       "date": "2026-09-06",
       "timestamp": "2026-09-06T09:51:00.000Z",
@@ -3424,7 +3424,7 @@
     {
       "id": "rec-2026-09-06-s-602",
       "studentId": "s-602",
-      "studentName": "钱以斯帖 (Esther)",
+      "studentName": "王凌鹏 (David)",
       "classId": "class-6",
       "date": "2026-09-06",
       "timestamp": "2026-09-06T08:46:00.000Z",
@@ -3437,7 +3437,7 @@
     {
       "id": "rec-2026-09-06-s-603",
       "studentId": "s-603",
-      "studentName": "许约瑟 (Joseph)",
+      "studentName": "邵熙辰 (Oscar)",
       "classId": "class-6",
       "date": "2026-09-06",
       "timestamp": "2026-09-06T08:45:00.000Z",
@@ -3571,7 +3571,7 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 53,
+  "syncVersion": 57,
   "hiddenClassIds": [],
-  "updatedAt": "2026-09-18T11:24:49.306Z"
+  "updatedAt": "2026-09-18T11:30:48.138Z"
 }

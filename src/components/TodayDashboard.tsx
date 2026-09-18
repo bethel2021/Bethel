@@ -357,10 +357,10 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         </div>
 
         {/* 3 Horizontal Equal-Width Statistics via Flex Layout */}
-        <div className="flex flex-row items-stretch gap-2 sm:gap-3.5 pt-2.5 border-t border-slate-100">
+        <div className="today-dashboard-stats today-dashboard-stats-row flex flex-row items-stretch gap-4 pt-2.5 border-t border-slate-100">
           
           {/* Stat 1: 已签到 */}
-          <div className="flex-1 min-w-0 bg-emerald-50/70 border border-emerald-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
+          <div className="today-dashboard-stat-item flex-1 min-w-0 bg-emerald-50/70 border border-emerald-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
             <span className="text-[11px] sm:text-xs font-bold text-emerald-800 flex items-center justify-center gap-1 truncate">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>已签到</span>
@@ -377,7 +377,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
           </div>
 
           {/* Stat 2: 未签到 */}
-          <div className="flex-1 min-w-0 bg-slate-50/90 border border-slate-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
+          <div className="today-dashboard-stat-item flex-1 min-w-0 bg-slate-50/90 border border-slate-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
             <span className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center justify-center gap-1 truncate">
               <UserX className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>未签到</span>
@@ -394,7 +394,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
           </div>
 
           {/* Stat 3: 迟到 */}
-          <div className="flex-1 min-w-0 bg-amber-50/70 border border-amber-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
+          <div className="today-dashboard-stat-item flex-1 min-w-0 bg-amber-50/70 border border-amber-200/90 rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center">
             <span className="text-[11px] sm:text-xs font-bold text-amber-800 flex items-center justify-center gap-1 truncate">
               <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
               <span>迟到</span>
