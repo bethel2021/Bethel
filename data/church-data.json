@@ -20,7 +20,9 @@
     "enableExcusedNote": true,
     "enableCheckinPopup": true,
     "adminPassword": "bethel2026",
-    "hiddenClassIds": []
+    "hiddenClassIds": [
+      "class-1"
+    ]
   },
   "classes": [
     {
@@ -33,7 +35,7 @@
       "color": "bg-emerald-500",
       "groupType": "sunday_school",
       "description": "「播撒真光幼苗，感受基督大爱」藉着诗歌律动与生动圣经故事，在温馨陪伴中建立安全感与敬拜初体验，让主爱从小扎根于幼小心田。",
-      "isHiddenFromHome": false
+      "isHiddenFromHome": true
     },
     {
       "id": "class-2",
@@ -3632,7 +3634,9 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 94,
-  "hiddenClassIds": [],
-  "updatedAt": "2026-09-18T16:08:52.690Z"
+  "syncVersion": 96,
+  "hiddenClassIds": [
+    "class-1"
+  ],
+  "updatedAt": "2026-09-18T16:26:04.691Z"
 }

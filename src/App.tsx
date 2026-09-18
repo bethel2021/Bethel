@@ -150,10 +150,14 @@ export default function App() {
 
     let mergedClassesForCache: ClassGroup[] | undefined;
     if (Array.isArray(data.classes)) {
+      const localHiddenSet = getLocalHiddenClassIds();
       const serverHiddenIds = new Set<string>([
         ...(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []),
         ...(Array.isArray(data.config?.hiddenClassIds) ? data.config.hiddenClassIds : []),
       ]);
+
+      const serverVersion = typeof data.syncVersion === 'number' ? data.syncVersion : 0;
+      const isServerNewer = serverVersion > syncVersionRef.current;
 
       const mergedClasses = data.classes.map((c: any) => {
         // 1. If this class has a local mutation in flight, preserve the pending state
@@ -164,12 +168,19 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : serverHiddenIds.has(c.id))
+              : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : (serverHiddenIds.has(c.id) || localHiddenSet.has(c.id)))
           };
         }
 
-        // 2. Authoritative server class state + fallback to server hidden sets if c.isHiddenFromHome is undefined
-        const isHidden = typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : serverHiddenIds.has(c.id);
+        // 2. Class hidden status logic:
+        // If server version is strictly newer than client, trust server's boolean/sets.
+        // Otherwise (equal or lower version, e.g. default server state), merge localHiddenSet to preserve user's local hide setting across reloads.
+        let isHidden: boolean;
+        if (isServerNewer) {
+          isHidden = typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : serverHiddenIds.has(c.id);
+        } else {
+          isHidden = c.isHiddenFromHome === true || serverHiddenIds.has(c.id) || localHiddenSet.has(c.id);
+        }
 
         return {
           ...c,
@@ -177,7 +188,7 @@ export default function App() {
         };
       });
 
-      // Synchronize persistent hidden class IDs with authoritative server result
+      // Synchronize persistent hidden class IDs with authoritative merged result
       const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => !!c.isHiddenFromHome).map((c: any) => c.id as string));
       saveLocalHiddenClassIds(newHiddenSet);
 
