@@ -128,7 +128,7 @@ export const initialStudents: Student[] = [
 
 export const initialSystemConfig: SystemConfig = {
   churchName: '伯特利教会',
-  schoolTitle: '主日学与团契',
+  schoolTitle: '主日学与团契IMS',
   allowedDayOfWeek: 0,
   checkinStartTime: '08:30',
   checkinEndTime: '12:30',

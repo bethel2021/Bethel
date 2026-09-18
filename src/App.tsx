@@ -364,6 +364,10 @@ export default function App() {
     await syncWithCloud();
   };
 
+  useEffect(() => {
+    document.title = '伯特利主日学与团契IMS';
+  }, []);
+
   // Multi-Engine Real-Time Sync Loop (WebSocket + SSE + Instant Long-Polling)
   useEffect(() => {
     let isMounted = true;

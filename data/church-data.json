@@ -1,7 +1,7 @@
 {
   "systemConfig": {
     "churchName": "伯特利教会",
-    "schoolTitle": "主日学与团契",
+    "schoolTitle": "主日学与团契IMS",
     "allowedDayOfWeek": 0,
     "checkinStartTime": "11:00",
     "checkinEndTime": "15:30",
@@ -3634,9 +3634,9 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 96,
+  "syncVersion": 99,
   "hiddenClassIds": [
     "class-1"
   ],
-  "updatedAt": "2026-09-18T16:26:04.691Z"
+  "updatedAt": "2026-09-18T17:31:42.207Z"
 }

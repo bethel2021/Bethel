@@ -1024,7 +1024,7 @@ apiRouter.post('/reset-data', (req: Request, res: Response) => {
     setSystemConfig({
       ...initialSystemConfig,
       churchName: '伯特利教会',
-      schoolTitle: '主日学与团契',
+      schoolTitle: '主日学与团契IMS',
     });
     generateHistoricalRecords();
     saveDataToFile();

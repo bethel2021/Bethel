@@ -1,6 +1,6 @@
 {
-  "name": "伯特利教会主日学与团契考勤系统",
-  "description": "主日学与团契考勤签到与各班级学生资料管理。",
+  "name": "伯特利主日学与团契IMS",
+  "description": "伯特利主日学与团契IMS考勤签到与各班级学员资料管理系统。",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
