@@ -1264,12 +1264,6 @@ export default function App() {
             <span className="font-semibold text-slate-800">{config.churchName}</span>
             <span>•</span>
             <span>{config.schoolTitle}</span>
-            <span className="text-slate-300">|</span>
-            <span className="text-[11px] text-slate-400">
-              {isServerAvailable === false 
-                ? '静态离线/本地存储模式' 
-                : '🟢 实时更新'}
-            </span>
           </p>
         </div>
       </footer>
