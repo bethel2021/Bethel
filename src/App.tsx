@@ -23,7 +23,9 @@ import {
   deleteLocalAccount, 
   updateLocalAccountPassword,
   exportLocalBackup,
-  importLocalBackup
+  importLocalBackup,
+  getLocalHiddenClassIds,
+  saveLocalHiddenClassIds
 } from './utils/localStore';
 import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts, checkIsWithinSundayWindow } from './utils/dateUtils';
 
@@ -139,6 +141,7 @@ export default function App() {
 
     let mergedClassesForCache: ClassGroup[] | undefined;
     if (Array.isArray(data.classes)) {
+      const localHiddenSet = getLocalHiddenClassIds();
       const local = getLocalData();
       const localClassesMap = new Map(local.classes.map(c => [c.id, c]));
       const mergedClasses = data.classes.map((c: any) => {
@@ -154,15 +157,23 @@ export default function App() {
           };
         }
 
-        // 2. Otherwise safely merge server data and local fallback
+        // 2. Otherwise safely merge server data and local persistent hidden set
         const localClass = localClassesMap.get(c.id);
+        const serverHidden = c.isHiddenFromHome;
+        const finalHidden = serverHidden !== undefined 
+          ? !!serverHidden 
+          : (localClass ? !!localClass.isHiddenFromHome : localHiddenSet.has(c.id));
+
         return {
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome !== undefined 
-            ? !!c.isHiddenFromHome 
-            : (localClass ? !!localClass.isHiddenFromHome : false)
+          isHiddenFromHome: finalHidden
         };
       });
+
+      // Synchronize persistent hidden class IDs with authoritative server result
+      const newHiddenSet = new Set(mergedClasses.filter(c => !!c.isHiddenFromHome).map(c => c.id));
+      saveLocalHiddenClassIds(newHiddenSet);
+
       mergedClassesForCache = mergedClasses;
       setClasses(prev => isDataEqual(prev, mergedClasses) ? prev : mergedClasses);
     }
@@ -786,6 +797,16 @@ export default function App() {
     syncVersionRef.current = (syncVersionRef.current || 0) + 1;
 
     const saveLocally = () => {
+      if (classData.isHiddenFromHome !== undefined) {
+        const hiddenSet = getLocalHiddenClassIds();
+        if (classData.isHiddenFromHome) {
+          hiddenSet.add(classId);
+        } else {
+          hiddenSet.delete(classId);
+        }
+        saveLocalHiddenClassIds(hiddenSet);
+      }
+
       setClasses(prev => {
         let updated: ClassGroup[];
         if (classData.id) {
@@ -822,6 +843,9 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number') {
+          syncVersionRef.current = data.syncVersion;
+        }
         if (data.class && data.class.id) {
           setClasses(prev => {
             const idx = prev.findIndex(c => c.id === data.class.id);
@@ -839,7 +863,9 @@ export default function App() {
     } catch {
       // Offline fallback
     } finally {
-      pendingClassMutationsRef.current.delete(classId);
+      setTimeout(() => {
+        pendingClassMutationsRef.current.delete(classId);
+      }, 4000);
       notifyCrossTabSync();
     }
   };
@@ -852,6 +878,16 @@ export default function App() {
     const currentClass = classes.find(c => c.id === classId);
     if (!currentClass) return;
 
+    // 1. Immediately update persistent local hidden set
+    const hiddenSet = getLocalHiddenClassIds();
+    if (isHiddenFromHome) {
+      hiddenSet.add(classId);
+    } else {
+      hiddenSet.delete(classId);
+    }
+    saveLocalHiddenClassIds(hiddenSet);
+
+    // 2. Protect with in-flight mutation ref to prevent trailing race-condition poll overwrites
     pendingClassMutationsRef.current.set(classId, { ...currentClass, isHiddenFromHome });
     syncVersionRef.current = (syncVersionRef.current || 0) + 1;
 
@@ -871,25 +907,36 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number') {
+          syncVersionRef.current = data.syncVersion;
+        }
         if (data.class) {
           setClasses(prev => {
-            const updated = prev.map(c => c.id === classId ? data.class : c);
+            const updated = prev.map(c => c.id === classId ? { ...c, ...data.class, isHiddenFromHome } : c);
             saveLocalData({ classes: updated });
             return updated;
           });
         }
       } else {
         // Fallback to /api/classes
-        await fetch('/api/classes', {
+        const fallbackRes = await fetch('/api/classes', {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({ ...currentClass, isHiddenFromHome }),
         });
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          if (typeof fallbackData.syncVersion === 'number') {
+            syncVersionRef.current = fallbackData.syncVersion;
+          }
+        }
       }
     } catch {
       // Offline fallback
     } finally {
-      pendingClassMutationsRef.current.delete(classId);
+      setTimeout(() => {
+        pendingClassMutationsRef.current.delete(classId);
+      }, 4000);
       notifyCrossTabSync();
     }
   };

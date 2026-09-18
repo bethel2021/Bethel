@@ -8,8 +8,29 @@ const STORAGE_KEYS = {
   RECORDS: 'bethel_records',
   ACTIVE_SUNDAY: 'bethel_active_sunday',
   INITIALIZED: 'bethel_data_initialized',
-  ACCOUNTS: 'bethel_admin_accounts'
+  ACCOUNTS: 'bethel_admin_accounts',
+  HIDDEN_CLASS_IDS: 'bethel_hidden_class_ids'
 };
+
+export function getLocalHiddenClassIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.HIDDEN_CLASS_IDS);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveLocalHiddenClassIds(ids: string[] | Set<string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const arr = Array.from(ids);
+    localStorage.setItem(STORAGE_KEYS.HIDDEN_CLASS_IDS, JSON.stringify(arr));
+  } catch {}
+}
 
 export const DEFAULT_ACCOUNTS: AdminAccount[] = [
   {
@@ -166,13 +187,16 @@ export function getLocalData() {
 
     // Ensure subjectTeacher is populated
     let hasUpdatedClasses = false;
+    const hiddenSet = getLocalHiddenClassIds();
     classes = classes.map(c => {
-      if (!c.subjectTeacher) {
+      const isHidden = hiddenSet.has(c.id) || !!c.isHiddenFromHome;
+      if (!c.subjectTeacher || c.isHiddenFromHome !== isHidden) {
         hasUpdatedClasses = true;
         const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);
         return {
           ...c,
-          subjectTeacher: match?.subjectTeacher || '主日学专职老师'
+          subjectTeacher: c.subjectTeacher || match?.subjectTeacher || '主日学专职老师',
+          isHiddenFromHome: isHidden
         };
       }
       return c;
@@ -214,7 +238,11 @@ export function saveLocalData(data: {
 }) {
   if (typeof window === 'undefined') return;
   try {
-    if (data.classes) localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(data.classes));
+    if (data.classes) {
+      localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(data.classes));
+      const hiddenIds = data.classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
+      saveLocalHiddenClassIds(hiddenIds);
+    }
     if (data.students) localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(data.students));
     if (data.config) localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(data.config));
     if (data.records) localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(data.records));
@@ -236,6 +264,7 @@ export function resetLocalData() {
     localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(records));
     localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, '2026-09-13');
     localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(DEFAULT_ACCOUNTS));
+    localStorage.removeItem(STORAGE_KEYS.HIDDEN_CLASS_IDS);
     localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     return {
       classes: initialClasses,

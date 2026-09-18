@@ -739,7 +739,7 @@ apiRouter.post('/classes', (req: Request, res: Response) => {
         isHiddenFromHome: isHiddenFromHome !== undefined ? !!isHiddenFromHome : (classes[idx].isHiddenFromHome || false),
       };
       saveDataToFile();
-      return res.json({ success: true, class: classes[idx], message: '班级信息修改成功' });
+      return res.json({ success: true, class: classes[idx], classes, syncVersion, message: '班级信息修改成功' });
     }
 
     const newClass: ClassGroup = {
@@ -756,7 +756,7 @@ apiRouter.post('/classes', (req: Request, res: Response) => {
     };
     classes.push(newClass);
     saveDataToFile();
-    res.json({ success: true, class: newClass, message: '成功新增班级/团契' });
+    res.json({ success: true, class: newClass, classes, syncVersion, message: '成功新增班级/团契' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -786,6 +786,8 @@ apiRouter.post('/classes/:id/visibility', (req: Request, res: Response) => {
     res.json({
       success: true,
       class: classes[idx],
+      classes,
+      syncVersion,
       message: `班级【${classes[idx].name}】已成功设置为首页${isHiddenFromHome ? '隐藏' : '显示'}`
     });
   } catch (err: any) {

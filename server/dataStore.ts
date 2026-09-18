@@ -160,6 +160,7 @@ export function saveDataToFile() {
     adminAccounts,
     activeSunday,
     syncVersion,
+    hiddenClassIds: classes.filter(c => !!c.isHiddenFromHome).map(c => c.id),
     updatedAt: lastModifiedTimestamp
   };
 
@@ -262,7 +263,13 @@ export function loadFromDisk(): boolean {
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf-8');
       const data = JSON.parse(raw);
-      if (Array.isArray(data.classes) && data.classes.length > 0) classes = data.classes;
+      if (Array.isArray(data.classes) && data.classes.length > 0) {
+        const hiddenSet = new Set(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []);
+        classes = data.classes.map((c: any) => ({
+          ...c,
+          isHiddenFromHome: hiddenSet.has(c.id) || !!c.isHiddenFromHome
+        }));
+      }
       if (Array.isArray(data.students) && data.students.length > 0) students = data.students;
       if (Array.isArray(data.records)) records = data.records;
       if (Array.isArray(data.adminAccounts) && data.adminAccounts.length > 0) adminAccounts = data.adminAccounts;
@@ -432,9 +439,10 @@ export function mergeClientData(payload: SyncPayload): {
         const mergedClass: ClassGroup = {
           ...existing,
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome !== undefined 
-            ? !!c.isHiddenFromHome 
-            : (existing.isHiddenFromHome ?? false)
+          // CRITICAL: Protect isHiddenFromHome from being accidentally unhidden by unauthenticated background sync payloads!
+          isHiddenFromHome: existing.isHiddenFromHome === true 
+            ? true 
+            : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : (existing.isHiddenFromHome ?? false))
         };
         if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {
           classMap.set(c.id, mergedClass);

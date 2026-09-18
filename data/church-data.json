@@ -32,7 +32,7 @@
       "color": "bg-emerald-500",
       "groupType": "sunday_school",
       "description": "小小班启蒙，圣经故事与赞美诗律动",
-      "isHiddenFromHome": false
+      "isHiddenFromHome": true
     },
     {
       "id": "class-2",
@@ -44,7 +44,7 @@
       "color": "bg-teal-500",
       "groupType": "sunday_school",
       "description": "幼儿诗歌、圣经小品格与常规模范",
-      "isHiddenFromHome": false
+      "isHiddenFromHome": true
     },
     {
       "id": "class-3",
@@ -3571,6 +3571,6 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 27,
-  "updatedAt": "2026-09-18T08:50:21.720Z"
+  "syncVersion": 40,
+  "updatedAt": "2026-09-18T09:42:11.284Z"
 }
