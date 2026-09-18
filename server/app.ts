@@ -38,11 +38,16 @@ const pollWaiters = new Set<{ res: Response; timer: NodeJS.Timeout; clientVersio
 
 export function getCurrentStatePayload(eventType: string = 'state_update', extraData?: any) {
   const currentSunday = getActiveSundayDate();
+  const hiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
   return {
     type: eventType,
     syncVersion,
     lastModified: lastModifiedTimestamp,
-    config: systemConfig,
+    config: {
+      ...systemConfig,
+      hiddenClassIds: hiddenIds
+    },
+    hiddenClassIds: hiddenIds,
     classes: classes.map(c => ({
       ...c,
       isHiddenFromHome: !!c.isHiddenFromHome

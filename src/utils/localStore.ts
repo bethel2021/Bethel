@@ -185,11 +185,11 @@ export function getLocalData() {
     classes = classes.filter(c => c.id !== 'class-8' && c.name !== '雅歌团契');
     students = students.filter(s => s.classId !== 'class-8' && s.id !== 's-801' && s.id !== 's-802');
 
-    // Ensure subjectTeacher is populated
+    // Ensure subjectTeacher is populated & hidden status preserved
     let hasUpdatedClasses = false;
     const hiddenSet = getLocalHiddenClassIds();
     classes = classes.map(c => {
-      const isHidden = c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : hiddenSet.has(c.id);
+      const isHidden = c.isHiddenFromHome === true || hiddenSet.has(c.id);
       if (!c.subjectTeacher || c.isHiddenFromHome !== isHidden) {
         hasUpdatedClasses = true;
         const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);

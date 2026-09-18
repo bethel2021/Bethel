@@ -19,7 +19,10 @@
     "lateThresholdTime": "09:30",
     "enableExcusedNote": true,
     "enableCheckinPopup": true,
-    "adminPassword": "bethel2026"
+    "adminPassword": "bethel2026",
+    "hiddenClassIds": [
+      "class-7"
+    ]
   },
   "classes": [
     {
@@ -97,14 +100,14 @@
     {
       "id": "class-7",
       "name": "以斯拉团契",
-      "ageRange": "16-20岁",
       "teacher": "东丽 老师",
+      "isHiddenFromHome": true,
+      "ageRange": "16-20岁",
       "subjectTeacher": "陈海伟牧师，来俊、张国 老师",
       "classroom": "大堂",
       "color": "bg-purple-500",
       "groupType": "fellowship",
-      "description": "「定志考究神道，立志行道教导」效法以斯拉专心考究遵行神律法的心志，在大学、职场与社会中作得胜见证，同心服侍教会、传承信仰使命。",
-      "isHiddenFromHome": false
+      "description": "「定志考究神道，立志行道教导」效法以斯拉专心考究遵行神律法的心志，在大学、职场与社会中作得胜见证，同心服侍教会、传承信仰使命。"
     }
   ],
   "students": [
@@ -3631,7 +3634,9 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 65,
-  "hiddenClassIds": [],
-  "updatedAt": "2026-09-18T12:17:27.922Z"
+  "syncVersion": 75,
+  "hiddenClassIds": [
+    "class-7"
+  ],
+  "updatedAt": "2026-09-18T13:06:17.763Z"
 }

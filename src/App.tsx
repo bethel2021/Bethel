@@ -150,6 +150,11 @@ export default function App() {
 
     let mergedClassesForCache: ClassGroup[] | undefined;
     if (Array.isArray(data.classes)) {
+      const serverHiddenIds = new Set<string>([
+        ...(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []),
+        ...(Array.isArray(data.config?.hiddenClassIds) ? data.config.hiddenClassIds : []),
+      ]);
+
       const mergedClasses = data.classes.map((c: any) => {
         // 1. If this class has a local mutation in flight, preserve the pending state
         if (pendingClassMutationsRef.current.has(c.id)) {
@@ -159,14 +164,16 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : !!c.isHiddenFromHome
+              : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : serverHiddenIds.has(c.id))
           };
         }
 
-        // 2. Authoritative server class state takes direct precedence across all devices
+        // 2. Authoritative server class state + server hidden sets
+        const isHidden = c.isHiddenFromHome === true || serverHiddenIds.has(c.id);
+
         return {
           ...c,
-          isHiddenFromHome: !!c.isHiddenFromHome
+          isHiddenFromHome: isHidden
         };
       });
 
@@ -847,25 +854,25 @@ export default function App() {
           syncVersionRef.current = data.syncVersion;
         }
         if (data.class && data.class.id) {
+          const authoritativeClasses: ClassGroup[] = Array.isArray(data.classes) ? data.classes : [];
           setClasses(prev => {
-            const idx = prev.findIndex(c => c.id === data.class.id);
-            if (idx !== -1) {
-              const updated = prev.map((c, i) => i === idx ? data.class : c);
-              saveLocalData({ classes: updated });
-              return isDataEqual(prev, updated) ? prev : updated;
-            }
-            const updated = [...prev, data.class];
+            const updated = authoritativeClasses.length > 0
+              ? authoritativeClasses
+              : (prev.some(c => c.id === data.class.id)
+                  ? prev.map(c => c.id === data.class.id ? data.class : c)
+                  : [...prev, data.class]);
             saveLocalData({ classes: updated });
             return updated;
           });
         }
+        // Force an immediate reload and local storage rewrite from authoritative state
+        pendingClassMutationsRef.current.delete(classId);
+        await loadState(false);
       }
     } catch {
       // Offline fallback
     } finally {
-      setTimeout(() => {
-        pendingClassMutationsRef.current.delete(classId);
-      }, 4000);
+      pendingClassMutationsRef.current.delete(classId);
       notifyCrossTabSync();
     }
   };
@@ -910,13 +917,20 @@ export default function App() {
         if (typeof data.syncVersion === 'number') {
           syncVersionRef.current = data.syncVersion;
         }
-        if (data.class) {
+        const authoritativeClasses: ClassGroup[] = Array.isArray(data.classes) ? data.classes : [];
+        if (authoritativeClasses.length > 0) {
+          setClasses(authoritativeClasses);
+          saveLocalData({ classes: authoritativeClasses });
+        } else if (data.class) {
           setClasses(prev => {
             const updated = prev.map(c => c.id === classId ? { ...c, ...data.class, isHiddenFromHome } : c);
             saveLocalData({ classes: updated });
             return updated;
           });
         }
+        // Force an immediate reload and local storage rewrite from authoritative state
+        pendingClassMutationsRef.current.delete(classId);
+        await loadState(false);
       } else {
         // Fallback to /api/classes
         const fallbackRes = await fetch('/api/classes', {
@@ -929,14 +943,14 @@ export default function App() {
           if (typeof fallbackData.syncVersion === 'number') {
             syncVersionRef.current = fallbackData.syncVersion;
           }
+          pendingClassMutationsRef.current.delete(classId);
+          await loadState(false);
         }
       }
     } catch {
       // Offline fallback
     } finally {
-      setTimeout(() => {
-        pendingClassMutationsRef.current.delete(classId);
-      }, 4000);
+      pendingClassMutationsRef.current.delete(classId);
       notifyCrossTabSync();
     }
   };

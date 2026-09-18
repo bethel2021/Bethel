@@ -71,6 +71,7 @@ export interface SystemConfig {
   lateThresholdTime: string; // 迟到判定分界时刻, e.g. "09:30"
   enableExcusedNote: boolean; // 是否启用请假事由备注功能
   enableCheckinPopup: boolean; // 是否在大屏模式显示实时打卡悬浮喜报
+  hiddenClassIds?: string[]; // 在首页隐藏的班级ID列表
   adminPassword?: string; // 后台管理员密码 (默认 bethel2026)
 }
 

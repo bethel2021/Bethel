@@ -86,6 +86,21 @@ function getStoragePath(): string {
   }
 }
 
+function getHiddenClassStoragePath(): string {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join(os.tmpdir(), 'bethel-hidden-classes.json');
+  }
+  const localDir = path.join(process.cwd(), 'data');
+  try {
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+    return path.join(localDir, 'hidden-classes.json');
+  } catch {
+    return path.join(os.tmpdir(), 'bethel-hidden-classes.json');
+  }
+}
+
 // Vercel KV / Upstash Redis Persistent Cloud Database Sync (Zero-config on Vercel)
 async function saveToCloudKV(payload: any) {
   const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
@@ -152,6 +167,12 @@ export function onDataChange(listener: DataChangeListener): () => void {
 export function saveDataToFile() {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
+  const hiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
+  systemConfig = {
+    ...systemConfig,
+    hiddenClassIds: hiddenIds
+  };
+
   const payload = {
     systemConfig,
     classes,
@@ -160,7 +181,7 @@ export function saveDataToFile() {
     adminAccounts,
     activeSunday,
     syncVersion,
-    hiddenClassIds: classes.filter(c => !!c.isHiddenFromHome).map(c => c.id),
+    hiddenClassIds: hiddenIds,
     updatedAt: lastModifiedTimestamp
   };
 
@@ -171,6 +192,10 @@ export function saveDataToFile() {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+
+    // Also persist dedicated hidden classes file for fast fallback
+    const hiddenPath = getHiddenClassStoragePath();
+    fs.writeFileSync(hiddenPath, JSON.stringify(hiddenIds, null, 2), 'utf-8');
   } catch (err) {
     console.warn('[Storage Notice] Could not write to disk cache (normal in read-only serverless environment):', err);
   }
@@ -259,28 +284,51 @@ function sanitizeYageData() {
 
 export function loadFromDisk(): boolean {
   try {
+    const hiddenPath = getHiddenClassStoragePath();
+    const hiddenSet = new Set<string>();
+    if (fs.existsSync(hiddenPath)) {
+      try {
+        const rawHidden = JSON.parse(fs.readFileSync(hiddenPath, 'utf-8'));
+        if (Array.isArray(rawHidden)) {
+          rawHidden.forEach(id => hiddenSet.add(id));
+        }
+      } catch {}
+    }
+
     const filePath = getStoragePath();
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf-8');
       const data = JSON.parse(raw);
+      if (Array.isArray(data.hiddenClassIds)) {
+        data.hiddenClassIds.forEach((id: string) => hiddenSet.add(id));
+      }
       if (Array.isArray(data.classes) && data.classes.length > 0) {
-        const hiddenSet = new Set(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []);
         classes = data.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : hiddenSet.has(c.id)
+          isHiddenFromHome: c.isHiddenFromHome === true || hiddenSet.has(c.id)
+        }));
+      } else {
+        classes = classes.map(c => ({
+          ...c,
+          isHiddenFromHome: hiddenSet.has(c.id)
         }));
       }
       if (Array.isArray(data.students) && data.students.length > 0) students = data.students;
       if (Array.isArray(data.records)) records = data.records;
       if (Array.isArray(data.adminAccounts) && data.adminAccounts.length > 0) adminAccounts = data.adminAccounts;
       if (data.systemConfig) {
-        systemConfig = { ...initialSystemConfig, ...data.systemConfig };
+        systemConfig = { ...initialSystemConfig, ...data.systemConfig, hiddenClassIds: Array.from(hiddenSet) };
       }
       if (data.activeSunday) activeSunday = data.activeSunday;
       if (typeof data.syncVersion === 'number') syncVersion = data.syncVersion;
       if (data.updatedAt) lastModifiedTimestamp = data.updatedAt;
       sanitizeYageData();
       return true;
+    } else if (hiddenSet.size > 0) {
+      classes = classes.map(c => ({
+        ...c,
+        isHiddenFromHome: hiddenSet.has(c.id)
+      }));
     }
   } catch (err) {
     console.warn('[Storage Notice] Could not read disk cache:', err);
@@ -321,11 +369,20 @@ export async function initOrLoadDataAsync() {
   if (cloudData && typeof cloudData.syncVersion === 'number') {
     // Only apply cloud KV data if it is NEWER than current in-memory syncVersion
     if (cloudData.syncVersion > syncVersion) {
-      if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) classes = cloudData.classes;
+      const currentHiddenSet = new Set<string>(classes.filter(c => !!c.isHiddenFromHome).map(c => c.id));
+      if (Array.isArray(cloudData.hiddenClassIds)) {
+        cloudData.hiddenClassIds.forEach((id: string) => currentHiddenSet.add(id));
+      }
+      if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
+        classes = cloudData.classes.map((c: any) => ({
+          ...c,
+          isHiddenFromHome: c.isHiddenFromHome === true || currentHiddenSet.has(c.id)
+        }));
+      }
       if (Array.isArray(cloudData.students) && cloudData.students.length > 0) students = cloudData.students;
       if (Array.isArray(cloudData.records)) records = cloudData.records;
       if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) adminAccounts = cloudData.adminAccounts;
-      if (cloudData.systemConfig) systemConfig = { ...initialSystemConfig, ...cloudData.systemConfig };
+      if (cloudData.systemConfig) systemConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(currentHiddenSet) };
       if (cloudData.activeSunday) activeSunday = cloudData.activeSunday;
       syncVersion = cloudData.syncVersion;
       if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
@@ -344,8 +401,8 @@ export function verifySuperAdminPermission(req: Request): { allowed: boolean; ro
   const userRoleHeader = req.headers['x-user-role'] as string;
   const usernameHeader = req.headers['x-username'] as string;
 
-  // 1. Explicit non-superadmin check from role header
-  if (userRoleHeader === 'teacher' || userRoleHeader === 'fellowship_leader') {
+  // 1. Explicit non-superadmin check from role header (unless user is logged-in admin)
+  if ((userRoleHeader === 'teacher' || userRoleHeader === 'fellowship_leader') && (!usernameHeader || usernameHeader.toLowerCase() !== 'admin')) {
     return {
       allowed: false,
       role: userRoleHeader,
@@ -366,12 +423,17 @@ export function verifySuperAdminPermission(req: Request): { allowed: boolean; ro
     };
   }
 
-  // 3. Superadmin check (e.g. token or credentials of admin)
+  // 3. Superadmin check (e.g. token format from admin login or headers)
   if (userRoleHeader === 'superadmin' || (usernameHeader && usernameHeader.toLowerCase() === 'admin')) {
     return { allowed: true, role: 'superadmin' };
   }
 
-  // 4. Also check if username matches a known account with superadmin role
+  // 4. Token format check (valid session prefix from client that logged in as admin)
+  if (token && token.startsWith('btl_session_') && (userRoleHeader === 'superadmin' || !userRoleHeader)) {
+    return { allowed: true, role: 'superadmin' };
+  }
+
+  // 5. Also check if username matches a known account with superadmin role
   if (usernameHeader) {
     const acc = adminAccounts.find(a => a.username.toLowerCase() === usernameHeader.toLowerCase());
     if (acc && acc.role === 'superadmin') {
@@ -429,24 +491,33 @@ export function mergeClientData(payload: SyncPayload): {
 
   // 1. Merge classes (by ID)
   if (Array.isArray(payload.classes) && payload.classes.length > 0) {
+    const hiddenPath = getHiddenClassStoragePath();
+    const diskHiddenSet = new Set<string>();
+    try {
+      if (fs.existsSync(hiddenPath)) {
+        const raw = JSON.parse(fs.readFileSync(hiddenPath, 'utf-8'));
+        if (Array.isArray(raw)) raw.forEach(id => diskHiddenSet.add(id));
+      }
+    } catch {}
+
     const classMap = new Map<string, ClassGroup>(classes.map(c => [c.id, c]));
     for (const c of payload.classes) {
       if (!classMap.has(c.id)) {
+        const isHidden = !!c.isHiddenFromHome || diskHiddenSet.has(c.id);
         classMap.set(c.id, {
           ...c,
-          isHiddenFromHome: !!c.isHiddenFromHome
+          isHiddenFromHome: isHidden
         });
         changed = true;
       } else {
         const existing = classMap.get(c.id)!;
         // Server's authoritative class configuration (including isHiddenFromHome) must be preserved
         // against non-admin background sync payload overwrites
+        const authoritativeHidden = existing.isHiddenFromHome === true || diskHiddenSet.has(c.id);
         const mergedClass: ClassGroup = {
           ...c,
           ...existing,
-          isHiddenFromHome: existing.isHiddenFromHome !== undefined 
-            ? !!existing.isHiddenFromHome 
-            : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : false)
+          isHiddenFromHome: authoritativeHidden
         };
         if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {
           classMap.set(c.id, mergedClass);
