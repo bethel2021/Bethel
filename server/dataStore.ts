@@ -432,16 +432,21 @@ export function mergeClientData(payload: SyncPayload): {
     const classMap = new Map<string, ClassGroup>(classes.map(c => [c.id, c]));
     for (const c of payload.classes) {
       if (!classMap.has(c.id)) {
-        classMap.set(c.id, c);
+        classMap.set(c.id, {
+          ...c,
+          isHiddenFromHome: !!c.isHiddenFromHome
+        });
         changed = true;
       } else {
         const existing = classMap.get(c.id)!;
+        // Server's authoritative class configuration (including isHiddenFromHome) must be preserved
+        // against non-admin background sync payload overwrites
         const mergedClass: ClassGroup = {
-          ...existing,
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome !== undefined 
-            ? !!c.isHiddenFromHome 
-            : (existing.isHiddenFromHome ?? false)
+          ...existing,
+          isHiddenFromHome: existing.isHiddenFromHome !== undefined 
+            ? !!existing.isHiddenFromHome 
+            : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : false)
         };
         if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {
           classMap.set(c.id, mergedClass);

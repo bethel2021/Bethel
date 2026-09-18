@@ -141,9 +141,6 @@ export default function App() {
 
     let mergedClassesForCache: ClassGroup[] | undefined;
     if (Array.isArray(data.classes)) {
-      const localHiddenSet = getLocalHiddenClassIds();
-      const local = getLocalData();
-      const localClassesMap = new Map(local.classes.map(c => [c.id, c]));
       const mergedClasses = data.classes.map((c: any) => {
         // 1. If this class has a local mutation in flight, preserve the pending state
         if (pendingClassMutationsRef.current.has(c.id)) {
@@ -153,20 +150,14 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : false)
+              : !!c.isHiddenFromHome
           };
         }
 
-        // 2. Otherwise safely merge server data and local persistent hidden set
-        const localClass = localClassesMap.get(c.id);
-        const serverHidden = c.isHiddenFromHome;
-        const finalHidden = serverHidden !== undefined 
-          ? !!serverHidden 
-          : (localClass && localClass.isHiddenFromHome !== undefined ? !!localClass.isHiddenFromHome : localHiddenSet.has(c.id));
-
+        // 2. Authoritative server class state takes direct precedence across all devices
         return {
           ...c,
-          isHiddenFromHome: finalHidden
+          isHiddenFromHome: !!c.isHiddenFromHome
         };
       });
 

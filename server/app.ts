@@ -43,7 +43,10 @@ export function getCurrentStatePayload(eventType: string = 'state_update', extra
     syncVersion,
     lastModified: lastModifiedTimestamp,
     config: systemConfig,
-    classes,
+    classes: classes.map(c => ({
+      ...c,
+      isHiddenFromHome: !!c.isHiddenFromHome
+    })),
     students,
     records,
     accounts: adminAccounts.map(a => ({
@@ -246,7 +249,10 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
   const currentSunday = getActiveSundayDate();
   res.json({
     config: systemConfig,
-    classes,
+    classes: classes.map(c => ({
+      ...c,
+      isHiddenFromHome: !!c.isHiddenFromHome
+    })),
     students,
     records,
     accounts: adminAccounts.map(a => ({
@@ -268,17 +274,18 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
 // 1.1 Cloud Multi-Device Sync endpoints
 apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
   await initOrLoadDataAsync();
-  const clientVersion = parseInt(req.query.v as string, 10) || 0;
   res.json({
     status: 'ok',
     syncVersion,
     lastModified: lastModifiedTimestamp,
     kvConnected: Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
-    hasUpdates: clientVersion !== syncVersion,
-    classes: clientVersion !== syncVersion ? classes : undefined,
-    students: clientVersion !== syncVersion ? students : undefined,
-    records: clientVersion !== syncVersion ? records : undefined,
-    config: clientVersion !== syncVersion ? systemConfig : undefined,
+    classes: classes.map(c => ({
+      ...c,
+      isHiddenFromHome: !!c.isHiddenFromHome
+    })),
+    students,
+    records,
+    config: systemConfig,
     activeSunday,
     serverTime: new Date().toISOString()
   });
