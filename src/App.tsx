@@ -168,8 +168,8 @@ export default function App() {
           };
         }
 
-        // 2. Authoritative server class state + server hidden sets
-        const isHidden = c.isHiddenFromHome === true || serverHiddenIds.has(c.id);
+        // 2. Authoritative server class state + fallback to server hidden sets if c.isHiddenFromHome is undefined
+        const isHidden = typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : serverHiddenIds.has(c.id);
 
         return {
           ...c,

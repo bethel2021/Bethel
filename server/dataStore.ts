@@ -305,12 +305,12 @@ export function loadFromDisk(): boolean {
       if (Array.isArray(data.classes) && data.classes.length > 0) {
         classes = data.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome === true || hiddenSet.has(c.id)
+          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
       } else {
         classes = classes.map(c => ({
           ...c,
-          isHiddenFromHome: hiddenSet.has(c.id)
+          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
       }
       if (Array.isArray(data.students) && data.students.length > 0) students = data.students;
@@ -376,7 +376,7 @@ export async function initOrLoadDataAsync() {
       if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
         classes = cloudData.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome === true || currentHiddenSet.has(c.id)
+          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : currentHiddenSet.has(c.id)
         }));
       }
       if (Array.isArray(cloudData.students) && cloudData.students.length > 0) students = cloudData.students;
@@ -503,7 +503,7 @@ export function mergeClientData(payload: SyncPayload): {
     const classMap = new Map<string, ClassGroup>(classes.map(c => [c.id, c]));
     for (const c of payload.classes) {
       if (!classMap.has(c.id)) {
-        const isHidden = !!c.isHiddenFromHome || diskHiddenSet.has(c.id);
+        const isHidden = typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : diskHiddenSet.has(c.id);
         classMap.set(c.id, {
           ...c,
           isHiddenFromHome: isHidden
@@ -511,14 +511,12 @@ export function mergeClientData(payload: SyncPayload): {
         changed = true;
       } else {
         const existing = classMap.get(c.id)!;
-        // Server's authoritative class configuration (including isHiddenFromHome) is preserved,
-        // but explicit client boolean value takes precedence if provided
-        const authoritativeHidden = c.isHiddenFromHome !== undefined
-          ? !!c.isHiddenFromHome
-          : (existing.isHiddenFromHome === true || diskHiddenSet.has(c.id));
+        const authoritativeHidden = typeof c.isHiddenFromHome === 'boolean'
+          ? c.isHiddenFromHome
+          : (typeof existing.isHiddenFromHome === 'boolean' ? existing.isHiddenFromHome : diskHiddenSet.has(c.id));
         const mergedClass: ClassGroup = {
-          ...c,
           ...existing,
+          ...c,
           isHiddenFromHome: authoritativeHidden
         };
         if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {
