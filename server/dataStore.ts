@@ -429,8 +429,15 @@ export function mergeClientData(payload: SyncPayload): {
         changed = true;
       } else {
         const existing = classMap.get(c.id)!;
-        if (JSON.stringify(existing) !== JSON.stringify(c)) {
-          classMap.set(c.id, { ...existing, ...c });
+        const mergedClass: ClassGroup = {
+          ...existing,
+          ...c,
+          isHiddenFromHome: c.isHiddenFromHome !== undefined 
+            ? !!c.isHiddenFromHome 
+            : (existing.isHiddenFromHome ?? false)
+        };
+        if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {
+          classMap.set(c.id, mergedClass);
           changed = true;
         }
       }

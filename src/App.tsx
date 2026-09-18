@@ -102,6 +102,7 @@ export default function App() {
   const previousRecordsCountRef = useRef<number>(0);
   const syncVersionRef = useRef<number>(0);
   const pendingMutationsRef = useRef<Set<string>>(new Set());
+  const pendingClassMutationsRef = useRef<Map<string, Partial<ClassGroup>>>(new Map());
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [serverRuntime, setServerRuntime] = useState<string | null>(null);
@@ -136,10 +137,24 @@ export default function App() {
     // Smart diffing updates to prevent unnecessary re-renders & page flickering
     setConfig(prev => isDataEqual(prev, data.config) ? prev : data.config);
 
+    let mergedClassesForCache: ClassGroup[] | undefined;
     if (Array.isArray(data.classes)) {
       const local = getLocalData();
       const localClassesMap = new Map(local.classes.map(c => [c.id, c]));
       const mergedClasses = data.classes.map((c: any) => {
+        // 1. If this class has a local mutation in flight, preserve the pending state
+        if (pendingClassMutationsRef.current.has(c.id)) {
+          const pending = pendingClassMutationsRef.current.get(c.id)!;
+          return {
+            ...c,
+            ...pending,
+            isHiddenFromHome: pending.isHiddenFromHome !== undefined 
+              ? !!pending.isHiddenFromHome 
+              : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : false)
+          };
+        }
+
+        // 2. Otherwise safely merge server data and local fallback
         const localClass = localClassesMap.get(c.id);
         return {
           ...c,
@@ -148,6 +163,7 @@ export default function App() {
             : (localClass ? !!localClass.isHiddenFromHome : false)
         };
       });
+      mergedClassesForCache = mergedClasses;
       setClasses(prev => isDataEqual(prev, mergedClasses) ? prev : mergedClasses);
     }
 
@@ -203,7 +219,7 @@ export default function App() {
 
     // Keep local cache synced as authoritative backup
     saveLocalData({
-      classes: data.classes || classes,
+      classes: mergedClassesForCache || data.classes || classes,
       students: data.students || students,
       config: data.config || config,
       records: data.records || records,
@@ -764,6 +780,11 @@ export default function App() {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加或修改班级的权限！');
     }
 
+    const classId = classData.id || `class-${Date.now()}`;
+    const mutationPayload: Partial<ClassGroup> = { ...classData, id: classId };
+    pendingClassMutationsRef.current.set(classId, mutationPayload);
+    syncVersionRef.current = (syncVersionRef.current || 0) + 1;
+
     const saveLocally = () => {
       setClasses(prev => {
         let updated: ClassGroup[];
@@ -771,7 +792,7 @@ export default function App() {
           updated = prev.map(c => c.id === classData.id ? { ...c, ...classData } as ClassGroup : c);
         } else {
           const newClass: ClassGroup = {
-            id: `class-${Date.now()}`,
+            id: classId,
             name: classData.name || '新班级',
             ageRange: classData.ageRange || '3-12岁',
             teacher: classData.teacher || '班级负责人',
@@ -787,7 +808,6 @@ export default function App() {
         saveLocalData({ classes: updated });
         return updated;
       });
-      notifyCrossTabSync();
     };
 
     saveLocally();
@@ -796,7 +816,7 @@ export default function App() {
       const res = await fetch('/api/classes', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(classData),
+        body: JSON.stringify(mutationPayload),
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
@@ -818,6 +838,59 @@ export default function App() {
       }
     } catch {
       // Offline fallback
+    } finally {
+      pendingClassMutationsRef.current.delete(classId);
+      notifyCrossTabSync();
+    }
+  };
+
+  // Handle quick toggle class home visibility
+  const handleToggleClassVisibility = async (classId: string, isHiddenFromHome: boolean) => {
+    if (currentUser?.role !== 'superadmin') {
+      throw new Error('权限不足：除了总管理员之外，其他账号没有修改班级首页展示状态的权限！');
+    }
+    const currentClass = classes.find(c => c.id === classId);
+    if (!currentClass) return;
+
+    pendingClassMutationsRef.current.set(classId, { ...currentClass, isHiddenFromHome });
+    syncVersionRef.current = (syncVersionRef.current || 0) + 1;
+
+    setClasses(prev => {
+      const updated = prev.map(c => c.id === classId ? { ...c, isHiddenFromHome } : c);
+      saveLocalData({ classes: updated });
+      return updated;
+    });
+
+    try {
+      const res = await fetch(`/api/classes/${classId}/visibility`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isHiddenFromHome }),
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        setIsServerAvailable(true);
+        if (data.class) {
+          setClasses(prev => {
+            const updated = prev.map(c => c.id === classId ? data.class : c);
+            saveLocalData({ classes: updated });
+            return updated;
+          });
+        }
+      } else {
+        // Fallback to /api/classes
+        await fetch('/api/classes', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ ...currentClass, isHiddenFromHome }),
+        });
+      }
+    } catch {
+      // Offline fallback
+    } finally {
+      pendingClassMutationsRef.current.delete(classId);
+      notifyCrossTabSync();
     }
   };
 
@@ -1249,6 +1322,7 @@ export default function App() {
             currentUser={currentUser}
             onSaveConfig={handleSaveConfig}
             onSaveClass={handleSaveClass}
+            onToggleClassVisibility={handleToggleClassVisibility}
             onDeleteClass={handleDeleteClass}
             onAddStudent={handleAddStudent}
             onBatchAddStudents={handleBatchAddStudents}

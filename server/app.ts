@@ -762,6 +762,37 @@ apiRouter.post('/classes', (req: Request, res: Response) => {
   }
 });
 
+// Update Class Home Visibility - 仅限总管理员
+apiRouter.post('/classes/:id/visibility', (req: Request, res: Response) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message });
+    }
+
+    const { id } = req.params;
+    const { isHiddenFromHome } = req.body;
+    const idx = classes.findIndex(c => c.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: '未找到指定班级' });
+    }
+
+    classes[idx] = {
+      ...classes[idx],
+      isHiddenFromHome: !!isHiddenFromHome,
+    };
+
+    saveDataToFile();
+    res.json({
+      success: true,
+      class: classes[idx],
+      message: `班级【${classes[idx].name}】已成功设置为首页${isHiddenFromHome ? '隐藏' : '显示'}`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete Class - 仅限总管理员
 apiRouter.delete('/classes/:id', (req: Request, res: Response) => {
   try {

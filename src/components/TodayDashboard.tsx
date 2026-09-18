@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Users, 
   CheckCircle2, 
@@ -77,20 +77,31 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   const todayRecords = records.filter(r => r.date === activeSunday);
 
   // Filter visible classes for the home page (respects isHiddenFromHome)
-  const visibleClasses = classes.filter(c => !c.isHiddenFromHome);
-  const visibleClassIdSet = new Set(visibleClasses.map(c => c.id));
-  const homeStudents = students.filter(s => visibleClassIdSet.has(s.classId));
+  const visibleClasses = useMemo(() => classes.filter(c => !c.isHiddenFromHome), [classes]);
+  const visibleClassIdSet = useMemo(() => new Set(visibleClasses.map(c => c.id)), [visibleClasses]);
+  const homeStudents = useMemo(() => students.filter(s => visibleClassIdSet.has(s.classId)), [students, visibleClassIdSet]);
 
-  // Filter students
-  const filteredStudents = students.filter(student => {
-    const inVisibleClass = visibleClassIdSet.has(student.classId);
-    const matchClass = selectedClassId === 'all' ? inVisibleClass : student.classId === selectedClassId;
-    const matchSearch = searchKeyword.trim() === '' || 
-      student.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-      student.parentPhone.includes(searchKeyword) ||
-      student.parentName.includes(searchKeyword);
-    return matchClass && matchSearch;
-  });
+  // If selectedClassId points to a class that was just hidden, automatically revert to 'all'
+  useEffect(() => {
+    if (selectedClassId !== 'all' && !visibleClassIdSet.has(selectedClassId)) {
+      setSelectedClassId('all');
+    }
+  }, [selectedClassId, visibleClassIdSet]);
+
+  // Filter students (never leak hidden classes on home page)
+  const filteredStudents = useMemo(() => {
+    return students.filter(student => {
+      const inVisibleClass = visibleClassIdSet.has(student.classId);
+      const matchClass = selectedClassId === 'all' 
+        ? inVisibleClass 
+        : (student.classId === selectedClassId && inVisibleClass);
+      const matchSearch = searchKeyword.trim() === '' || 
+        student.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        student.parentPhone.includes(searchKeyword) ||
+        student.parentName.includes(searchKeyword);
+      return matchClass && matchSearch;
+    });
+  }, [students, visibleClassIdSet, selectedClassId, searchKeyword]);
 
   // Calculate statistics (scoped to visible classes on home page)
   const activeScopeStudents = selectedClassId === 'all' 

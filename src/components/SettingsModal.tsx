@@ -45,6 +45,7 @@ interface SettingsModalProps {
   currentUser: AdminUser | null;
   onSaveConfig: (updated: Partial<SystemConfig>) => Promise<void>;
   onSaveClass: (classData: Partial<ClassGroup>) => Promise<void>;
+  onToggleClassVisibility?: (classId: string, isHiddenFromHome: boolean) => Promise<void>;
   onDeleteClass: (classId: string) => Promise<void>;
   onAddStudent: (studentData: any) => Promise<void>;
   onBatchAddStudents: (classId: string, namesText: string, defaultAge?: number, defaultBirthDate?: string) => Promise<void>;
@@ -69,6 +70,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentUser,
   onSaveConfig,
   onSaveClass,
+  onToggleClassVisibility,
   onDeleteClass,
   onAddStudent,
   onBatchAddStudents,
@@ -99,6 +101,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Class Editing Modal / State
   const [editingClass, setEditingClass] = useState<Partial<ClassGroup> | null>(null);
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
+  const [togglingClassId, setTogglingClassId] = useState<string | null>(null);
 
   // In-App Deletion Confirmation State (Replaces window.confirm to avoid iframe blocking)
   const [deleteTarget, setDeleteTarget] = useState<
@@ -236,15 +239,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       showNotice('error', '权限受限：除了总管理员之外，其他账号没有修改班级首页展示状态的权限！');
       return;
     }
+    if (togglingClassId) return;
+
     const targetStatus = !cls.isHiddenFromHome;
+    setTogglingClassId(cls.id);
     try {
-      await onSaveClass({ ...cls, isHiddenFromHome: targetStatus });
+      if (onToggleClassVisibility) {
+        await onToggleClassVisibility(cls.id, targetStatus);
+      } else {
+        await onSaveClass({ ...cls, isHiddenFromHome: targetStatus });
+      }
       showNotice(
         'success',
         `班级【${cls.name}】已成功设置为：首页${targetStatus ? '隐藏' : '显示'}！`
       );
     } catch (err: any) {
       showNotice('error', err.message || '设置首页展示状态失败');
+    } finally {
+      setTogglingClassId(null);
     }
   };
 
@@ -869,12 +881,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {isSuperAdmin ? (
                         <div className="flex items-center gap-1">
                           <button
+                            type="button"
+                            disabled={togglingClassId === cls.id}
                             onClick={() => handleToggleClassHomeVisibility(cls)}
                             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                               cls.isHiddenFromHome 
                                 ? 'text-amber-800 bg-amber-50 hover:bg-amber-100' 
                                 : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                            }`}
+                            } ${togglingClassId === cls.id ? 'opacity-40 cursor-wait' : ''}`}
                             title={cls.isHiddenFromHome ? '该班级在首页已隐藏，点击设为显示' : '该班级在首页正常显示，点击设为隐藏'}
                           >
                             {cls.isHiddenFromHome ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -954,12 +968,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {isSuperAdmin ? (
                         <button
                           type="button"
+                          disabled={togglingClassId === cls.id}
                           onClick={() => handleToggleClassHomeVisibility(cls)}
                           className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
                             cls.isHiddenFromHome
                               ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
                               : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200'
-                          }`}
+                          } ${togglingClassId === cls.id ? 'opacity-40 cursor-wait' : ''}`}
                           title={cls.isHiddenFromHome ? '点击恢复在首页展示' : '点击在首页隐藏该班级'}
                         >
                           {cls.isHiddenFromHome ? (
