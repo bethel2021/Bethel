@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
   Clock, 
@@ -174,6 +174,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [verseRef, setVerseRef] = useState(config.memoryVerseReference);
   const [adminPassword, setAdminPassword] = useState(config.adminPassword || 'bethel2026');
   const [isSavingSystem, setIsSavingSystem] = useState(false);
+
+  // Sync state whenever global config updates
+  useEffect(() => {
+    setOptionsState({
+      testMode: config.testMode ?? false,
+      enableMemoryVerseOption: config.enableMemoryVerseOption ?? true,
+      defaultMemoryVerseChecked: config.defaultMemoryVerseChecked ?? true,
+      enableOfferingOption: config.enableOfferingOption ?? true,
+      defaultOfferingChecked: config.defaultOfferingChecked ?? true,
+      enableLateRule: config.enableLateRule ?? true,
+      lateThresholdTime: config.lateThresholdTime || '09:30',
+      enableExcusedNote: config.enableExcusedNote ?? true,
+    });
+    setChurchName(config.churchName);
+    setSchoolTitle(config.schoolTitle);
+    setStartTime(config.checkinStartTime);
+    setEndTime(config.checkinEndTime);
+    setMemoryVerse(config.weeklyMemoryVerse);
+    setVerseRef(config.memoryVerseReference);
+    if (config.adminPassword) setAdminPassword(config.adminPassword);
+  }, [config]);
 
   // Filter students for display
   const displayedStudents = selectedClassFilter === 'all'

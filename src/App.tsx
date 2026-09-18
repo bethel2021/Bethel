@@ -789,8 +789,21 @@ export default function App() {
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
         setIsServerAvailable(true);
-        await loadState(false);
+        if (data.class && data.class.id) {
+          setClasses(prev => {
+            const idx = prev.findIndex(c => c.id === data.class.id);
+            if (idx !== -1) {
+              const updated = prev.map((c, i) => i === idx ? data.class : c);
+              saveLocalData({ classes: updated });
+              return isDataEqual(prev, updated) ? prev : updated;
+            }
+            const updated = [...prev, data.class];
+            saveLocalData({ classes: updated });
+            return updated;
+          });
+        }
       }
     } catch {
       // Offline fallback

@@ -284,8 +284,6 @@ export function loadFromDisk(): boolean {
 
 export function initOrLoadData() {
   if (isInitialized) {
-    loadFromDisk();
-    sanitizeYageData();
     return;
   }
   isInitialized = true;
@@ -308,22 +306,26 @@ export function initOrLoadData() {
 }
 
 export async function initOrLoadDataAsync() {
-  const cloudData = await loadFromCloudKV();
-  if (cloudData) {
-    if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) classes = cloudData.classes;
-    if (Array.isArray(cloudData.students) && cloudData.students.length > 0) students = cloudData.students;
-    if (Array.isArray(cloudData.records)) records = cloudData.records;
-    if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) adminAccounts = cloudData.adminAccounts;
-    if (cloudData.systemConfig) systemConfig = { ...initialSystemConfig, ...cloudData.systemConfig };
-    if (cloudData.activeSunday) activeSunday = cloudData.activeSunday;
-    if (typeof cloudData.syncVersion === 'number') syncVersion = cloudData.syncVersion;
-    if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
-    sanitizeYageData();
-    saveDataToFile();
-    return;
+  if (!isInitialized) {
+    loadFromDisk();
+    isInitialized = true;
   }
-  loadFromDisk();
-  sanitizeYageData();
+  const cloudData = await loadFromCloudKV();
+  if (cloudData && typeof cloudData.syncVersion === 'number') {
+    // Only apply cloud KV data if it is NEWER than current in-memory syncVersion
+    if (cloudData.syncVersion > syncVersion) {
+      if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) classes = cloudData.classes;
+      if (Array.isArray(cloudData.students) && cloudData.students.length > 0) students = cloudData.students;
+      if (Array.isArray(cloudData.records)) records = cloudData.records;
+      if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) adminAccounts = cloudData.adminAccounts;
+      if (cloudData.systemConfig) systemConfig = { ...initialSystemConfig, ...cloudData.systemConfig };
+      if (cloudData.activeSunday) activeSunday = cloudData.activeSunday;
+      syncVersion = cloudData.syncVersion;
+      if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
+      sanitizeYageData();
+      saveDataToFile();
+    }
+  }
 }
 
 // Helper to verify if requester is superadmin
