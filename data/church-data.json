@@ -21,7 +21,7 @@
     "enableCheckinPopup": true,
     "adminPassword": "bethel2026",
     "hiddenClassIds": [
-      "class-7"
+      "class-1"
     ]
   },
   "classes": [
@@ -35,7 +35,7 @@
       "color": "bg-emerald-500",
       "groupType": "sunday_school",
       "description": "「播撒真光幼苗，感受基督大爱」藉着诗歌律动与生动圣经故事，在温馨陪伴中建立安全感与敬拜初体验，让主爱从小扎根于幼小心田。",
-      "isHiddenFromHome": false
+      "isHiddenFromHome": true
     },
     {
       "id": "class-2",
@@ -101,13 +101,13 @@
       "id": "class-7",
       "name": "以斯拉团契",
       "teacher": "东丽 老师",
-      "isHiddenFromHome": true,
+      "isHiddenFromHome": false,
       "ageRange": "16-20岁",
       "subjectTeacher": "陈海伟牧师，来俊、张国 老师",
       "classroom": "大堂",
       "color": "bg-purple-500",
       "groupType": "fellowship",
-      "description": "「定志考究神道，立志行道教导」效法以斯拉专心考究遵行神律法的心志，在大学、职场与社会中作得胜见证，同心服侍教会、传承信仰使命。"
+      "description": "「定志考究神道，立志行道教导」效法以斯拉专心考究遵行神律法的心志，在校园与职场中作得胜见证，同心服侍教会、传承信仰使命。"
     }
   ],
   "students": [
@@ -3634,9 +3634,9 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 75,
+  "syncVersion": 81,
   "hiddenClassIds": [
-    "class-7"
+    "class-1"
   ],
-  "updatedAt": "2026-09-18T13:06:17.763Z"
+  "updatedAt": "2026-09-18T13:41:24.548Z"
 }

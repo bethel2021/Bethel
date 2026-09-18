@@ -92,7 +92,7 @@ export const initialClasses: ClassGroup[] = [
     classroom: '大堂', 
     color: 'bg-purple-500',
     groupType: 'fellowship',
-    description: '「定志考究神道，立志行道教导」效法以斯拉专心考究遵行神律法的心志，在大学、职场与社会中作得胜见证，同心服侍教会、传承信仰使命。',
+    description: '「定志考究神道，立志行道教导」效法以斯拉专心考究遵行神律法的心志，在校园与职场中作得胜见证，同心服侍教会、传承信仰使命。',
     isHiddenFromHome: false
   }
 ];
