@@ -796,7 +796,7 @@ apiRouter.post('/classes/:id/visibility', (req: Request, res: Response) => {
     }
 
     const { id } = req.params;
-    const { isHiddenFromHome } = req.body;
+    const { isHiddenFromHome, hiddenClassIds: clientHiddenIds } = req.body;
     const idx = classes.findIndex(c => c.id === id);
     if (idx === -1) {
       return res.status(404).json({ error: '未找到指定班级' });
@@ -807,11 +807,24 @@ apiRouter.post('/classes/:id/visibility', (req: Request, res: Response) => {
       isHiddenFromHome: !!isHiddenFromHome,
     };
 
+    if (Array.isArray(clientHiddenIds)) {
+      const reconciledSet = new Set<string>(clientHiddenIds.map((item: any) => String(item)));
+      if (isHiddenFromHome) {
+        reconciledSet.add(id);
+      } else {
+        reconciledSet.delete(id);
+      }
+      classes.forEach(c => {
+        c.isHiddenFromHome = reconciledSet.has(c.id);
+      });
+    }
+
     saveDataToFile();
     res.json({
       success: true,
       class: classes[idx],
       classes,
+      config: systemConfig,
       syncVersion,
       message: `班级【${classes[idx].name}】已成功设置为首页${isHiddenFromHome ? '隐藏' : '显示'}`
     });

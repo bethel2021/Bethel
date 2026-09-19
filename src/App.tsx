@@ -914,19 +914,36 @@ export default function App() {
     pendingClassMutationsRef.current.set(classId, { ...currentClass, isHiddenFromHome });
     syncVersionRef.current = (syncVersionRef.current || 0) + 1;
 
+    // 3. Memory state consistency check for hiddenClassIds & classes to prevent cross-device state rollback
     const nextHiddenArray = Array.from(hiddenSet);
-    setConfig(prev => ({
-      ...prev,
-      hiddenClassIds: nextHiddenArray
-    }));
+    
+    setConfig(prev => {
+      const mergedHiddenIds = Array.from(new Set([
+        ...(Array.isArray(prev?.hiddenClassIds) ? prev.hiddenClassIds : []),
+        ...nextHiddenArray
+      ])).filter(id => isHiddenFromHome ? true : id !== classId);
+      return {
+        ...prev,
+        hiddenClassIds: mergedHiddenIds
+      };
+    });
 
     setClasses(prev => {
-      const updated = prev.map(c => c.id === classId ? { ...c, isHiddenFromHome } : c);
+      const updated = prev.map(c => {
+        if (c.id === classId) {
+          return { ...c, isHiddenFromHome };
+        }
+        return c;
+      });
+
+      // Recalculate validated hidden IDs array from memory state to guarantee consistency
+      const validatedHiddenIds = updated.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+
       saveLocalData({ 
         classes: updated,
         config: {
           ...config,
-          hiddenClassIds: nextHiddenArray
+          hiddenClassIds: validatedHiddenIds
         }
       });
       return updated;
@@ -936,7 +953,7 @@ export default function App() {
       const res = await fetch(`/api/classes/${classId}/visibility`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ isHiddenFromHome }),
+        body: JSON.stringify({ isHiddenFromHome, hiddenClassIds: nextHiddenArray }),
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
