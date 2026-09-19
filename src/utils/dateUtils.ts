@@ -125,6 +125,51 @@ export function getDayOfWeekName(date: Date): string {
   return days[rome.dayOfWeek];
 }
 
+/**
+ * Calculates the active Sunday date (in Europe/Rome timezone).
+ * If today is Sunday, returns today's date (YYYY-MM-DD).
+ * If today is Mon-Sat, returns the upcoming next Sunday's date (YYYY-MM-DD).
+ */
+export function getActiveSundayDate(date: Date = new Date()): string {
+  const rome = getRomeTimeParts(date);
+  if (rome.dayOfWeek === 0) {
+    return rome.dateStr;
+  }
+  const daysUntilNextSunday = 7 - rome.dayOfWeek;
+  const targetDateObj = new Date(`${rome.dateStr}T12:00:00Z`);
+  targetDateObj.setUTCDate(targetDateObj.getUTCDate() + daysUntilNextSunday);
+  const y = targetDateObj.getUTCFullYear();
+  const m = String(targetDateObj.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(targetDateObj.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Returns Sunday label and date information for UI display.
+ * If today is Sunday: label is "主日：", isTodaySunday: true
+ * If today is Monday-Saturday: label is "下个主日：", isTodaySunday: false
+ */
+export function getSundayDisplayInfo(date: Date = new Date(), sundayDateStr?: string): {
+  isSunday: boolean;
+  label: string; // '主日：' or '下个主日：'
+  sundayDate: string; // YYYY-MM-DD
+  formattedDate: string; // e.g. '2026年9月20日'
+  fullDisplay: string; // e.g. '主日：2026年9月20日' or '下个主日：2026年9月20日'
+} {
+  const rome = getRomeTimeParts(date);
+  const isSunday = rome.dayOfWeek === 0;
+  const label = isSunday ? '主日：' : '下个主日：';
+  const targetSunday = sundayDateStr || getActiveSundayDate(date);
+  const formattedDate = formatChineseDate(targetSunday);
+  return {
+    isSunday,
+    label,
+    sundayDate: targetSunday,
+    formattedDate,
+    fullDisplay: `${label}${formattedDate}`
+  };
+}
+
 export function checkIsWithinSundayWindow(
   now: Date = new Date(),
   checkinStartTime: string = '08:30',

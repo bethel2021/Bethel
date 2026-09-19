@@ -1,5 +1,6 @@
 import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords } from '../mockData';
 import type { ClassGroup, Student, SystemConfig, AttendanceRecord, AdminUser, AdminAccount, Teacher } from '../types';
+import { getActiveSundayDate } from './dateUtils';
 
 const STORAGE_KEYS = {
   CLASSES: 'bethel_classes',
@@ -144,7 +145,7 @@ export function getLocalData() {
       students: initialStudents,
       config: initialSystemConfig,
       records: generateInitialRecords(),
-      activeSunday: '2026-09-13'
+      activeSunday: getActiveSundayDate()
     };
   }
 
@@ -152,11 +153,12 @@ export function getLocalData() {
     const isInitialized = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
     if (!isInitialized) {
       const records = generateInitialRecords(initialStudents);
+      const currentSunday = getActiveSundayDate();
       localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(initialClasses));
       localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(initialStudents));
       localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(initialSystemConfig));
       localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(records));
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, '2026-09-13');
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, currentSunday);
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
 
       return {
@@ -164,7 +166,7 @@ export function getLocalData() {
         students: initialStudents,
         config: initialSystemConfig,
         records,
-        activeSunday: '2026-09-13'
+        activeSunday: currentSunday
       };
     }
 
@@ -215,7 +217,7 @@ export function getLocalData() {
     records = Array.isArray(records) ? records.filter(r => r.classId !== 'class-8' && r.studentId !== 's-801' && r.studentId !== 's-802') : [];
 
     const rawSunday = localStorage.getItem(STORAGE_KEYS.ACTIVE_SUNDAY);
-    const activeSunday = rawSunday || '2026-09-13';
+    const activeSunday = rawSunday || getActiveSundayDate();
 
     const rawTeachers = localStorage.getItem(STORAGE_KEYS.TEACHERS);
     const teachers: Teacher[] = rawTeachers ? JSON.parse(rawTeachers) : [];
@@ -228,7 +230,7 @@ export function getLocalData() {
       students: initialStudents,
       config: initialSystemConfig,
       records: generateInitialRecords(initialStudents),
-      activeSunday: '2026-09-13',
+      activeSunday: getActiveSundayDate(),
       teachers: []
     };
   }
@@ -265,12 +267,13 @@ export function saveLocalData(data: {
 export function resetLocalData() {
   if (typeof window === 'undefined') return;
   try {
+    const currentSunday = getActiveSundayDate();
     const records = generateInitialRecords(initialStudents);
     localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(initialClasses));
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(initialStudents));
     localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(initialSystemConfig));
     localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(records));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, '2026-09-13');
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, currentSunday);
     localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(DEFAULT_ACCOUNTS));
     localStorage.removeItem(STORAGE_KEYS.HIDDEN_CLASS_IDS);
     localStorage.removeItem(STORAGE_KEYS.TEACHERS);
@@ -281,7 +284,7 @@ export function resetLocalData() {
       config: initialSystemConfig,
       records,
       accounts: DEFAULT_ACCOUNTS,
-      activeSunday: '2026-09-13',
+      activeSunday: currentSunday,
       teachers: []
     };
   } catch (e) {

@@ -66,7 +66,13 @@ export function getActiveSundayDate(): string {
   if (rome.dayOfWeek === 0) {
     return rome.dateStr;
   }
-  return '2026-09-13';
+  const daysUntilNextSunday = 7 - rome.dayOfWeek;
+  const targetDateObj = new Date(`${rome.dateStr}T12:00:00Z`);
+  targetDateObj.setUTCDate(targetDateObj.getUTCDate() + daysUntilNextSunday);
+  const y = targetDateObj.getUTCFullYear();
+  const m = String(targetDateObj.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(targetDateObj.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export let activeSunday = getActiveSundayDate();

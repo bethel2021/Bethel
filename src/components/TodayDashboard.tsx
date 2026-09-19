@@ -19,7 +19,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../types';
-import { formatChineseDate, checkIsWithinSundayWindow } from '../utils/dateUtils';
+import { formatChineseDate, checkIsWithinSundayWindow, getSundayDisplayInfo } from '../utils/dateUtils';
 import { calculateAge, formatBirthDate } from '../utils/studentUtils';
 
 interface TodayDashboardProps {
@@ -55,6 +55,10 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   const visibleClasses = useMemo(() => classes.filter(c => !c.isHiddenFromHome), [classes]);
   const visibleClassIdSet = useMemo(() => new Set(visibleClasses.map(c => c.id)), [visibleClasses]);
   const homeStudents = useMemo(() => students.filter(s => visibleClassIdSet.has(s.classId)), [students, visibleClassIdSet]);
+
+  const sundayInfo = useMemo(() => {
+    return getSundayDisplayInfo(new Date(), activeSunday);
+  }, [activeSunday]);
 
   const [selectedClassId, setSelectedClassId] = useState<string>(() => {
     const firstVisible = classes.find(c => !c.isHiddenFromHome);
@@ -222,8 +226,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 </span>
               </div>
               <div className="text-[11px] sm:text-xs text-amber-200 font-medium whitespace-nowrap flex items-center gap-0.5 sm:gap-1 shrink-0 ml-auto">
-                <span className="text-amber-200/80">当前主日：</span>
-                <span className="text-white font-semibold">{formatChineseDate(activeSunday)}</span>
+                <span className="text-amber-200/80">{sundayInfo.label}</span>
+                <span className="text-white font-semibold">{formatChineseDate(activeSunday || sundayInfo.sundayDate)}</span>
               </div>
             </div>
             <p className="text-xs sm:text-sm text-amber-100/90 max-w-3xl leading-relaxed">
@@ -411,8 +415,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 )}
               </div>
               <div className="text-[11px] sm:text-xs text-slate-600 font-medium whitespace-nowrap flex items-center gap-0.5 sm:gap-1 bg-slate-100/90 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md border border-slate-200/70 shrink-0 ml-auto">
-                <span className="text-slate-500">当前主日：</span>
-                <span className="text-slate-800 font-semibold">{formatChineseDate(activeSunday)}</span>
+                <span className="text-slate-500">{sundayInfo.label}</span>
+                <span className="text-slate-800 font-semibold">{formatChineseDate(activeSunday || sundayInfo.sundayDate)}</span>
               </div>
             </div>
 

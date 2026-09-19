@@ -3,6 +3,7 @@ import {
   Church, 
   Users, 
   CalendarCheck, 
+  Cake,
   Award, 
   Settings, 
   Clock, 
@@ -23,8 +24,8 @@ import { checkIsWithinSundayWindow, getDayOfWeekName } from '../utils/dateUtils'
 
 interface HeaderProps {
   config: SystemConfig;
-  activeTab: 'today' | 'monthly' | 'annual' | 'settings';
-  setActiveTab: (tab: 'today' | 'monthly' | 'annual' | 'settings') => void;
+  activeTab: 'today' | 'attendance' | 'birthday' | 'settings' | 'monthly' | 'annual';
+  setActiveTab: (tab: 'today' | 'attendance' | 'birthday' | 'settings') => void;
   onQuickToggleTestMode?: () => void;
   currentUser: AdminUser | null;
   onOpenLogin: () => void;
@@ -35,6 +36,7 @@ interface HeaderProps {
   lastSyncTime?: string;
   isServerAvailable?: boolean | null;
   serverRuntime?: string | null;
+  upcomingBirthdayCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -50,6 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
   lastSyncTime = '',
   isServerAvailable = true,
   serverRuntime = null,
+  upcomingBirthdayCount = 0,
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -212,7 +215,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-slate-100">
           <button
             onClick={() => setActiveTab('today')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-0.5 transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'today'
                 ? 'bg-amber-700 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -223,27 +226,36 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('monthly')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-0.5 transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'monthly'
+            onClick={() => setActiveTab('attendance')}
+            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'attendance' || activeTab === 'monthly' || activeTab === 'annual'
                 ? 'bg-amber-700 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
             <CalendarCheck className="w-4 h-4 text-inherit" />
-            <span>月度统计</span>
+            <span>考勤统计</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('annual')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-0.5 transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'annual'
+            onClick={() => setActiveTab('birthday')}
+            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'birthday'
                 ? 'bg-amber-700 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <Award className="w-4 h-4 text-inherit" />
-            <span>年度成绩</span>
+            <Cake className="w-4 h-4 text-inherit" />
+            <span>生日提醒</span>
+            {upcomingBirthdayCount > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                activeTab === 'birthday' 
+                  ? 'bg-white/20 text-white' 
+                  : 'bg-amber-100 text-amber-900 border border-amber-300'
+              }`}>
+                {upcomingBirthdayCount}
+              </span>
+            )}
           </button>
         </div>
       </div>

@@ -176,6 +176,7 @@ var records = [];
 var systemConfig = { ...initialSystemConfig };
 var adminAccounts = [...initialAdminAccounts];
 var activeSessions = /* @__PURE__ */ new Map();
+var teachers = [];
 var syncVersion = 1;
 var lastModifiedTimestamp = (/* @__PURE__ */ new Date()).toISOString();
 function getRomeTimeParts(date = /* @__PURE__ */ new Date()) {
@@ -223,7 +224,13 @@ function getActiveSundayDate() {
   if (rome.dayOfWeek === 0) {
     return rome.dateStr;
   }
-  return "2026-09-13";
+  const daysUntilNextSunday = 7 - rome.dayOfWeek;
+  const targetDateObj = new Date(`${rome.dateStr}T12:00:00Z`);
+  targetDateObj.setUTCDate(targetDateObj.getUTCDate() + daysUntilNextSunday);
+  const y = targetDateObj.getUTCFullYear();
+  const m = String(targetDateObj.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(targetDateObj.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 var activeSunday = getActiveSundayDate();
 function getStoragePath() {
@@ -303,10 +310,12 @@ function saveDataToFile() {
   syncVersion++;
   lastModifiedTimestamp = (/* @__PURE__ */ new Date()).toISOString();
   const hiddenIds = classes.filter((c) => !!c.isHiddenFromHome).map((c) => c.id);
-  systemConfig = {
+  const updatedConfig = {
     ...systemConfig,
     hiddenClassIds: hiddenIds
   };
+  Object.keys(systemConfig).forEach((key) => delete systemConfig[key]);
+  Object.assign(systemConfig, updatedConfig);
   const payload = {
     systemConfig,
     classes,
@@ -316,6 +325,7 @@ function saveDataToFile() {
     activeSunday,
     syncVersion,
     hiddenClassIds: hiddenIds,
+    teachers,
     updatedAt: lastModifiedTimestamp
   };
   try {
@@ -340,7 +350,8 @@ function saveDataToFile() {
         adminAccounts,
         activeSunday,
         syncVersion,
-        lastModifiedTimestamp
+        lastModifiedTimestamp,
+        teachers
       });
     } catch (err) {
       console.warn("[Realtime Sync Error] Listener callback failed:", err);
@@ -350,7 +361,7 @@ function saveDataToFile() {
   });
 }
 function generateHistoricalRecords() {
-  records = [];
+  records.length = 0;
   const pastSundays = [
     "2026-06-07",
     "2026-06-14",
@@ -409,9 +420,15 @@ function generateHistoricalRecords() {
 }
 var isInitialized = false;
 function sanitizeYageData() {
-  classes = classes.filter((c) => c.id !== "class-8" && c.name !== "\u96C5\u6B4C\u56E2\u5951");
-  students = students.filter((s) => s.classId !== "class-8" && s.id !== "s-801" && s.id !== "s-802");
-  records = records.filter((r) => r.classId !== "class-8" && r.studentId !== "s-801" && r.studentId !== "s-802");
+  const filteredClasses = classes.filter((c) => c.id !== "class-8" && c.name !== "\u96C5\u6B4C\u56E2\u5951");
+  classes.length = 0;
+  classes.push(...filteredClasses);
+  const filteredStudents = students.filter((s) => s.classId !== "class-8" && s.id !== "s-801" && s.id !== "s-802");
+  students.length = 0;
+  students.push(...filteredStudents);
+  const filteredRecords = records.filter((r) => r.classId !== "class-8" && r.studentId !== "s-801" && r.studentId !== "s-802");
+  records.length = 0;
+  records.push(...filteredRecords);
 }
 function loadFromDisk() {
   try {
@@ -434,21 +451,58 @@ function loadFromDisk() {
         data.hiddenClassIds.forEach((id) => hiddenSet.add(id));
       }
       if (Array.isArray(data.classes) && data.classes.length > 0) {
-        classes = data.classes.map((c) => ({
+        const mappedClasses = data.classes.map((c) => ({
           ...c,
           isHiddenFromHome: typeof c.isHiddenFromHome === "boolean" ? c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
+        classes.length = 0;
+        classes.push(...mappedClasses);
       } else {
-        classes = classes.map((c) => ({
+        const mappedClasses = classes.map((c) => ({
           ...c,
           isHiddenFromHome: typeof c.isHiddenFromHome === "boolean" ? c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
+        classes.length = 0;
+        classes.push(...mappedClasses);
       }
-      if (Array.isArray(data.students) && data.students.length > 0) students = data.students;
-      if (Array.isArray(data.records)) records = data.records;
-      if (Array.isArray(data.adminAccounts) && data.adminAccounts.length > 0) adminAccounts = data.adminAccounts;
+      if (Array.isArray(data.students) && data.students.length > 0) {
+        students.length = 0;
+        students.push(...data.students);
+      }
+      if (Array.isArray(data.records)) {
+        const originalCount = data.records.length;
+        const cleanedRecords = data.records.filter((r) => r.date !== "2026-09-06" && r.date !== "2026-09-13");
+        records.length = 0;
+        records.push(...cleanedRecords);
+        if (originalCount !== cleanedRecords.length) {
+          console.log(`[Storage Cleanup] Reset ${originalCount - cleanedRecords.length} records for September 6th and 13th, 2026.`);
+          setTimeout(() => saveDataToFile(), 100);
+        }
+      }
+      if (Array.isArray(data.adminAccounts) && data.adminAccounts.length > 0) {
+        adminAccounts.length = 0;
+        adminAccounts.push(...data.adminAccounts);
+      }
+      if (Array.isArray(data.teachers)) {
+        teachers.length = 0;
+        teachers.push(...data.teachers);
+      } else {
+        const defaultTeachers = [
+          { id: "t-1", name: "\u6625\u6765 \u8001\u5E08", gender: "boy", phone: "13812345671", wechat: "chunlai_teacher", classId: "class-1", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+          { id: "t-2", name: "\u79CB\u5A1F \u8001\u5E08", gender: "girl", phone: "13812345672", wechat: "qiujuan_teacher", classId: "class-2", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+          { id: "t-3", name: "\u82E5\u96EA \u8001\u5E08", gender: "girl", phone: "13812345673", wechat: "ruoxue_teacher", classId: "class-3", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+          { id: "t-4", name: "\u4E0A\u597D \u8001\u5E08", gender: "boy", phone: "13812345674", wechat: "shanghao_teacher", classId: "class-4", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+          { id: "t-5", name: "\u96EA\u6210 \u8001\u5E08", gender: "boy", phone: "13812345675", wechat: "xuecheng_teacher", classId: "class-5", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+          { id: "t-6", name: "\u5FD7\u5B89 \u8001\u5E08", gender: "boy", phone: "13812345676", wechat: "zhian_teacher", classId: "class-6", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+          { id: "t-7", name: "\u4E1C\u4E3D \u8001\u5E08", gender: "girl", phone: "13812345677", wechat: "dongli_teacher", classId: "class-7", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" }
+        ];
+        teachers.length = 0;
+        teachers.push(...defaultTeachers);
+      }
       if (data.systemConfig) {
-        systemConfig = { ...initialSystemConfig, ...data.systemConfig, hiddenClassIds: Array.from(hiddenSet) };
+        const mergedConfig = { ...initialSystemConfig, ...data.systemConfig, hiddenClassIds: Array.from(hiddenSet) };
+        Object.keys(systemConfig).forEach((key) => delete systemConfig[key]);
+        Object.assign(systemConfig, mergedConfig);
       }
       if (data.activeSunday) activeSunday = data.activeSunday;
       if (typeof data.syncVersion === "number") syncVersion = data.syncVersion;
@@ -456,10 +510,25 @@ function loadFromDisk() {
       sanitizeYageData();
       return true;
     } else if (hiddenSet.size > 0) {
-      classes = classes.map((c) => ({
+      const mappedClasses = classes.map((c) => ({
         ...c,
         isHiddenFromHome: hiddenSet.has(c.id)
       }));
+      classes.length = 0;
+      classes.push(...mappedClasses);
+    }
+    if (!fs.existsSync(filePath)) {
+      const defaultTeachers = [
+        { id: "t-1", name: "\u6625\u6765 \u8001\u5E08", gender: "boy", phone: "13812345671", wechat: "chunlai_teacher", classId: "class-1", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+        { id: "t-2", name: "\u79CB\u5A1F \u8001\u5E08", gender: "girl", phone: "13812345672", wechat: "qiujuan_teacher", classId: "class-2", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+        { id: "t-3", name: "\u82E5\u96EA \u8001\u5E08", gender: "girl", phone: "13812345673", wechat: "ruoxue_teacher", classId: "class-3", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+        { id: "t-4", name: "\u4E0A\u597D \u8001\u5E08", gender: "boy", phone: "13812345674", wechat: "shanghao_teacher", classId: "class-4", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+        { id: "t-5", name: "\u96EA\u6210 \u8001\u5E08", gender: "boy", phone: "13812345675", wechat: "xuecheng_teacher", classId: "class-5", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+        { id: "t-6", name: "\u5FD7\u5B89 \u8001\u5E08", gender: "boy", phone: "13812345676", wechat: "zhian_teacher", classId: "class-6", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" },
+        { id: "t-7", name: "\u4E1C\u4E3D \u8001\u5E08", gender: "girl", phone: "13812345677", wechat: "dongli_teacher", classId: "class-7", roleTitle: "\u4E3B\u65E5\u5B66\u73ED\u4E3B\u4EFB", joinDate: "2026-01-01" }
+      ];
+      teachers.length = 0;
+      teachers.push(...defaultTeachers);
     }
   } catch (err) {
     console.warn("[Storage Notice] Could not read disk cache:", err);
@@ -499,15 +568,34 @@ async function initOrLoadDataAsync() {
         cloudData.hiddenClassIds.forEach((id) => currentHiddenSet.add(id));
       }
       if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
-        classes = cloudData.classes.map((c) => ({
+        const mappedClasses = cloudData.classes.map((c) => ({
           ...c,
           isHiddenFromHome: typeof c.isHiddenFromHome === "boolean" ? c.isHiddenFromHome : currentHiddenSet.has(c.id)
         }));
+        classes.length = 0;
+        classes.push(...mappedClasses);
       }
-      if (Array.isArray(cloudData.students) && cloudData.students.length > 0) students = cloudData.students;
-      if (Array.isArray(cloudData.records)) records = cloudData.records;
-      if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) adminAccounts = cloudData.adminAccounts;
-      if (cloudData.systemConfig) systemConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(currentHiddenSet) };
+      if (Array.isArray(cloudData.students) && cloudData.students.length > 0) {
+        students.length = 0;
+        students.push(...cloudData.students);
+      }
+      if (Array.isArray(cloudData.records)) {
+        records.length = 0;
+        records.push(...cloudData.records);
+      }
+      if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) {
+        adminAccounts.length = 0;
+        adminAccounts.push(...cloudData.adminAccounts);
+      }
+      if (Array.isArray(cloudData.teachers)) {
+        teachers.length = 0;
+        teachers.push(...cloudData.teachers);
+      }
+      if (cloudData.systemConfig) {
+        const mergedConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(currentHiddenSet) };
+        Object.keys(systemConfig).forEach((key) => delete systemConfig[key]);
+        Object.assign(systemConfig, mergedConfig);
+      }
       if (cloudData.activeSunday) activeSunday = cloudData.activeSunday;
       syncVersion = cloudData.syncVersion;
       if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
@@ -558,16 +646,20 @@ function verifySuperAdminPermission(req) {
   };
 }
 function setClasses(newClasses) {
-  classes = newClasses;
+  classes.length = 0;
+  classes.push(...newClasses);
 }
 function setStudents(newStudents) {
-  students = newStudents;
+  students.length = 0;
+  students.push(...newStudents);
 }
 function setRecords(newRecords) {
-  records = newRecords;
+  records.length = 0;
+  records.push(...newRecords);
 }
 function setSystemConfig(newConfig) {
-  systemConfig = newConfig;
+  Object.keys(systemConfig).forEach((key) => delete systemConfig[key]);
+  Object.assign(systemConfig, newConfig);
 }
 function mergeClientData(payload) {
   let changed = false;
@@ -603,7 +695,9 @@ function mergeClientData(payload) {
         }
       }
     }
-    classes = Array.from(classMap.values());
+    const mergedClasses = Array.from(classMap.values());
+    classes.length = 0;
+    classes.push(...mergedClasses);
   }
   if (Array.isArray(payload.students) && payload.students.length > 0) {
     const studentMap = new Map(students.map((s) => [s.id, s]));
@@ -619,7 +713,9 @@ function mergeClientData(payload) {
         }
       }
     }
-    students = Array.from(studentMap.values());
+    const mergedStudents = Array.from(studentMap.values());
+    students.length = 0;
+    students.push(...mergedStudents);
   }
   if (Array.isArray(payload.records) && payload.records.length > 0) {
     const recordMap = new Map(records.map((r) => [r.id, r]));
@@ -635,7 +731,27 @@ function mergeClientData(payload) {
         }
       }
     }
-    records = Array.from(recordMap.values());
+    const mergedRecords = Array.from(recordMap.values());
+    records.length = 0;
+    records.push(...mergedRecords);
+  }
+  if (Array.isArray(payload.teachers) && payload.teachers.length > 0) {
+    const teacherMap = new Map(teachers.map((t) => [t.id, t]));
+    for (const t of payload.teachers) {
+      if (!teacherMap.has(t.id)) {
+        teacherMap.set(t.id, t);
+        changed = true;
+      } else {
+        const existing = teacherMap.get(t.id);
+        if (JSON.stringify(existing) !== JSON.stringify(t)) {
+          teacherMap.set(t.id, { ...existing, ...t });
+          changed = true;
+        }
+      }
+    }
+    const mergedTeachers = Array.from(teacherMap.values());
+    teachers.length = 0;
+    teachers.push(...mergedTeachers);
   }
   if (payload.activeSunday) {
     activeSunday = payload.activeSunday;
@@ -650,7 +766,8 @@ function mergeClientData(payload) {
     config: systemConfig,
     activeSunday,
     syncVersion,
-    lastModifiedTimestamp
+    lastModifiedTimestamp,
+    teachers
   };
 }
 
@@ -677,6 +794,7 @@ function getCurrentStatePayload(eventType = "state_update", extraData) {
     })),
     students,
     records,
+    teachers,
     accounts: adminAccounts.map((a) => ({
       id: a.id,
       username: a.username,
@@ -849,6 +967,7 @@ apiRouter.get("/state", async (req, res) => {
     })),
     students,
     records,
+    teachers,
     accounts: adminAccounts.map((a) => ({
       id: a.id,
       username: a.username,
@@ -1468,6 +1587,72 @@ apiRouter.delete("/students/:id", (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+apiRouter.post("/teachers", (req, res) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message });
+    }
+    const { id, name, gender, phone, wechat, classId, roleTitle, joinDate, notes } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "\u6559\u5E08\u59D3\u540D\u5747\u4E3A\u5FC5\u586B\u9879" });
+    }
+    const idx = teachers.findIndex((t) => id && t.id === id);
+    if (idx !== -1) {
+      teachers[idx] = {
+        ...teachers[idx],
+        name,
+        gender: gender || "boy",
+        phone: phone || "",
+        wechat: wechat || "",
+        classId: classId || "",
+        roleTitle: roleTitle || "\u4E3B\u65E5\u5B66\u8001\u5E08",
+        joinDate: joinDate || teachers[idx].joinDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        notes: notes || ""
+      };
+      saveDataToFile();
+      broadcastRealtimeState("teachers_updated");
+      return res.json({ success: true, teacher: teachers[idx], message: "\u6559\u5E08\u8D44\u6599\u5DF2\u66F4\u65B0" });
+    }
+    const newTeacher = {
+      id: `t-${Date.now().toString().slice(-6)}`,
+      name,
+      gender: gender || "boy",
+      phone: phone || "",
+      wechat: wechat || "",
+      classId: classId || "",
+      roleTitle: roleTitle || "\u4E3B\u65E5\u5B66\u8001\u5E08",
+      joinDate: joinDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+      notes: notes || ""
+    };
+    teachers.push(newTeacher);
+    saveDataToFile();
+    broadcastRealtimeState("teachers_updated");
+    return res.json({ success: true, teacher: newTeacher, message: "\u6210\u529F\u6DFB\u52A0\u6559\u5E08\u8D44\u6599" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+apiRouter.delete("/teachers/:id", (req, res) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message });
+    }
+    const { id } = req.params;
+    const idx = teachers.findIndex((t) => t.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: "\u672A\u627E\u5230\u8BE5\u6559\u5E08\u8D44\u6599" });
+    }
+    const removed = teachers[idx];
+    teachers.splice(idx, 1);
+    saveDataToFile();
+    broadcastRealtimeState("teachers_updated");
+    return res.json({ success: true, message: `\u6559\u5E08\u3010${removed.name}\u3011\u5DF2\u6210\u529F\u4ECE\u540D\u518C\u4E2D\u5F7B\u5E95\u5220\u9664\uFF01` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 apiRouter.post("/config", (req, res) => {
   try {
     const auth = verifySuperAdminPermission(req);
@@ -1695,7 +1880,7 @@ app.use("/api", (req, res) => {
   res.status(404).json({
     error: `\u63A5\u53E3\u672A\u627E\u5230: ${req.method} ${req.url}`,
     status: 404,
-    validEndpoints: ["/api/health", "/api/state", "/api/cloud-sync", "/api/sync-data", "/api/checkin", "/api/classes", "/api/students", "/api/config"]
+    validEndpoints: ["/api/health", "/api/state", "/api/cloud-sync", "/api/sync-data", "/api/checkin", "/api/classes", "/api/students", "/api/teachers", "/api/config"]
   });
 });
 var app_default = app;

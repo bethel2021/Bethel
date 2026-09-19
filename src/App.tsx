@@ -9,8 +9,8 @@ import {
 import type { SystemConfig, ClassGroup, Student, AttendanceRecord, AdminUser, AdminAccount } from './types';
 import { Header } from './components/Header';
 import { TodayDashboard } from './components/TodayDashboard';
-import { MonthlyReportView } from './components/MonthlyReportView';
-import { AnnualReportView } from './components/AnnualReportView';
+import { AttendanceStatsView } from './components/AttendanceStatsView';
+import { BirthdayReminderView } from './components/BirthdayReminderView';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginModal } from './components/LoginModal';
 import { MultiDeviceSyncModal } from './components/MultiDeviceSyncModal';
@@ -28,7 +28,8 @@ import {
   saveLocalHiddenClassIds
 } from './utils/localStore';
 import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords } from './mockData';
-import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts, checkIsWithinSundayWindow } from './utils/dateUtils';
+import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts, checkIsWithinSundayWindow, getActiveSundayDate } from './utils/dateUtils';
+import { getAllStudentsBirthdayInfo } from './utils/birthdayUtils';
 
 const TAB_ID = Math.random().toString(36).substring(2, 9);
 
@@ -43,7 +44,7 @@ function isDataEqual(a: any, b: any): boolean {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'today' | 'monthly' | 'annual' | 'settings'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'attendance' | 'birthday' | 'settings'>('today');
   const [loading, setLoading] = useState(true);
   const [newCheckinAlert, setNewCheckinAlert] = useState<string | null>(null);
 
@@ -112,9 +113,9 @@ export default function App() {
   const [activeSunday, setActiveSunday] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const local = getLocalData();
-      return local.activeSunday || '2026-09-13';
+      return local.activeSunday || getActiveSundayDate();
     }
-    return '2026-09-13';
+    return getActiveSundayDate();
   });
 
   const previousRecordsCountRef = useRef<number>(0);
@@ -1436,6 +1437,7 @@ export default function App() {
         lastSyncTime={lastSyncTime}
         isServerAvailable={isServerAvailable}
         serverRuntime={serverRuntime}
+        upcomingBirthdayCount={getAllStudentsBirthdayInfo(students, classes, new Date()).filter(i => i.isWithinOneWeek).length}
       />
 
       {/* Content Body */}
@@ -1454,8 +1456,8 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'monthly' && (
-          <MonthlyReportView
+        {activeTab === 'attendance' && (
+          <AttendanceStatsView
             config={config}
             classes={classes}
             students={students}
@@ -1465,12 +1467,11 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'annual' && (
-          <AnnualReportView
+        {activeTab === 'birthday' && (
+          <BirthdayReminderView
             config={config}
             classes={classes}
             students={students}
-            records={records}
             currentUser={currentUser}
             onOpenLogin={() => setIsLoginModalOpen(true)}
           />
