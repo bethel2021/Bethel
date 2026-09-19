@@ -39,10 +39,7 @@ const pollWaiters = new Set<{ res: Response; timer: NodeJS.Timeout; clientVersio
 
 export function getCurrentStatePayload(eventType: string = 'state_update', extraData?: any) {
   const currentSunday = getActiveSundayDate();
-  const hiddenIds = Array.from(new Set([
-    ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
-    ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
-  ]));
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   systemConfig.hiddenClassIds = hiddenIds;
 
   return {
@@ -259,10 +256,7 @@ apiRouter.get('/health', (req: Request, res: Response) => {
 apiRouter.get('/state', async (req: Request, res: Response) => {
   await initOrLoadDataAsync();
   const currentSunday = getActiveSundayDate();
-  const hiddenIds = Array.from(new Set([
-    ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
-    ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
-  ]));
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   systemConfig.hiddenClassIds = hiddenIds;
   res.json({
     config: {
@@ -296,10 +290,7 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
 // 1.1 Cloud Multi-Device Sync endpoints
 apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
   await initOrLoadDataAsync();
-  const hiddenIds = Array.from(new Set([
-    ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
-    ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
-  ]));
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   systemConfig.hiddenClassIds = hiddenIds;
   res.json({
     status: 'ok',

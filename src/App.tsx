@@ -158,7 +158,6 @@ export default function App() {
 
     let mergedClassesForCache: ClassGroup[] | undefined;
     if (Array.isArray(data.classes)) {
-      const localHiddenIds = getLocalHiddenClassIds();
       const serverHiddenIds = new Set<string>([
         ...(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []),
         ...(Array.isArray(data.config?.hiddenClassIds) ? data.config.hiddenClassIds : []),
@@ -173,13 +172,13 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : (c.isHiddenFromHome === true || serverHiddenIds.has(c.id) || localHiddenIds.has(c.id))
+              : (c.isHiddenFromHome === true || serverHiddenIds.has(c.id))
           };
         }
 
         // 2. Class hidden status:
-        // A class is hidden if marked true on server, present in server/config hidden list, OR present in local hidden set
-        const isHidden = c.isHiddenFromHome === true || serverHiddenIds.has(c.id) || localHiddenIds.has(c.id);
+        // When connected, the server's state is authoritative across all logged-in devices
+        const isHidden = c.isHiddenFromHome === true || serverHiddenIds.has(c.id);
 
         return {
           ...c,

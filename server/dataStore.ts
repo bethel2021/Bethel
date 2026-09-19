@@ -175,10 +175,7 @@ export function onDataChange(listener: DataChangeListener): () => void {
 export function saveDataToFile() {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  const hiddenIds = Array.from(new Set([
-    ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
-    ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
-  ]));
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   systemConfig.hiddenClassIds = hiddenIds;
   classes.forEach(c => {
     c.isHiddenFromHome = hiddenIds.includes(c.id);
@@ -456,23 +453,15 @@ export async function initOrLoadDataAsync() {
   if (cloudData && typeof cloudData.syncVersion === 'number') {
     // Only apply cloud KV data if it is NEWER than current in-memory syncVersion
     if (cloudData.syncVersion > syncVersion) {
-      const currentHiddenSet = new Set<string>([
-        ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
-        ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
+      const cloudHiddenSet = new Set<string>([
+        ...(Array.isArray(cloudData.hiddenClassIds) ? cloudData.hiddenClassIds : []),
+        ...(Array.isArray(cloudData.systemConfig?.hiddenClassIds) ? cloudData.systemConfig.hiddenClassIds : []),
+        ...(Array.isArray(cloudData.config?.hiddenClassIds) ? cloudData.config.hiddenClassIds : [])
       ]);
-      if (Array.isArray(cloudData.hiddenClassIds)) {
-        cloudData.hiddenClassIds.forEach((id: string) => currentHiddenSet.add(id));
-      }
-      if (cloudData.config && Array.isArray(cloudData.config.hiddenClassIds)) {
-        cloudData.config.hiddenClassIds.forEach((id: string) => currentHiddenSet.add(id));
-      }
-      if (cloudData.systemConfig && Array.isArray(cloudData.systemConfig.hiddenClassIds)) {
-        cloudData.systemConfig.hiddenClassIds.forEach((id: string) => currentHiddenSet.add(id));
-      }
       if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
         const mappedClasses = cloudData.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome === true || currentHiddenSet.has(c.id)
+          isHiddenFromHome: c.isHiddenFromHome === true || cloudHiddenSet.has(c.id)
         }));
         classes.length = 0;
         classes.push(...mappedClasses);
@@ -494,7 +483,7 @@ export async function initOrLoadDataAsync() {
         teachers.push(...cloudData.teachers);
       }
       if (cloudData.systemConfig) {
-        const mergedConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(currentHiddenSet) };
+        const mergedConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(cloudHiddenSet) };
         Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
         Object.assign(systemConfig, mergedConfig);
       }
@@ -639,10 +628,8 @@ export function mergeClientData(payload: SyncPayload): {
       } else {
         const existing = classMap.get(c.id)!;
         // The server's settings (including isHiddenFromHome, teachers, and classroom) are authoritative for existing classes.
-        // We preserve the server's existing isHiddenFromHome status instead of letting clients overwrite it.
-        const authoritativeHidden = c.isHiddenFromHome !== undefined
-          ? !!c.isHiddenFromHome
-          : (existing.isHiddenFromHome === true || diskHiddenSet.has(c.id));
+        // Routine client background syncs must preserve the server's existing isHiddenFromHome status.
+        const authoritativeHidden = existing.isHiddenFromHome === true || diskHiddenSet.has(c.id);
         const mergedClass: ClassGroup = {
           ...existing,
           ...c,
