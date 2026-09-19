@@ -1030,16 +1030,18 @@ apiRouter.post('/teachers', (req: Request, res: Response) => {
       return res.status(400).json({ error: '教师姓名均为必填项' });
     }
 
+    const cleanName = String(name).trim().replace(/\s*老师$/, '');
+
     const idx = teachers.findIndex(t => id && t.id === id);
     if (idx !== -1) {
       teachers[idx] = {
         ...teachers[idx],
-        name,
+        name: cleanName,
         gender: gender || 'boy',
         phone: phone || '',
         wechat: wechat || '',
         classId: classId || '',
-        roleTitle: roleTitle || '主日学老师',
+        roleTitle: roleTitle || '班主任',
         joinDate: joinDate || teachers[idx].joinDate || new Date().toISOString().split('T')[0],
         notes: notes || ''
       };
@@ -1051,12 +1053,12 @@ apiRouter.post('/teachers', (req: Request, res: Response) => {
 
     const newTeacher = {
       id: `t-${Date.now().toString().slice(-6)}`,
-      name,
+      name: cleanName,
       gender: gender || 'boy',
       phone: phone || '',
       wechat: wechat || '',
       classId: classId || '',
-      roleTitle: roleTitle || '主日学老师',
+      roleTitle: roleTitle || '班主任',
       joinDate: joinDate || new Date().toISOString().split('T')[0],
       notes: notes || ''
     };

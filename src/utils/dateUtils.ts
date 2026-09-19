@@ -172,8 +172,8 @@ export function getSundayDisplayInfo(date: Date = new Date(), sundayDateStr?: st
 
 export function checkIsWithinSundayWindow(
   now: Date = new Date(),
-  checkinStartTime: string = '08:30',
-  checkinEndTime: string = '12:30',
+  checkinStartTime: string = '11:00',
+  checkinEndTime: string = '16:00',
   testMode: boolean = false
 ): { isAllowed: boolean; statusMsg: string; isSunday: boolean } {
   if (testMode) {
@@ -195,8 +195,8 @@ export function checkIsWithinSundayWindow(
     };
   }
 
-  let startMinutes = 8 * 60 + 30;
-  let endMinutes = 12 * 60 + 30;
+  let startMinutes = 11 * 60;
+  let endMinutes = 16 * 60;
 
   if (checkinStartTime) {
     const [sh, sm] = checkinStartTime.split(':').map(Number);

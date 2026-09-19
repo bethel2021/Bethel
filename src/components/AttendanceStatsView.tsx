@@ -354,7 +354,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
 
         <div class="footer">
           <div>班级任课教师签名：__________________</div>
-          <div>主日学校长/团长 签名：__________________</div>
+          <div>负责同工/团长 签名：__________________</div>
           <div>日期：2026年____月____日</div>
         </div>
 
@@ -932,7 +932,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
               <span>注：迟到计入出席统计，请假与旷课不计入有效出席率。</span>
               <div className="flex items-center gap-4">
                 <span>班级导师签名：______________</span>
-                <span>主日学校长/团长 签名：______________</span>
+                <span>负责同工/团长 签名：______________</span>
               </div>
             </div>
           </div>

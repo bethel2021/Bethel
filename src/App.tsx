@@ -27,7 +27,7 @@ import {
   getLocalHiddenClassIds,
   saveLocalHiddenClassIds
 } from './utils/localStore';
-import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords } from './mockData';
+import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords, initialTeachers } from './mockData';
 import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts, checkIsWithinSundayWindow, getActiveSundayDate } from './utils/dateUtils';
 import { getAllStudentsBirthdayInfo } from './utils/birthdayUtils';
 
@@ -106,9 +106,15 @@ export default function App() {
   const [teachers, setTeachers] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
       const local = getLocalData();
-      return (local as any).teachers || [];
+      const list = (local as any).teachers && (local as any).teachers.length > 0 ? (local as any).teachers : initialTeachers;
+      return list.map((t: any) => {
+        if (t.name && (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成'))) {
+          return { ...t, gender: 'girl' };
+        }
+        return t;
+      });
     }
-    return [];
+    return initialTeachers;
   });
   const [activeSunday, setActiveSunday] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -199,7 +205,13 @@ export default function App() {
     }
 
     if (Array.isArray(data.teachers)) {
-      setTeachers(prev => isDataEqual(prev, data.teachers) ? prev : data.teachers);
+      const normalizedTeachers = data.teachers.map((t: any) => {
+        if (t.name && (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成'))) {
+          return { ...t, gender: 'girl' };
+        }
+        return t;
+      });
+      setTeachers(prev => isDataEqual(prev, normalizedTeachers) ? prev : normalizedTeachers);
     }
 
     if (data.accounts && Array.isArray(data.accounts) && data.accounts.length > 0) {
@@ -679,9 +691,9 @@ export default function App() {
         let finalStatus = data.status;
         if (finalStatus === 'present') {
           let isLate = false;
-          // 1. Check if late rule is enabled and exceeds late threshold (e.g. 09:30)
+          // 1. Check if late rule is enabled and exceeds late threshold (e.g. 15:00)
           if (config.enableLateRule) {
-            const [lateH, lateM] = (config.lateThresholdTime || '09:30').split(':').map(Number);
+            const [lateH, lateM] = (config.lateThresholdTime || '15:00').split(':').map(Number);
             if (nowTimeParts.hour > lateH || (nowTimeParts.hour === lateH && nowTimeParts.minute > lateM)) {
               isLate = true;
             }
@@ -1404,10 +1416,15 @@ export default function App() {
     }
   };
 
-  // Import JSON backup file (一键导入数据恢复)
-  const handleImportData = async (file: File) => {
+  // Import JSON backup file or raw JSON string (一键导入数据恢复，适配 Vercel 云端)
+  const handleImportData = async (fileOrJson: File | string) => {
     try {
-      const text = await file.text();
+      let text = '';
+      if (typeof fileOrJson === 'string') {
+        text = fileOrJson.trim();
+      } else {
+        text = await fileOrJson.text();
+      }
       const restored = importLocalBackup(text);
       setClasses(restored.classes);
       setStudents(restored.students);
@@ -1415,11 +1432,33 @@ export default function App() {
       setRecords(restored.records);
       setAccounts(restored.accounts);
       setActiveSunday(restored.activeSunday);
+      if (restored.teachers && restored.teachers.length > 0) {
+        setTeachers(restored.teachers);
+      }
+
+      // Sync restored state directly with Vercel Serverless / Cloud KV
+      try {
+        await fetch('/api/cloud-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            classes: restored.classes,
+            students: restored.students,
+            records: restored.records,
+            config: restored.config,
+            teachers: restored.teachers || [],
+            accounts: restored.accounts
+          })
+        });
+      } catch (err) {
+        console.warn('Vercel cloud sync error on import:', err);
+      }
+
       notifyCrossTabSync();
-      setNewCheckinAlert(`📦 数据恢复成功：已恢复 ${restored.classes.length} 个班级与 ${restored.students.length} 名在册学员！`);
+      setNewCheckinAlert(`📦 数据恢复成功：已恢复 ${restored.classes.length} 个班级与 ${restored.students.length} 名在册学员，已强同步至 Vercel 云端！`);
       setTimeout(() => setNewCheckinAlert(null), 4000);
     } catch (err: any) {
-      throw new Error('导入恢复失败: ' + (err.message || '文件格式无效'));
+      throw new Error('导入恢复失败: ' + (err.message || '文件或数据格式无效'));
     }
   };
 

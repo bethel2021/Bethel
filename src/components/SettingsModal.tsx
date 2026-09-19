@@ -32,10 +32,14 @@ import {
   Upload,
   Cloud,
   Server,
-  Globe
+  Globe,
+  Copy,
+  FileText,
+  ClipboardCheck
 } from 'lucide-react';
 import type { SystemConfig, Student, ClassGroup, AdminUser, AdminAccount } from '../types';
 import { calculateAge, formatBirthDate, getDefaultBirthDateForAge } from '../utils/studentUtils';
+import { exportLocalBackup } from '../utils/localStore';
 
 interface SettingsModalProps {
   config: SystemConfig;
@@ -59,7 +63,7 @@ interface SettingsModalProps {
   isSyncing?: boolean;
   lastSyncTime?: string;
   onExportData?: () => void;
-  onImportData?: (file: File) => Promise<void>;
+  onImportData?: (fileOrJson: File | string) => Promise<void>;
   teachers?: any[];
   onSaveTeacher?: (teacherData: any) => Promise<void>;
   onDeleteTeacher?: (teacherId: string) => Promise<void>;
@@ -135,6 +139,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [newAccountPassword, setNewAccountPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
+  // Vercel JSON Backup Copy & Paste Import State
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [pastedJsonText, setPastedJsonText] = useState('');
+  const [isCopySuccess, setIsCopySuccess] = useState(false);
+
+  const handleCopyBackupJson = async () => {
+    try {
+      const jsonStr = exportLocalBackup();
+      await navigator.clipboard.writeText(jsonStr);
+      setIsCopySuccess(true);
+      showNotice('success', '备份 JSON 文本已成功复制到剪贴板！');
+      setTimeout(() => setIsCopySuccess(false), 2500);
+    } catch {
+      showNotice('error', '复制失败，请直接点击“下载 JSON 备份文件”');
+    }
+  };
+
+  const handlePasteImportSubmit = async () => {
+    if (!pastedJsonText.trim()) {
+      showNotice('error', '请先粘贴有效的 JSON 备份文本！');
+      return;
+    }
+    if (!confirm('确定要通过粘贴的 JSON 文本恢复数据吗？此操作将合并更新当前所有班级名册与考勤，并同步至 Vercel 云端。')) {
+      return;
+    }
+    try {
+      if (onImportData) {
+        await onImportData(pastedJsonText.trim());
+        showNotice('success', '备份数据已成功解析，并更新至 Vercel 云端与本设备！');
+        setPastedJsonText('');
+        setIsPasteModalOpen(false);
+      }
+    } catch (err: any) {
+      showNotice('error', err.message || 'JSON 备份文本格式解析失败，请检查数据完整性');
+    }
+  };
+
   // Student Filter & Batch Import State
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>(classes[0]?.id || 'all');
   const [batchClassId, setBatchClassId] = useState<string>(classes[0]?.id || '');
@@ -159,18 +200,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [teacherPhone, setTeacherPhone] = useState('');
   const [teacherWechat, setTeacherWechat] = useState('');
   const [teacherClassId, setTeacherClassId] = useState('');
-  const [teacherRoleTitle, setTeacherRoleTitle] = useState('主日学班主任');
+  const [teacherRoleTitle, setTeacherRoleTitle] = useState('班主任');
   const [teacherJoinDate, setTeacherJoinDate] = useState(new Date().toISOString().split('T')[0]);
   const [teacherNotes, setTeacherNotes] = useState('');
 
+  const normalizeRoleTitle = (rt?: string) => {
+    if (!rt) return '班主任';
+    if (rt === '主日学班主任') return '班主任';
+    if (rt === '主日学同工') return '上课老师';
+    if (rt === '助教老师' || rt === '助教' || rt === '辅助老师') return '辅助老师';
+    if (rt === '主日学校长' || rt === '主日学讲员') return '班主任';
+    return rt;
+  };
+
   const handleEditTeacher = (t: any) => {
     setEditingTeacher(t);
-    setTeacherName(t.name);
-    setTeacherGender(t.gender || 'boy');
+    const cleanName = (t.name || '').replace(/\s*老师$/, '');
+    setTeacherName(cleanName);
+    const isSister = t.gender === 'girl' || ['春来', '上好', '雪成', '秋娟', '若雪', '东丽'].some(n => cleanName.includes(n));
+    setTeacherGender(isSister ? 'girl' : (t.gender || 'boy'));
     setTeacherPhone(t.phone || '');
     setTeacherWechat(t.wechat || '');
     setTeacherClassId(t.classId || '');
-    setTeacherRoleTitle(t.roleTitle || '主日学班主任');
+    setTeacherRoleTitle(normalizeRoleTitle(t.roleTitle));
     setTeacherJoinDate(t.joinDate || new Date().toISOString().split('T')[0]);
     setTeacherNotes(t.notes || '');
   };
@@ -182,7 +234,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setTeacherPhone('');
     setTeacherWechat('');
     setTeacherClassId(classes[0]?.id || '');
-    setTeacherRoleTitle('主日学班主任');
+    setTeacherRoleTitle('班主任');
     setTeacherJoinDate(new Date().toISOString().split('T')[0]);
     setTeacherNotes('');
   };
@@ -193,7 +245,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       showNotice('error', '权限不足：只有总管理员才能管理教师资料！');
       return;
     }
-    if (!teacherName) {
+    const cleanedName = teacherName.trim().replace(/\s*老师$/, '');
+    if (!cleanedName) {
       showNotice('error', '教师姓名不能为空！');
       return;
     }
@@ -202,7 +255,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (onSaveTeacher) {
         await onSaveTeacher({
           id: editingTeacher?.id,
-          name: teacherName,
+          name: cleanedName,
           gender: teacherGender,
           phone: teacherPhone,
           wechat: teacherWechat,
@@ -251,7 +304,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     enableOfferingOption: config.enableOfferingOption ?? true,
     defaultOfferingChecked: config.defaultOfferingChecked ?? true,
     enableLateRule: config.enableLateRule ?? true,
-    lateThresholdTime: config.lateThresholdTime || '09:30',
+    lateThresholdTime: config.lateThresholdTime || '15:00',
     enableExcusedNote: config.enableExcusedNote ?? true,
   });
 
@@ -274,7 +327,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       enableOfferingOption: config.enableOfferingOption ?? true,
       defaultOfferingChecked: config.defaultOfferingChecked ?? true,
       enableLateRule: config.enableLateRule ?? true,
-      lateThresholdTime: config.lateThresholdTime || '09:30',
+      lateThresholdTime: config.lateThresholdTime || '15:00',
       enableExcusedNote: config.enableExcusedNote ?? true,
     });
     setChurchName(config.churchName);
@@ -950,11 +1003,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-semibold">
                     <tr>
                       <th className="px-3.5 py-3">姓名</th>
-                      <th className="px-3.5 py-3">称谓/角色</th>
+                      <th className="px-3.5 py-3">性别</th>
+                      <th className="px-3.5 py-3">角色</th>
                       <th className="px-3.5 py-3">负责班级</th>
                       <th className="px-3.5 py-3">联系电话</th>
-                      <th className="px-3.5 py-3">微信</th>
-                      <th className="px-3.5 py-3">入职/加入日期</th>
                       <th className="px-3.5 py-3 text-right">操作</th>
                     </tr>
                   </thead>
@@ -964,7 +1016,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       : teachers.filter(t => t.classId === selectedTeacherClassFilter)
                     ).length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                           暂无负责该班级的教师，请在右侧新增教师资料
                         </td>
                       </tr>
@@ -974,16 +1026,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         : teachers.filter(t => t.classId === selectedTeacherClassFilter)
                       ).map(t => {
                         const cls = classes.find(c => c.id === t.classId);
+                        const cleanTeacherName = (t.name || '').replace(/\s*老师$/, '');
+                        const isSister = t.gender === 'girl' || ['春来', '上好', '雪成', '秋娟', '若雪', '东丽'].some(n => cleanTeacherName.includes(n));
                         return (
                           <tr key={t.id} className="hover:bg-amber-50/40 transition-colors">
                             <td className="px-3.5 py-2.5">
                               <div className="flex items-center gap-1.5 font-semibold text-slate-900">
-                                <span className={`w-1.5 h-1.5 rounded-full ${t.gender === 'boy' ? 'bg-blue-400' : 'bg-pink-400'}`} />
-                                <span>{t.name}</span>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isSister ? 'bg-pink-400' : 'bg-blue-400'}`} />
+                                <span>{cleanTeacherName}</span>
                               </div>
                             </td>
+                            <td className="px-3.5 py-2.5 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                isSister
+                                  ? 'bg-pink-50 text-pink-700 border border-pink-200/80'
+                                  : 'bg-sky-50 text-sky-700 border border-sky-200/80'
+                              }`}>
+                                {isSister ? '姊妹' : '弟兄'}
+                              </span>
+                            </td>
                             <td className="px-3.5 py-2.5 font-medium text-slate-600">
-                              {t.roleTitle || '主日学老师'}
+                              {normalizeRoleTitle(t.roleTitle)}
                             </td>
                             <td className="px-3.5 py-2.5">
                               <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-[11px] font-medium">
@@ -993,21 +1056,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <td className="px-3.5 py-2.5 text-slate-700 font-mono">
                               {t.phone || '无'}
                             </td>
-                            <td className="px-3.5 py-2.5 text-slate-700 font-mono">
-                              {t.wechat || '无'}
-                            </td>
-                            <td className="px-3.5 py-2.5 text-slate-500 font-medium">
-                              {t.joinDate || '2026-01-01'}
-                            </td>
                             <td className="px-3.5 py-2.5 text-right space-x-1 whitespace-nowrap">
                               <button
-                                onClick={() => handleEditTeacher(t)}
+                                onClick={() => handleEditTeacher({ ...t, name: cleanTeacherName })}
                                 className="px-2 py-1 text-[11px] rounded bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-900 font-bold transition-all shrink-0 cursor-pointer"
                               >
                                 编辑
                               </button>
                               <button
-                                onClick={() => handleDeleteTeacherClick(t.id, t.name)}
+                                onClick={() => handleDeleteTeacherClick(t.id, cleanTeacherName)}
                                 className="px-2 py-1 text-[11px] rounded bg-red-50 text-red-700 hover:bg-red-100 font-bold transition-all shrink-0 cursor-pointer"
                               >
                                 删除
@@ -1051,7 +1108,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     required
                     value={teacherName}
                     onChange={e => setTeacherName(e.target.value)}
-                    placeholder="请输入老师姓名"
+                    placeholder="请输入姓名"
                     className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                   />
                 </div>
@@ -1059,18 +1116,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      称谓角色
+                      角色
                     </label>
                     <select
                       value={teacherRoleTitle}
                       onChange={e => setTeacherRoleTitle(e.target.value)}
                       className="w-full text-xs px-2.5 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                     >
-                      <option value="主日学班主任">主日学班主任</option>
-                      <option value="主日学校长">主日学校长</option>
-                      <option value="主日学同工">主日学同工</option>
-                      <option value="主日学讲员">主日学讲员</option>
-                      <option value="助教老师">助教老师</option>
+                      <option value="班主任">班主任</option>
+                      <option value="上课老师">上课老师</option>
+                      <option value="辅助老师">辅助老师</option>
                     </select>
                   </div>
 
@@ -1121,42 +1176,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      联系电话
-                    </label>
-                    <input
-                      type="text"
-                      value={teacherPhone}
-                      onChange={e => setTeacherPhone(e.target.value)}
-                      placeholder="手机号"
-                      className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      微信 ID
-                    </label>
-                    <input
-                      type="text"
-                      value={teacherWechat}
-                      onChange={e => setTeacherWechat(e.target.value)}
-                      placeholder="微信账号"
-                      className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                    />
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    入职 / 加入日期
+                    联系电话
                   </label>
                   <input
-                    type="date"
-                    value={teacherJoinDate}
-                    onChange={e => setTeacherJoinDate(e.target.value)}
+                    type="text"
+                    value={teacherPhone}
+                    onChange={e => setTeacherPhone(e.target.value)}
+                    placeholder="手机号"
                     className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -2108,7 +2136,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
                     <strong>开启测试模式：</strong>突破【仅限星期天限定时间段】限制，允许总管理员与教师在任意星期、任意时间自由执行打卡与点名测试；<br />
-                    <strong>关闭测试模式：</strong>恢复正常模式，仅在<strong>星期天指定时段（{config.checkinStartTime || '08:30'} ~ {config.checkinEndTime || '12:30'}）</strong>开放签到。非主日时间段首页显示“请等待下一个主日”并拦截点名操作。
+                    <strong>关闭测试模式：</strong>恢复正常模式，仅在<strong>星期天指定时段（{config.checkinStartTime || '11:00'} ~ {config.checkinEndTime || '16:00'}）</strong>开放签到。非主日时间段首页显示“请等待下一个主日”并拦截点名操作。
                   </p>
                 </div>
                 <button
@@ -2380,7 +2408,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </form>
 
-        {/* DATA BACKUP & RESTORE SECTION */}
+        {/* DATA BACKUP & RESTORE SECTION (Vercel Serverless & Multi-Device Sync Optimized) */}
         <div className="bg-white p-6 rounded-2xl border border-amber-200/80 shadow-2xs space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -2388,16 +2416,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
                   <Download className="w-4 h-4" />
                 </span>
-                <span>数据完整备份与跨设备导入恢复 (JSON)</span>
+                <span>数据完整备份与跨设备导入恢复 (JSON / Vercel 云端)</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300/60">
+                  Vercel 云端多端同步
+                </span>
               </div>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                适用于在 GitHub Pages 静态托管、离线环境或在不同设备（手机、平板、电脑）之间快速迁移或恢复完整主日学资料。
+                针对 Vercel 无服务器 (Serverless) 部署环境、移动端（微信浏览器/手机）与桌面设备协同设计。支持 JSON 文件下载/上传，以及数据文本快捷复制与粘贴导入，导入后同步强推写回 Vercel 云端数据库 (Cloud KV)。
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            {/* Export Backup */}
+            {/* Export Backup Card */}
             <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/80 flex flex-col justify-between gap-3">
               <div>
                 <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -2405,20 +2436,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span>导出系统数据备份</span>
                 </div>
                 <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                  将现有所有班级、在册学生花名册、主日签到历史及后台管理员账号打包导出为单个 JSON 文件。
+                  打包现有所有班级、在册学生花名册、教师资料、主日签到历史及后台管理员账号为标准 JSON。
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={onExportData}
-                className="w-full py-2.5 px-4 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>立即下载完整备份文件</span>
-              </button>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={onExportData}
+                  className="w-full py-2.5 px-4 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>下载 JSON 备份文件</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyBackupJson}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-100/80 hover:bg-amber-200/80 text-amber-900 font-bold text-xs flex items-center justify-center gap-1.5 border border-amber-300/70 transition-all cursor-pointer"
+                >
+                  {isCopySuccess ? <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-amber-800" />}
+                  <span>{isCopySuccess ? '已复制 JSON 文本！' : '复制 JSON 备份文本 (微信/剪贴板)'}</span>
+                </button>
+              </div>
             </div>
 
-            {/* Import Backup */}
+            {/* Import Backup Card */}
             <div className={`p-4 rounded-xl border flex flex-col justify-between gap-3 ${isSuperAdmin ? 'bg-sky-50/50 border-sky-200/80' : 'bg-slate-50 border-slate-200/80'}`}>
               <div>
                 <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -2432,37 +2473,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   )}
                 </div>
                 <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                  从此前导出的备份文件一键恢复所有资料。导入后将立即更新本地名册并同步至其他标签页。
+                  一键恢复全部资料。导入后将立即更新本设备名册并实时同步至 Vercel 后端接口与所有已登录终端。
                 </p>
               </div>
               {isSuperAdmin ? (
-                <label className="w-full py-2.5 px-4 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition-colors text-center">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>选择备份文件 (.json) 导入</span>
-                  <input
-                    type="file"
-                    accept=".json"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (!confirm(`确定要从备份文件【${file.name}】中恢复数据吗？此操作将合并覆盖当前名册与考勤。`)) {
-                        e.target.value = '';
-                        return;
-                      }
-                      try {
-                        if (onImportData) {
-                          await onImportData(file);
-                          showNotice('success', '备份数据已成功导入并恢复！');
+                <div className="space-y-2">
+                  <label className="w-full py-2.5 px-4 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition-colors text-center">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>选择备份文件 (.json) 导入</span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (!confirm(`确定要从备份文件【${file.name}】中恢复数据吗？此操作将合并覆盖当前名册与考勤，并上传至 Vercel 云端。`)) {
+                          e.target.value = '';
+                          return;
                         }
-                      } catch (err: any) {
-                        showNotice('error', err.message || '导入文件解析失败');
-                      } finally {
-                        e.target.value = '';
-                      }
-                    }}
-                  />
-                </label>
+                        try {
+                          if (onImportData) {
+                            await onImportData(file);
+                            showNotice('success', '备份数据已成功导入并强同步至 Vercel 云端！');
+                          }
+                        } catch (err: any) {
+                          showNotice('error', err.message || '导入文件解析失败');
+                        } finally {
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsPasteModalOpen(true)}
+                    className="w-full py-2 px-3 rounded-xl bg-sky-100/80 hover:bg-sky-200/80 text-sky-900 font-bold text-xs flex items-center justify-center gap-1.5 border border-sky-300/70 transition-all cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-sky-800" />
+                    <span>粘贴 JSON 文本快速恢复</span>
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
@@ -2477,10 +2528,78 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-[11px] text-slate-500 leading-relaxed">
-            💡 <strong>多端运行提示：</strong>在 GitHub Pages 静态环境下，所有编辑、删除、新增的班级和学员资料均实时保存在当前浏览器的持久存储中；跨设备切换使用时，可通过上方的「导出」与「导入」实现秒级无缝迁移。
+            💡 <strong>Vercel 云端部署与多端同步说明：</strong>本系统已针对 Vercel 无服务器 (Serverless) 架构与云端数据库（Cloud KV）进行全量数据同步调优。执行数据导入恢复后，最新名册将即刻推送到 Vercel 云端服务端，所有在线访问的手机端与电脑端均可秒级无缝同步。建议在进行大规模学员调整前先导出 JSON 备份。
           </div>
         </div>
       </div>
+      )}
+
+      {/* PASTE JSON IMPORT MODAL (Vercel 云端 JSON 文本快速恢复弹窗) */}
+      {isPasteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl border border-sky-200 shadow-2xl max-w-xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-linear-to-r from-sky-700 to-sky-800 text-white p-5 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base font-serif flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-sky-200" />
+                  <span>粘贴 JSON 备份文本恢复 (Vercel 云端)</span>
+                </h3>
+                <p className="text-xs text-sky-200 mt-0.5">
+                  适用于移动端设备或跨设备快速迁移，直接粘贴导出的 JSON 字符串
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsPasteModalOpen(false);
+                  setPastedJsonText('');
+                }}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  备份 JSON 字符串 <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={8}
+                  value={pastedJsonText}
+                  onChange={(e) => setPastedJsonText(e.target.value)}
+                  placeholder="在此处粘贴由系统导出的 JSON 备份文本内容..."
+                  className="w-full text-xs font-mono p-3 rounded-2xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 bg-slate-50/50 leading-relaxed"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 leading-relaxed">
+                ⚠️ <strong>注意：</strong>解析成功后，系统将自动合并更新班级名册、考勤历史与系统设置，并推送强同步写回 Vercel 云端数据库。
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPasteModalOpen(false);
+                    setPastedJsonText('');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePasteImportSubmit}
+                  className="px-5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>解析并同步导入</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ========================================================================= */}
@@ -2985,7 +3104,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  姓名 / 教师称谓 *
+                  姓名 / 显示名称 *
                 </label>
                 <input
                   type="text"

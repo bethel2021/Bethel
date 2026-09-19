@@ -53,8 +53,8 @@ export interface SystemConfig {
   churchName: string; // '伯特利教会'
   schoolTitle: string; // '主日学与团契'
   allowedDayOfWeek: number; // 0 = Sunday
-  checkinStartTime: string; // e.g. "08:30"
-  checkinEndTime: string; // e.g. "12:30"
+  checkinStartTime: string; // e.g. "11:00"
+  checkinEndTime: string; // e.g. "16:00"
   testMode: boolean; // if true, bypass Sunday & time restrictions for easy testing
   currentYear: number;
   currentSemester: string;
@@ -68,7 +68,7 @@ export interface SystemConfig {
   enableOfferingOption?: boolean;
   defaultOfferingChecked?: boolean;
   enableLateRule: boolean; // 是否启用迟到计算规则
-  lateThresholdTime: string; // 迟到判定分界时刻, e.g. "09:30"
+  lateThresholdTime: string; // 迟到判定分界时刻, e.g. "15:00"
   enableExcusedNote: boolean; // 是否启用请假事由备注功能
   enableCheckinPopup: boolean; // 是否在大屏模式显示实时打卡悬浮喜报
   hiddenClassIds?: string[]; // 在首页隐藏的班级ID列表

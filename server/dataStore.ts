@@ -305,6 +305,22 @@ function sanitizeYageData() {
   const filteredRecords = records.filter(r => r.classId !== 'class-8' && r.studentId !== 's-801' && r.studentId !== 's-802');
   records.length = 0;
   records.push(...filteredRecords);
+
+  teachers.forEach(t => {
+    if (t && typeof t.name === 'string') {
+      t.name = t.name.replace(/\s*老师$/, '');
+      if (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成')) {
+        t.gender = 'girl';
+      }
+    }
+    if (t) {
+      if (t.roleTitle === '主日学班主任') t.roleTitle = '班主任';
+      else if (t.roleTitle === '主日学同工') t.roleTitle = '上课老师';
+      else if (t.roleTitle === '助教老师' || t.roleTitle === '助教') t.roleTitle = '辅助老师';
+      else if (t.roleTitle === '主日学校长' || t.roleTitle === '主日学讲员') t.roleTitle = '班主任';
+      else if (!t.roleTitle) t.roleTitle = '班主任';
+    }
+  });
 }
 
 export function loadFromDisk(): boolean {
@@ -371,13 +387,13 @@ export function loadFromDisk(): boolean {
         teachers.push(...data.teachers);
       } else {
         const defaultTeachers = [
-          { id: 't-1', name: '春来 老师', gender: 'boy', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-          { id: 't-2', name: '秋娟 老师', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-          { id: 't-3', name: '若雪 老师', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-          { id: 't-4', name: '上好 老师', gender: 'boy', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-          { id: 't-5', name: '雪成 老师', gender: 'boy', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-          { id: 't-6', name: '志安 老师', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-          { id: 't-7', name: '东丽 老师', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '主日学班主任', joinDate: '2026-01-01' }
+          { id: 't-1', name: '春来 老师', gender: 'girl', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-2', name: '秋娟 老师', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-3', name: '若雪 老师', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-4', name: '上好 老师', gender: 'girl', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-5', name: '雪成 老师', gender: 'girl', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-6', name: '志安 老师', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-7', name: '东丽 老师', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '班主任', joinDate: '2026-01-01' }
         ];
         teachers.length = 0;
         teachers.push(...defaultTeachers);
@@ -403,13 +419,13 @@ export function loadFromDisk(): boolean {
 
     if (!fs.existsSync(filePath)) {
       const defaultTeachers = [
-        { id: 't-1', name: '春来 老师', gender: 'boy', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-        { id: 't-2', name: '秋娟 老师', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-        { id: 't-3', name: '若雪 老师', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-        { id: 't-4', name: '上好 老师', gender: 'boy', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-        { id: 't-5', name: '雪成 老师', gender: 'boy', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-        { id: 't-6', name: '志安 老师', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
-        { id: 't-7', name: '东丽 老师', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '主日学班主任', joinDate: '2026-01-01' }
+        { id: 't-1', name: '春来', gender: 'girl', phone: '13812345671', classId: 'class-1', roleTitle: '班主任' },
+        { id: 't-2', name: '秋娟', gender: 'girl', phone: '13812345672', classId: 'class-2', roleTitle: '班主任' },
+        { id: 't-3', name: '若雪', gender: 'girl', phone: '13812345673', classId: 'class-3', roleTitle: '班主任' },
+        { id: 't-4', name: '上好', gender: 'girl', phone: '13812345674', classId: 'class-4', roleTitle: '班主任' },
+        { id: 't-5', name: '雪成', gender: 'girl', phone: '13812345675', classId: 'class-5', roleTitle: '班主任' },
+        { id: 't-6', name: '志安', gender: 'boy', phone: '13812345676', classId: 'class-6', roleTitle: '班主任' },
+        { id: 't-7', name: '东丽', gender: 'girl', phone: '13812345677', classId: 'class-7', roleTitle: '班主任' }
       ];
       teachers.length = 0;
       teachers.push(...defaultTeachers);

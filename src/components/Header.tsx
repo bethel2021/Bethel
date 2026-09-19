@@ -116,10 +116,10 @@ export const Header: React.FC<HeaderProps> = ({
             
             {/* Clock Box */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1.5 flex items-center gap-2 text-xs text-slate-700">
-              <Clock className="w-4 h-4 text-amber-700" />
-              <div className="leading-tight">
-                <span className="font-semibold text-slate-900">{timeString}</span>
-                <span className="text-slate-500 ml-1.5 hidden sm:inline">{dateString} ({getDayOfWeekName(currentTime)})</span>
+              <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+              <div className="leading-tight flex items-center">
+                <span className="font-semibold text-slate-900 font-mono tabular-nums inline-block w-[64px] shrink-0 text-center">{timeString}</span>
+                <span className="text-slate-500 ml-1.5 hidden sm:inline whitespace-nowrap">{dateString} ({getDayOfWeekName(currentTime)})</span>
               </div>
             </div>
 

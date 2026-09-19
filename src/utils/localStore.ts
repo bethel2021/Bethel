@@ -1,4 +1,4 @@
-import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords } from '../mockData';
+import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords, initialTeachers } from '../mockData';
 import type { ClassGroup, Student, SystemConfig, AttendanceRecord, AdminUser, AdminAccount, Teacher } from '../types';
 import { getActiveSundayDate } from './dateUtils';
 
@@ -191,6 +191,11 @@ export function getLocalData() {
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const config: SystemConfig = rawConfig ? { ...initialSystemConfig, ...JSON.parse(rawConfig) } : initialSystemConfig;
 
+    // Upgrade old default checkin times to 11:00, 16:00, 15:00 if they were set to old defaults
+    if (config.checkinStartTime === '08:30') config.checkinStartTime = '11:00';
+    if (config.checkinEndTime === '12:30') config.checkinEndTime = '16:00';
+    if (config.lateThresholdTime === '09:30') config.lateThresholdTime = '15:00';
+
     // Ensure hidden status preserved across classes and hidden sets
     const hiddenSet = getLocalHiddenClassIds();
     if (Array.isArray(config.hiddenClassIds)) {
@@ -222,7 +227,24 @@ export function getLocalData() {
     const activeSunday = rawSunday || getActiveSundayDate();
 
     const rawTeachers = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-    const teachers: Teacher[] = rawTeachers ? JSON.parse(rawTeachers) : [];
+    let teachers: Teacher[] = rawTeachers ? JSON.parse(rawTeachers) : initialTeachers;
+    if (!Array.isArray(teachers) || teachers.length === 0) {
+      teachers = initialTeachers;
+    }
+    // Normalize gender and roleTitle for teachers
+    teachers = teachers.map(t => {
+      let updatedGender = t.gender;
+      if (t.name && (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成'))) {
+        updatedGender = 'girl';
+      }
+      let updatedRoleTitle = t.roleTitle;
+      if (updatedRoleTitle === '主日学班主任') updatedRoleTitle = '班主任';
+      else if (updatedRoleTitle === '主日学同工') updatedRoleTitle = '上课老师';
+      else if (updatedRoleTitle === '助教老师' || updatedRoleTitle === '助教') updatedRoleTitle = '辅助老师';
+      else if (updatedRoleTitle === '主日学校长' || updatedRoleTitle === '主日学讲员') updatedRoleTitle = '班主任';
+      return { ...t, gender: updatedGender, roleTitle: updatedRoleTitle || '班主任' };
+    });
+    localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(teachers));
 
     return { classes, students, config, records, activeSunday, teachers };
   } catch (e) {
@@ -233,7 +255,7 @@ export function getLocalData() {
       config: initialSystemConfig,
       records: generateInitialRecords(initialStudents),
       activeSunday: getActiveSundayDate(),
-      teachers: []
+      teachers: initialTeachers
     };
   }
 }
@@ -302,12 +324,15 @@ export interface BackupData {
   config: SystemConfig;
   records: AttendanceRecord[];
   accounts: AdminAccount[];
+  teachers?: Teacher[];
+  hiddenClassIds?: string[];
   activeSunday: string;
 }
 
 export function exportLocalBackup(): string {
   const local = getLocalData();
   const accounts = getLocalAccounts();
+  const hiddenClassIds = Array.from(getLocalHiddenClassIds());
   const backup: BackupData = {
     version: '1.0',
     exportDate: new Date().toISOString(),
@@ -316,6 +341,8 @@ export function exportLocalBackup(): string {
     config: local.config,
     records: local.records,
     accounts,
+    teachers: local.teachers,
+    hiddenClassIds,
     activeSunday: local.activeSunday
   };
   return JSON.stringify(backup, null, 2);
@@ -327,6 +354,8 @@ export function importLocalBackup(jsonStr: string): {
   config: SystemConfig;
   records: AttendanceRecord[];
   accounts: AdminAccount[];
+  teachers: Teacher[];
+  hiddenClassIds: string[];
   activeSunday: string;
 } {
   const parsed = JSON.parse(jsonStr);
@@ -341,6 +370,8 @@ export function importLocalBackup(jsonStr: string): {
   const config = parsed.config ? { ...initialSystemConfig, ...parsed.config } : initialSystemConfig;
   const records = Array.isArray(parsed.records) ? parsed.records : [];
   const accounts = Array.isArray(parsed.accounts) && parsed.accounts.length > 0 ? parsed.accounts : DEFAULT_ACCOUNTS;
+  const teachers = Array.isArray(parsed.teachers) ? parsed.teachers : [];
+  const hiddenClassIds = Array.isArray(parsed.hiddenClassIds) ? parsed.hiddenClassIds : [];
   const activeSunday = parsed.activeSunday || '2026-09-13';
 
   saveLocalData({
@@ -349,11 +380,15 @@ export function importLocalBackup(jsonStr: string): {
     config,
     records,
     accounts,
+    teachers,
     activeSunday
   });
   saveLocalAccounts(accounts);
+  if (hiddenClassIds.length > 0) {
+    saveLocalHiddenClassIds(hiddenClassIds);
+  }
 
-  return { classes, students, config, records, accounts, activeSunday };
+  return { classes, students, config, records, accounts, teachers, hiddenClassIds, activeSunday };
 }
 
 export function localLogin(username: string, password: string): AdminUser | null {
