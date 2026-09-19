@@ -246,7 +246,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Cake className="w-4 h-4 text-inherit" />
-            <span>生日提醒</span>
+            <span>生日关怀</span>
             {upcomingBirthdayCount > 0 && (
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
                 activeTab === 'birthday' 
