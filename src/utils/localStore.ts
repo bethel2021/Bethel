@@ -188,29 +188,31 @@ export function getLocalData() {
     classes = classes.filter(c => c.id !== 'class-8' && c.name !== '雅歌团契');
     students = students.filter(s => s.classId !== 'class-8' && s.id !== 's-801' && s.id !== 's-802');
 
-    // Ensure subjectTeacher is populated & hidden status preserved
-    let hasUpdatedClasses = false;
-    const hiddenSet = getLocalHiddenClassIds();
-    classes = classes.map(c => {
-      const isHidden = c.isHiddenFromHome === true || hiddenSet.has(c.id);
-      if (!c.subjectTeacher || c.isHiddenFromHome !== isHidden) {
-        hasUpdatedClasses = true;
-        const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);
-        return {
-          ...c,
-          subjectTeacher: c.subjectTeacher || match?.subjectTeacher || '主日学专职老师',
-          isHiddenFromHome: isHidden
-        };
-      }
-      return c;
-    });
-    if (hasUpdatedClasses) {
-      localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
-      saveLocalHiddenClassIds(classes.filter(c => !!c.isHiddenFromHome).map(c => c.id));
-    }
-
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const config: SystemConfig = rawConfig ? { ...initialSystemConfig, ...JSON.parse(rawConfig) } : initialSystemConfig;
+
+    // Ensure hidden status preserved across classes and hidden sets
+    const hiddenSet = getLocalHiddenClassIds();
+    if (Array.isArray(config.hiddenClassIds)) {
+      config.hiddenClassIds.forEach(id => hiddenSet.add(id));
+    }
+
+    classes = classes.map(c => {
+      const isHidden = c.isHiddenFromHome === true || hiddenSet.has(c.id);
+      const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);
+      return {
+        ...c,
+        subjectTeacher: c.subjectTeacher || match?.subjectTeacher || '主日学专职老师',
+        isHiddenFromHome: isHidden
+      };
+    });
+    
+    // Always persist normalized state
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
+    const allHiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
+    saveLocalHiddenClassIds(allHiddenIds);
+    config.hiddenClassIds = allHiddenIds;
+    localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
 
     const rawRecords = localStorage.getItem(STORAGE_KEYS.RECORDS);
     let records: AttendanceRecord[] = rawRecords ? JSON.parse(rawRecords) : generateInitialRecords(students);

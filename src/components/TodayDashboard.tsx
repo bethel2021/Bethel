@@ -52,7 +52,21 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   onOpenLogin,
   onManualUpdate,
 }) => {
-  const visibleClasses = useMemo(() => classes.filter(c => !c.isHiddenFromHome), [classes]);
+  const hiddenIdSet = useMemo(() => {
+    const set = new Set<string>();
+    if (Array.isArray(config?.hiddenClassIds)) {
+      config.hiddenClassIds.forEach(id => set.add(id));
+    }
+    classes.forEach(c => {
+      if (c.isHiddenFromHome === true) set.add(c.id);
+    });
+    return set;
+  }, [config?.hiddenClassIds, classes]);
+
+  const visibleClasses = useMemo(() => {
+    return classes.filter(c => !c.isHiddenFromHome && !hiddenIdSet.has(c.id));
+  }, [classes, hiddenIdSet]);
+
   const visibleClassIdSet = useMemo(() => new Set(visibleClasses.map(c => c.id)), [visibleClasses]);
   const homeStudents = useMemo(() => students.filter(s => visibleClassIdSet.has(s.classId)), [students, visibleClassIdSet]);
 
@@ -61,9 +75,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   }, [activeSunday]);
 
   const [selectedClassId, setSelectedClassId] = useState<string>(() => {
-    const firstVisible = classes.find(c => !c.isHiddenFromHome);
-    return firstVisible ? firstVisible.id : '';
+    const firstVisible = classes.find(c => !c.isHiddenFromHome && (!config?.hiddenClassIds || !config.hiddenClassIds.includes(c.id)));
+    return firstVisible ? firstVisible.id : (classes[0]?.id || '');
   });
+
+  useEffect(() => {
+    if (visibleClasses.length > 0 && !visibleClassIdSet.has(selectedClassId)) {
+      setSelectedClassId(visibleClasses[0].id);
+    }
+  }, [visibleClasses, visibleClassIdSet, selectedClassId]);
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'checked_in' | 'uncheck_in' | 'late'>('all');
   const [excuseModalStudent, setExcuseModalStudent] = useState<Student | null>(null);

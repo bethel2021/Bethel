@@ -39,7 +39,12 @@ const pollWaiters = new Set<{ res: Response; timer: NodeJS.Timeout; clientVersio
 
 export function getCurrentStatePayload(eventType: string = 'state_update', extraData?: any) {
   const currentSunday = getActiveSundayDate();
-  const hiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
+  const hiddenIds = Array.from(new Set([
+    ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
+    ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
+  ]));
+  systemConfig.hiddenClassIds = hiddenIds;
+
   return {
     type: eventType,
     syncVersion,
@@ -51,7 +56,7 @@ export function getCurrentStatePayload(eventType: string = 'state_update', extra
     hiddenClassIds: hiddenIds,
     classes: classes.map(c => ({
       ...c,
-      isHiddenFromHome: !!c.isHiddenFromHome
+      isHiddenFromHome: hiddenIds.includes(c.id)
     })),
     students,
     records,
@@ -254,7 +259,11 @@ apiRouter.get('/health', (req: Request, res: Response) => {
 apiRouter.get('/state', async (req: Request, res: Response) => {
   await initOrLoadDataAsync();
   const currentSunday = getActiveSundayDate();
-  const hiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
+  const hiddenIds = Array.from(new Set([
+    ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
+    ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
+  ]));
+  systemConfig.hiddenClassIds = hiddenIds;
   res.json({
     config: {
       ...systemConfig,
@@ -263,7 +272,7 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
     hiddenClassIds: hiddenIds,
     classes: classes.map(c => ({
       ...c,
-      isHiddenFromHome: !!c.isHiddenFromHome
+      isHiddenFromHome: hiddenIds.includes(c.id)
     })),
     students,
     records,
@@ -287,6 +296,11 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
 // 1.1 Cloud Multi-Device Sync endpoints
 apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
   await initOrLoadDataAsync();
+  const hiddenIds = Array.from(new Set([
+    ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
+    ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
+  ]));
+  systemConfig.hiddenClassIds = hiddenIds;
   res.json({
     status: 'ok',
     syncVersion,
@@ -294,7 +308,7 @@ apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
     kvConnected: Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
     classes: classes.map(c => ({
       ...c,
-      isHiddenFromHome: !!c.isHiddenFromHome
+      isHiddenFromHome: hiddenIds.includes(c.id)
     })),
     students,
     records,

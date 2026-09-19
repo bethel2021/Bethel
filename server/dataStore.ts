@@ -175,7 +175,15 @@ export function onDataChange(listener: DataChangeListener): () => void {
 export function saveDataToFile() {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  const hiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
+  const hiddenIds = Array.from(new Set([
+    ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
+    ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
+  ]));
+  systemConfig.hiddenClassIds = hiddenIds;
+  classes.forEach(c => {
+    c.isHiddenFromHome = hiddenIds.includes(c.id);
+  });
+
   const updatedConfig = {
     ...systemConfig,
     hiddenClassIds: hiddenIds
@@ -322,17 +330,23 @@ export function loadFromDisk(): boolean {
       if (Array.isArray(data.hiddenClassIds)) {
         data.hiddenClassIds.forEach((id: string) => hiddenSet.add(id));
       }
+      if (data.systemConfig && Array.isArray(data.systemConfig.hiddenClassIds)) {
+        data.systemConfig.hiddenClassIds.forEach((id: string) => hiddenSet.add(id));
+      }
+      if (data.config && Array.isArray(data.config.hiddenClassIds)) {
+        data.config.hiddenClassIds.forEach((id: string) => hiddenSet.add(id));
+      }
       if (Array.isArray(data.classes) && data.classes.length > 0) {
         const mappedClasses = data.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
+          isHiddenFromHome: c.isHiddenFromHome === true || hiddenSet.has(c.id)
         }));
         classes.length = 0;
         classes.push(...mappedClasses);
       } else {
         const mappedClasses = classes.map(c => ({
           ...c,
-          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
+          isHiddenFromHome: c.isHiddenFromHome === true || hiddenSet.has(c.id)
         }));
         classes.length = 0;
         classes.push(...mappedClasses);
@@ -442,14 +456,23 @@ export async function initOrLoadDataAsync() {
   if (cloudData && typeof cloudData.syncVersion === 'number') {
     // Only apply cloud KV data if it is NEWER than current in-memory syncVersion
     if (cloudData.syncVersion > syncVersion) {
-      const currentHiddenSet = new Set<string>(classes.filter(c => !!c.isHiddenFromHome).map(c => c.id));
+      const currentHiddenSet = new Set<string>([
+        ...classes.filter(c => c.isHiddenFromHome === true).map(c => c.id),
+        ...(Array.isArray(systemConfig.hiddenClassIds) ? systemConfig.hiddenClassIds : [])
+      ]);
       if (Array.isArray(cloudData.hiddenClassIds)) {
         cloudData.hiddenClassIds.forEach((id: string) => currentHiddenSet.add(id));
+      }
+      if (cloudData.config && Array.isArray(cloudData.config.hiddenClassIds)) {
+        cloudData.config.hiddenClassIds.forEach((id: string) => currentHiddenSet.add(id));
+      }
+      if (cloudData.systemConfig && Array.isArray(cloudData.systemConfig.hiddenClassIds)) {
+        cloudData.systemConfig.hiddenClassIds.forEach((id: string) => currentHiddenSet.add(id));
       }
       if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
         const mappedClasses = cloudData.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : currentHiddenSet.has(c.id)
+          isHiddenFromHome: c.isHiddenFromHome === true || currentHiddenSet.has(c.id)
         }));
         classes.length = 0;
         classes.push(...mappedClasses);
@@ -597,10 +620,17 @@ export function mergeClientData(payload: SyncPayload): {
       }
     } catch {}
 
+    if (Array.isArray(systemConfig.hiddenClassIds)) {
+      systemConfig.hiddenClassIds.forEach(id => diskHiddenSet.add(id));
+    }
+    classes.forEach(c => {
+      if (c.isHiddenFromHome === true) diskHiddenSet.add(c.id);
+    });
+
     const classMap = new Map<string, ClassGroup>(classes.map(c => [c.id, c]));
     for (const c of payload.classes) {
       if (!classMap.has(c.id)) {
-        const isHidden = typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : diskHiddenSet.has(c.id);
+        const isHidden = c.isHiddenFromHome === true || diskHiddenSet.has(c.id);
         classMap.set(c.id, {
           ...c,
           isHiddenFromHome: isHidden
@@ -610,11 +640,10 @@ export function mergeClientData(payload: SyncPayload): {
         const existing = classMap.get(c.id)!;
         // The server's settings (including isHiddenFromHome, teachers, and classroom) are authoritative for existing classes.
         // We preserve the server's existing isHiddenFromHome status instead of letting clients overwrite it.
-        const authoritativeHidden = typeof existing.isHiddenFromHome === 'boolean'
-          ? existing.isHiddenFromHome
-          : diskHiddenSet.has(c.id);
+        const authoritativeHidden = existing.isHiddenFromHome === true || diskHiddenSet.has(c.id);
         const mergedClass: ClassGroup = {
           ...existing,
+          ...c,
           isHiddenFromHome: authoritativeHidden
         };
         if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {

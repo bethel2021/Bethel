@@ -158,13 +158,11 @@ export default function App() {
 
     let mergedClassesForCache: ClassGroup[] | undefined;
     if (Array.isArray(data.classes)) {
-      const localHiddenSet = getLocalHiddenClassIds();
       const serverHiddenIds = new Set<string>([
         ...(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []),
         ...(Array.isArray(data.config?.hiddenClassIds) ? data.config.hiddenClassIds : []),
       ]);
 
-      const serverVersion = typeof data.syncVersion === 'number' ? data.syncVersion : 0;
       const mergedClasses = data.classes.map((c: any) => {
         // 1. If this class has a local mutation in flight, preserve the pending state
         if (pendingClassMutationsRef.current.has(c.id)) {
@@ -174,16 +172,13 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : serverHiddenIds.has(c.id))
+              : (c.isHiddenFromHome === true || serverHiddenIds.has(c.id))
           };
         }
 
-        // 2. Class hidden status logic:
-        // Since a persistent backend is available, the server is the single authoritative source of truth.
-        // We always trust the server's hidden status if defined, falling back to server's hidden sets.
-        const isHidden = typeof c.isHiddenFromHome === 'boolean' 
-          ? c.isHiddenFromHome 
-          : serverHiddenIds.has(c.id);
+        // 2. Class hidden status:
+        // A class is hidden if marked true or if present in server/config hidden list
+        const isHidden = c.isHiddenFromHome === true || serverHiddenIds.has(c.id);
 
         return {
           ...c,
@@ -921,9 +916,21 @@ export default function App() {
     pendingClassMutationsRef.current.set(classId, { ...currentClass, isHiddenFromHome });
     syncVersionRef.current = (syncVersionRef.current || 0) + 1;
 
+    const nextHiddenArray = Array.from(hiddenSet);
+    setConfig(prev => ({
+      ...prev,
+      hiddenClassIds: nextHiddenArray
+    }));
+
     setClasses(prev => {
       const updated = prev.map(c => c.id === classId ? { ...c, isHiddenFromHome } : c);
-      saveLocalData({ classes: updated });
+      saveLocalData({ 
+        classes: updated,
+        config: {
+          ...config,
+          hiddenClassIds: nextHiddenArray
+        }
+      });
       return updated;
     });
 
@@ -940,14 +947,17 @@ export default function App() {
         if (typeof data.syncVersion === 'number') {
           syncVersionRef.current = data.syncVersion;
         }
+        if (data.config) {
+          setConfig(data.config);
+        }
         const authoritativeClasses: ClassGroup[] = Array.isArray(data.classes) ? data.classes : [];
         if (authoritativeClasses.length > 0) {
           setClasses(authoritativeClasses);
-          saveLocalData({ classes: authoritativeClasses });
+          saveLocalData({ classes: authoritativeClasses, config: data.config });
         } else if (data.class) {
           setClasses(prev => {
             const updated = prev.map(c => c.id === classId ? { ...c, ...data.class, isHiddenFromHome } : c);
-            saveLocalData({ classes: updated });
+            saveLocalData({ classes: updated, config: data.config });
             return updated;
           });
         }
