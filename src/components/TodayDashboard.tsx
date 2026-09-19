@@ -218,7 +218,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               <div className="flex items-center min-w-0 shrink">
                 <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white/20 text-amber-100 text-[11px] sm:text-xs font-semibold backdrop-blur-xs whitespace-nowrap">
                   <ShieldAlert className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-                  <span>访客模式（学生隐私受保护）</span>
+                  <span>访客模式</span>
                 </span>
               </div>
               <div className="text-[11px] sm:text-xs text-amber-200 font-medium whitespace-nowrap flex items-center gap-0.5 sm:gap-1 shrink-0 ml-auto">
