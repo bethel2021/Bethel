@@ -656,8 +656,6 @@ export default function App() {
 
     if (!windowStatus.isAllowed) {
       const msg = '非主日签到开放时段，请等待下一个主日！';
-      setNewCheckinAlert(`⚠️ ${msg}`);
-      setTimeout(() => setNewCheckinAlert(null), 4000);
       throw new Error(msg);
     }
 

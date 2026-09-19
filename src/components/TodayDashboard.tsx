@@ -93,6 +93,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   const processingRef = useRef<Set<string>>(new Set());
   const rosterRef = useRef<HTMLDivElement>(null);
 
+  const windowStatus = useMemo(() => {
+    return checkIsWithinSundayWindow(
+      new Date(),
+      config.checkinStartTime,
+      config.checkinEndTime,
+      config.testMode
+    );
+  }, [config.checkinStartTime, config.checkinEndTime, config.testMode]);
+
   const handleStatClick = (type: 'checked_in' | 'uncheck_in' | 'late') => {
     setStatusFilter(prev => prev === type ? 'all' : type);
     if (rosterRef.current) {
@@ -186,6 +195,13 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     studentId: string,
     status: 'present' | 'late' | 'excused' | 'absent'
   ) => {
+    if (!windowStatus.isAllowed) {
+      setNoticeDialog({
+        title: '温馨提醒',
+        content: '非主日签到开放时段，请等待下一个主日！',
+      });
+      return;
+    }
     if (processingRef.current.has(studentId)) return;
     processingRef.current.add(studentId);
     setLoadingStudentId(studentId);
@@ -206,6 +222,13 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   };
 
   const handleOpenExcuseModal = (student: Student) => {
+    if (!windowStatus.isAllowed) {
+      setNoticeDialog({
+        title: '温馨提醒',
+        content: '非主日签到开放时段，请等待下一个主日！',
+      });
+      return;
+    }
     const existing = todayRecords.find(r => r.studentId === student.id);
     setExcuseReason(existing?.notes || '主日随父母探亲外出请假');
     setExcuseModalStudent(student);
@@ -213,6 +236,14 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
   const handleConfirmExcuse = async () => {
     if (!excuseModalStudent) return;
+    if (!windowStatus.isAllowed) {
+      setExcuseModalStudent(null);
+      setNoticeDialog({
+        title: '温馨提醒',
+        content: '非主日签到开放时段，请等待下一个主日！',
+      });
+      return;
+    }
     setLoadingStudentId(excuseModalStudent.id);
     try {
       await onManualUpdate({
@@ -354,13 +385,6 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       </div>
     );
   }
-
-  const windowStatus = checkIsWithinSundayWindow(
-    new Date(),
-    config.checkinStartTime,
-    config.checkinEndTime,
-    config.testMode
-  );
 
   return (
     <div className="space-y-3 sm:space-y-3.5">
