@@ -212,7 +212,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-slate-100">
           <button
             onClick={() => setActiveTab('today')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'today'
                 ? 'bg-amber-700 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -224,7 +224,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('monthly')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'monthly'
                 ? 'bg-amber-700 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -236,7 +236,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('annual')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'annual'
                 ? 'bg-amber-700 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
