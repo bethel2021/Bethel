@@ -212,16 +212,19 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     return (
       <div className="space-y-6">
         {/* Visitor Welcome & Login Notice */}
-        <div className="bg-linear-to-r from-amber-700 via-amber-800 to-amber-900 rounded-2xl p-6 text-white shadow-md">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-amber-100 text-xs font-semibold backdrop-blur-xs flex items-center gap-1">
-                <ShieldAlert className="w-3.5 h-3.5 text-amber-200" />
-                <span>访客模式（学生隐私受保护）</span>
-              </span>
-              <span className="text-xs text-amber-200">
-                当前主日：{formatChineseDate(activeSunday)}
-              </span>
+        <div className="bg-linear-to-r from-amber-700 via-amber-800 to-amber-900 rounded-2xl p-4 sm:p-6 text-white shadow-md">
+          <div className="space-y-2.5">
+            <div className="flex flex-row items-center justify-between gap-1.5 sm:gap-4 w-full flex-nowrap min-w-0">
+              <div className="flex items-center min-w-0 shrink">
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white/20 text-amber-100 text-[11px] sm:text-xs font-semibold backdrop-blur-xs whitespace-nowrap">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+                  <span>访客模式（学生隐私受保护）</span>
+                </span>
+              </div>
+              <div className="text-[11px] sm:text-xs text-amber-200 font-medium whitespace-nowrap flex items-center gap-0.5 sm:gap-1 shrink-0 ml-auto">
+                <span className="text-amber-200/80">当前主日：</span>
+                <span className="text-white font-semibold">{formatChineseDate(activeSunday)}</span>
+              </div>
             </div>
             <p className="text-xs sm:text-sm text-amber-100/90 max-w-3xl leading-relaxed">
               为保护主日学儿童与团契成员的隐私安全，学员资料及考勤点名功能仅对本堂主日学教师及同工开放。访客仅可查看各班级与团契基本情况。
@@ -395,29 +398,32 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
           </div>
         ) : (
           <>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-1.5">
-                    <Users className="w-4.5 h-4.5 text-amber-700" />
-                    <span>今日主日学实时签到看板</span>
-                  </h2>
-                  {currentSelectedClass && (
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200/80">
-                      {currentSelectedClass.name}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <span>当前主日：{formatChineseDate(activeSunday)}</span>
-                  <span className="text-slate-300">•</span>
-                  <span>应到总人数：<strong className="text-slate-900 font-bold">{totalCount}</strong> 人</span>
-                  <span className="text-slate-300">•</span>
-                  <span>请假：<strong className="text-blue-700 font-bold">{excusedCount}</strong> 人</span>
-                  <span className="text-slate-300">•</span>
-                  <span>综合到勤率：<strong className="text-emerald-700 font-bold">{attendanceRate}%</strong></span>
-                </p>
+            <div className="flex flex-row items-center justify-between gap-1.5 sm:gap-3 mb-2 w-full flex-nowrap min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap min-w-0 shrink">
+                <h2 className="text-sm sm:text-lg font-bold text-slate-900 flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shrink-0">
+                  <Users className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-700 shrink-0" />
+                  <span>实时签到看板</span>
+                </h2>
+                {currentSelectedClass && (
+                  <span className="text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg bg-amber-100 text-amber-900 border border-amber-200/80 whitespace-nowrap shrink-0">
+                    {currentSelectedClass.name}
+                  </span>
+                )}
               </div>
+              <div className="text-[11px] sm:text-xs text-slate-600 font-medium whitespace-nowrap flex items-center gap-0.5 sm:gap-1 bg-slate-100/90 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md border border-slate-200/70 shrink-0 ml-auto">
+                <span className="text-slate-500">当前主日：</span>
+                <span className="text-slate-800 font-semibold">{formatChineseDate(activeSunday)}</span>
+              </div>
+            </div>
+
+            <div className="mb-2">
+              <p className="text-xs text-slate-500 flex items-center gap-x-2.5 whitespace-nowrap overflow-x-auto py-0.5">
+                <span>应到总人数：<strong className="text-slate-900 font-bold">{totalCount}</strong> 人</span>
+                <span className="text-slate-300">•</span>
+                <span>请假：<strong className="text-blue-700 font-bold">{excusedCount}</strong> 人</span>
+                <span className="text-slate-300">•</span>
+                <span>综合到勤率：<strong className="text-emerald-700 font-bold">{attendanceRate}%</strong></span>
+              </p>
             </div>
 
             {/* 3 Horizontal Equal-Width Statistics via Flex Layout */}

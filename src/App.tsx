@@ -102,6 +102,13 @@ export default function App() {
     return generateInitialRecords();
   });
   const [accounts, setAccounts] = useState<AdminAccount[]>(() => getLocalAccounts());
+  const [teachers, setTeachers] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const local = getLocalData();
+      return (local as any).teachers || [];
+    }
+    return [];
+  });
   const [activeSunday, setActiveSunday] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const local = getLocalData();
@@ -195,6 +202,10 @@ export default function App() {
       setStudents(prev => isDataEqual(prev, data.students) ? prev : data.students);
     }
 
+    if (Array.isArray(data.teachers)) {
+      setTeachers(prev => isDataEqual(prev, data.teachers) ? prev : data.teachers);
+    }
+
     if (data.accounts && Array.isArray(data.accounts) && data.accounts.length > 0) {
       setAccounts(prev => isDataEqual(prev, data.accounts) ? prev : data.accounts);
     } else if (!data.accounts) {
@@ -248,8 +259,9 @@ export default function App() {
       config: data.config || config,
       records: data.records || records,
       activeSunday: data.activeSunday || activeSunday,
-      accounts: data.accounts || accounts
-    });
+      accounts: data.accounts || accounts,
+      teachers: data.teachers || teachers
+    } as any);
 
     if (Array.isArray(data.records)) {
       previousRecordsCountRef.current = data.records.length;
@@ -647,7 +659,7 @@ export default function App() {
     );
 
     if (!windowStatus.isAllowed) {
-      const msg = '非主日签到开放时段，请等待下一个主日！（可联系管理员开启｛测试模式｝）';
+      const msg = '非主日签到开放时段，请等待下一个主日！';
       setNewCheckinAlert(`⚠️ ${msg}`);
       setTimeout(() => setNewCheckinAlert(null), 4000);
       throw new Error(msg);
@@ -1140,6 +1152,85 @@ export default function App() {
     }
   };
 
+  // Handle save teacher (添加/修改教师)
+  const handleSaveTeacher = async (teacherData: any) => {
+    if (currentUser?.role !== 'superadmin') {
+      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有管理教师的权限！');
+    }
+
+    const saveLocally = () => {
+      setTeachers(prev => {
+        let updated;
+        const idx = prev.findIndex(t => teacherData.id && t.id === teacherData.id);
+        if (idx !== -1) {
+          updated = [...prev];
+          updated[idx] = { ...updated[idx], ...teacherData };
+        } else {
+          const newTeacher = {
+            id: teacherData.id || `t-${Date.now().toString().slice(-6)}`,
+            ...teacherData
+          };
+          updated = [...prev, newTeacher];
+        }
+        saveLocalData({ teachers: updated } as any);
+        return updated;
+      });
+      notifyCrossTabSync();
+    };
+
+    saveLocally();
+
+    try {
+      const res = await fetch('/api/teachers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify(teacherData)
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        setIsServerAvailable(true);
+        await loadState(false);
+      }
+    } catch {
+      // Offline fallback
+    }
+  };
+
+  // Handle delete teacher (删除教师)
+  const handleDeleteTeacher = async (teacherId: string) => {
+    if (currentUser?.role !== 'superadmin') {
+      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有删除教师的权限！');
+    }
+
+    const deleteLocally = () => {
+      setTeachers(prev => {
+        const updated = prev.filter(t => t.id !== teacherId);
+        saveLocalData({ teachers: updated } as any);
+        return updated;
+      });
+      notifyCrossTabSync();
+    };
+
+    deleteLocally();
+
+    try {
+      const res = await fetch(`/api/teachers/${teacherId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        setIsServerAvailable(true);
+        await loadState(false);
+      }
+    } catch {
+      // Offline fallback
+    }
+  };
+
   // Handle reset data (恢复示范数据)
   const handleResetData = async () => {
     if (currentUser?.role !== 'superadmin') {
@@ -1391,6 +1482,7 @@ export default function App() {
             classes={classes}
             students={students}
             accounts={accounts}
+            teachers={teachers}
             currentUser={currentUser}
             onSaveConfig={handleSaveConfig}
             onSaveClass={handleSaveClass}
@@ -1399,6 +1491,8 @@ export default function App() {
             onAddStudent={handleAddStudent}
             onBatchAddStudents={handleBatchAddStudents}
             onDeleteStudent={handleDeleteStudent}
+            onSaveTeacher={handleSaveTeacher}
+            onDeleteTeacher={handleDeleteTeacher}
             onResetData={handleResetData}
             onOpenLogin={() => setIsLoginModalOpen(true)}
             onSaveAccount={handleSaveAccount}

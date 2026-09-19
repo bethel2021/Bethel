@@ -60,6 +60,9 @@ interface SettingsModalProps {
   lastSyncTime?: string;
   onExportData?: () => void;
   onImportData?: (file: File) => Promise<void>;
+  teachers?: any[];
+  onSaveTeacher?: (teacherData: any) => Promise<void>;
+  onDeleteTeacher?: (teacherId: string) => Promise<void>;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -85,8 +88,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   lastSyncTime = '',
   onExportData,
   onImportData,
+  teachers = [],
+  onSaveTeacher,
+  onDeleteTeacher,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'classes' | 'students' | 'accounts' | 'options' | 'system'>('classes');
+  const [activeSubTab, setActiveSubTab] = useState<'classes' | 'students' | 'teachers' | 'accounts' | 'options' | 'system'>('classes');
   
   const isSuperAdmin = currentUser?.role === 'superadmin';
 
@@ -108,6 +114,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     | { type: 'class'; id: string; name: string; enrolledCount: number }
     | { type: 'student'; id: string; name: string }
     | { type: 'account'; id: string; name: string; username: string }
+    | { type: 'teacher'; id: string; name: string }
     | null
   >(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -143,6 +150,86 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [singleParent, setSingleParent] = useState('');
   const [singlePhone, setSinglePhone] = useState('');
   const [isAddingSingle, setIsAddingSingle] = useState(false);
+
+  // Teacher States & Helpers
+  const [selectedTeacherClassFilter, setSelectedTeacherClassFilter] = useState<string>('all');
+  const [editingTeacher, setEditingTeacher] = useState<any | null>(null);
+  const [teacherName, setTeacherName] = useState('');
+  const [teacherGender, setTeacherGender] = useState<'boy' | 'girl'>('boy');
+  const [teacherPhone, setTeacherPhone] = useState('');
+  const [teacherWechat, setTeacherWechat] = useState('');
+  const [teacherClassId, setTeacherClassId] = useState('');
+  const [teacherRoleTitle, setTeacherRoleTitle] = useState('主日学班主任');
+  const [teacherJoinDate, setTeacherJoinDate] = useState(new Date().toISOString().split('T')[0]);
+  const [teacherNotes, setTeacherNotes] = useState('');
+
+  const handleEditTeacher = (t: any) => {
+    setEditingTeacher(t);
+    setTeacherName(t.name);
+    setTeacherGender(t.gender || 'boy');
+    setTeacherPhone(t.phone || '');
+    setTeacherWechat(t.wechat || '');
+    setTeacherClassId(t.classId || '');
+    setTeacherRoleTitle(t.roleTitle || '主日学班主任');
+    setTeacherJoinDate(t.joinDate || new Date().toISOString().split('T')[0]);
+    setTeacherNotes(t.notes || '');
+  };
+
+  const handleClearTeacherForm = () => {
+    setEditingTeacher(null);
+    setTeacherName('');
+    setTeacherGender('boy');
+    setTeacherPhone('');
+    setTeacherWechat('');
+    setTeacherClassId(classes[0]?.id || '');
+    setTeacherRoleTitle('主日学班主任');
+    setTeacherJoinDate(new Date().toISOString().split('T')[0]);
+    setTeacherNotes('');
+  };
+
+  const handleTeacherSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin) {
+      showNotice('error', '权限不足：只有总管理员才能管理教师资料！');
+      return;
+    }
+    if (!teacherName) {
+      showNotice('error', '教师姓名不能为空！');
+      return;
+    }
+
+    try {
+      if (onSaveTeacher) {
+        await onSaveTeacher({
+          id: editingTeacher?.id,
+          name: teacherName,
+          gender: teacherGender,
+          phone: teacherPhone,
+          wechat: teacherWechat,
+          classId: teacherClassId,
+          roleTitle: teacherRoleTitle,
+          joinDate: teacherJoinDate,
+          notes: teacherNotes
+        });
+        showNotice('success', editingTeacher ? '教师资料修改成功！' : '成功添加教师资料！');
+        handleClearTeacherForm();
+      }
+    } catch (err: any) {
+      showNotice('error', err.message || '保存教师资料失败');
+    }
+  };
+
+  const handleDeleteTeacherClick = (id: string, name: string) => {
+    if (!isSuperAdmin) {
+      showNotice('error', '权限不足：只有总管理员才能删除教师资料！');
+      return;
+    }
+    setDeleteTarget({
+      type: 'teacher',
+      id,
+      name
+    });
+  };
 
   // Student Editing Modal / State
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -342,6 +429,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         if (onDeleteAccount) {
           await onDeleteAccount(deleteTarget.username);
           showNotice('success', `管理账号【${deleteTarget.name}】已成功删除！`);
+        }
+      } else if (deleteTarget.type === 'teacher') {
+        if (onDeleteTeacher) {
+          await onDeleteTeacher(deleteTarget.id);
+          showNotice('success', `教师【${deleteTarget.name}】的档案已成功彻底删除！`);
         }
       }
       setDeleteTarget(null);
@@ -643,7 +735,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            班级信息设置、学生资料管理、后台账号管理、其他功能设置与教会信息设置
+            班级信息设置、教师资料管理、学生资料管理、后台账号管理、教会信息设置与其他功能设置
           </p>
         </div>
 
@@ -739,78 +831,362 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       )}
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 border-b border-slate-200 pb-3">
         <button
           onClick={() => setActiveSubTab('classes')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+          className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'classes'
               ? 'bg-amber-700 text-white shadow-2xs'
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <Church className="w-3.5 h-3.5" />
+          <Church className="w-3.5 h-3.5 shrink-0" />
           <span>班级信息设置</span>
         </button>
 
         <button
+          onClick={() => setActiveSubTab('teachers')}
+          className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'teachers'
+              ? 'bg-amber-700 text-white shadow-2xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <UserCheck className="w-3.5 h-3.5 shrink-0" />
+          <span>教师资料管理</span>
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('students')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+          className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'students'
               ? 'bg-amber-700 text-white shadow-2xs'
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <Users className="w-3.5 h-3.5" />
+          <Users className="w-3.5 h-3.5 shrink-0" />
           <span>学生资料管理</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('accounts')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+          className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'accounts'
               ? 'bg-amber-700 text-white shadow-2xs'
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <ShieldCheck className="w-3.5 h-3.5" />
+          <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
           <span>后台账号管理</span>
-          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-            activeSubTab === 'accounts' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
-          }`}>
-            {accounts.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('options')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
-            activeSubTab === 'options'
-              ? 'bg-amber-700 text-white shadow-2xs'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          <Sliders className="w-3.5 h-3.5" />
-          <span>其他功能设置</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('system')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+          className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'system'
               ? 'bg-amber-700 text-white shadow-2xs'
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <Settings className="w-3.5 h-3.5" />
+          <Settings className="w-3.5 h-3.5 shrink-0" />
           <span>教会信息设置</span>
           {!isSuperAdmin && (
-            <span className="text-[10px] bg-amber-100/80 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded flex items-center gap-0.5">
-              <Lock className="w-2.5 h-2.5" />
-              <span>锁定只读</span>
-            </span>
+            <Lock className="w-3 h-3 text-amber-500 shrink-0" title="锁定只读" />
           )}
         </button>
+
+        <button
+          onClick={() => setActiveSubTab('options')}
+          className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'options'
+              ? 'bg-amber-700 text-white shadow-2xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5 shrink-0" />
+          <span>其他功能设置</span>
+        </button>
       </div>
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 0.5: TEACHER PROFILE MANAGEMENT (教师资料管理) */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'teachers' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Left 2 Cols: Teacher List & Filter */}
+          <div className="lg:col-span-2 space-y-4">
+            
+            {/* Filter Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-700">筛选负责班级:</span>
+                <select
+                  value={selectedTeacherClassFilter}
+                  onChange={e => setSelectedTeacherClassFilter(e.target.value)}
+                  className="text-sm px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 font-medium focus:bg-white cursor-pointer"
+                >
+                  <option value="all">全部班级 ({teachers.length}人)</option>
+                  {classes.map(c => {
+                    const count = teachers.filter(t => t.classId === c.id).length;
+                    return (
+                      <option key={c.id} value={c.id}>{c.name} ({count}人)</option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div className="text-xs text-slate-500 font-medium">
+                当前筛选下：<span className="font-bold text-amber-900">
+                  {selectedTeacherClassFilter === 'all' ? teachers.length : teachers.filter(t => t.classId === selectedTeacherClassFilter).length}
+                </span> 位教师
+              </div>
+            </div>
+
+            {/* Teachers Table */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-700">
+                  <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-semibold">
+                    <tr>
+                      <th className="px-3.5 py-3">姓名</th>
+                      <th className="px-3.5 py-3">称谓/角色</th>
+                      <th className="px-3.5 py-3">负责班级</th>
+                      <th className="px-3.5 py-3">联系电话</th>
+                      <th className="px-3.5 py-3">微信</th>
+                      <th className="px-3.5 py-3">入职/加入日期</th>
+                      <th className="px-3.5 py-3 text-right">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(selectedTeacherClassFilter === 'all' 
+                      ? teachers 
+                      : teachers.filter(t => t.classId === selectedTeacherClassFilter)
+                    ).length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                          暂无负责该班级的教师，请在右侧新增教师资料
+                        </td>
+                      </tr>
+                    ) : (
+                      (selectedTeacherClassFilter === 'all' 
+                        ? teachers 
+                        : teachers.filter(t => t.classId === selectedTeacherClassFilter)
+                      ).map(t => {
+                        const cls = classes.find(c => c.id === t.classId);
+                        return (
+                          <tr key={t.id} className="hover:bg-amber-50/40 transition-colors">
+                            <td className="px-3.5 py-2.5">
+                              <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+                                <span className={`w-1.5 h-1.5 rounded-full ${t.gender === 'boy' ? 'bg-blue-400' : 'bg-pink-400'}`} />
+                                <span>{t.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-3.5 py-2.5 font-medium text-slate-600">
+                              {t.roleTitle || '主日学老师'}
+                            </td>
+                            <td className="px-3.5 py-2.5">
+                              <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-[11px] font-medium">
+                                {cls ? cls.name : '未关联'}
+                              </span>
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-700 font-mono">
+                              {t.phone || '无'}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-700 font-mono">
+                              {t.wechat || '无'}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-500 font-medium">
+                              {t.joinDate || '2026-01-01'}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-right space-x-1 whitespace-nowrap">
+                              <button
+                                onClick={() => handleEditTeacher(t)}
+                                className="px-2 py-1 text-[11px] rounded bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-900 font-bold transition-all shrink-0 cursor-pointer"
+                              >
+                                编辑
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTeacherClick(t.id, t.name)}
+                                className="px-2 py-1 text-[11px] rounded bg-red-50 text-red-700 hover:bg-red-100 font-bold transition-all shrink-0 cursor-pointer"
+                              >
+                                删除
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Col: Add / Edit Teacher Form */}
+          <div className="space-y-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <UserPlus className="w-4 h-4 text-amber-700" />
+                  <span>{editingTeacher ? '编辑教师档案' : '录入新教师资料'}</span>
+                </h4>
+                {editingTeacher && (
+                  <button
+                    onClick={handleClearTeacherForm}
+                    className="text-[10px] text-slate-500 hover:text-amber-800 font-bold cursor-pointer"
+                  >
+                    取消编辑
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={handleTeacherSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    教师姓名 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={teacherName}
+                    onChange={e => setTeacherName(e.target.value)}
+                    placeholder="请输入老师姓名"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      称谓角色
+                    </label>
+                    <select
+                      value={teacherRoleTitle}
+                      onChange={e => setTeacherRoleTitle(e.target.value)}
+                      className="w-full text-xs px-2.5 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="主日学班主任">主日学班主任</option>
+                      <option value="主日学校长">主日学校长</option>
+                      <option value="主日学同工">主日学同工</option>
+                      <option value="主日学讲员">主日学讲员</option>
+                      <option value="助教老师">助教老师</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      教师性别
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTeacherGender('boy')}
+                        className={`text-xs py-2 rounded-xl border font-bold transition-all cursor-pointer ${
+                          teacherGender === 'boy'
+                            ? 'bg-blue-50 text-blue-800 border-blue-400 shadow-2xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        弟兄
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTeacherGender('girl')}
+                        className={`text-xs py-2 rounded-xl border font-bold transition-all cursor-pointer ${
+                          teacherGender === 'girl'
+                            ? 'bg-pink-50 text-pink-800 border-pink-400 shadow-2xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        姊妹
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    负责班级 / 团契
+                  </label>
+                  <select
+                    value={teacherClassId}
+                    onChange={e => setTeacherClassId(e.target.value)}
+                    className="w-full text-xs px-2.5 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">请选择负责班级</option>
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      联系电话
+                    </label>
+                    <input
+                      type="text"
+                      value={teacherPhone}
+                      onChange={e => setTeacherPhone(e.target.value)}
+                      placeholder="手机号"
+                      className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      微信 ID
+                    </label>
+                    <input
+                      type="text"
+                      value={teacherWechat}
+                      onChange={e => setTeacherWechat(e.target.value)}
+                      placeholder="微信账号"
+                      className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    入职 / 加入日期
+                  </label>
+                  <input
+                    type="date"
+                    value={teacherJoinDate}
+                    onChange={e => setTeacherJoinDate(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    备注信息 (如任教特长)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={teacherNotes}
+                    onChange={e => setTeacherNotes(e.target.value)}
+                    placeholder="选填，如：擅长吉他、音乐赞美、少儿绘画"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!isSuperAdmin}
+                  className="w-full py-2.5 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{editingTeacher ? '更新档案' : '录入系统'}</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* SUB-TAB 1: CLASSES MANAGEMENT (自定义班级名称与班级负责、上课老师) */}
@@ -1020,17 +1396,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Filter Bar */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-700">筛选班级/团契:</span>
+                <span className="text-sm font-semibold text-slate-700">筛选班级/团契:</span>
                 <select
                   value={selectedClassFilter}
                   onChange={e => setSelectedClassFilter(e.target.value)}
-                  className="text-xs px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 font-medium focus:bg-white"
+                  className="text-sm px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 font-medium focus:bg-white cursor-pointer"
                 >
-                  <option value="all">全部班级与团契 ({students.length}人)</option>
+                  <option value="all" className="text-sm font-semibold">全部班级与团契 ({students.length}人)</option>
                   {classes.map(c => {
                     const count = students.filter(s => s.classId === c.id).length;
                     return (
-                      <option key={c.id} value={c.id}>{c.name} ({count}人)</option>
+                      <option key={c.id} value={c.id} className="text-sm">{c.name} ({count}人)</option>
                     );
                   })}
                 </select>
@@ -2488,7 +2864,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     ? '确认删除班级/团契？' 
                     : deleteTarget.type === 'student' 
                     ? '确认移除在册学员？'
-                    : '确认删除管理员账号？'}
+                    : deleteTarget.type === 'account'
+                    ? '确认删除管理员账号？'
+                    : '确认删除教师档案？'}
                 </h3>
                 <div className="text-xs text-slate-600 mt-1.5 space-y-2 leading-relaxed">
                   {deleteTarget.type === 'class' ? (
@@ -2509,7 +2887,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <p>
                       您确定要将学员 <strong className="text-slate-900 font-bold">【{deleteTarget.name}】</strong> 从主日学名册中彻底移除吗？此操作将一并清除该学员的历史考勤记录。
                     </p>
-                  ) : (
+                  ) : deleteTarget.type === 'account' ? (
                     <>
                       <p>
                         您确定要永久注销并删除管理账号 <strong className="text-slate-900 font-bold">【{deleteTarget.name}】</strong> 吗？
@@ -2518,6 +2896,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         ⚠️ <strong>安全提示：</strong>账号删除后，该同工将无法再登录系统进行签到或管理。如仅需暂停使用，可修改其密码。
                       </div>
                     </>
+                  ) : (
+                    <p>
+                      您确定要将教师 <strong className="text-slate-900 font-bold">【{deleteTarget.name}】</strong> 的档案从系统彻底删除吗？此操作不可恢复。
+                    </p>
                   )}
                 </div>
               </div>

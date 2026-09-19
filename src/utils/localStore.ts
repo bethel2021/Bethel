@@ -1,5 +1,5 @@
 import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords } from '../mockData';
-import type { ClassGroup, Student, SystemConfig, AttendanceRecord, AdminUser, AdminAccount } from '../types';
+import type { ClassGroup, Student, SystemConfig, AttendanceRecord, AdminUser, AdminAccount, Teacher } from '../types';
 
 const STORAGE_KEYS = {
   CLASSES: 'bethel_classes',
@@ -9,7 +9,8 @@ const STORAGE_KEYS = {
   ACTIVE_SUNDAY: 'bethel_active_sunday',
   INITIALIZED: 'bethel_data_initialized',
   ACCOUNTS: 'bethel_admin_accounts',
-  HIDDEN_CLASS_IDS: 'bethel_hidden_class_ids'
+  HIDDEN_CLASS_IDS: 'bethel_hidden_class_ids',
+  TEACHERS: 'bethel_teachers'
 };
 
 export function getLocalHiddenClassIds(): Set<string> {
@@ -216,7 +217,10 @@ export function getLocalData() {
     const rawSunday = localStorage.getItem(STORAGE_KEYS.ACTIVE_SUNDAY);
     const activeSunday = rawSunday || '2026-09-13';
 
-    return { classes, students, config, records, activeSunday };
+    const rawTeachers = localStorage.getItem(STORAGE_KEYS.TEACHERS);
+    const teachers: Teacher[] = rawTeachers ? JSON.parse(rawTeachers) : [];
+
+    return { classes, students, config, records, activeSunday, teachers };
   } catch (e) {
     console.warn('Failed reading from localStorage, using fallback defaults', e);
     return {
@@ -224,7 +228,8 @@ export function getLocalData() {
       students: initialStudents,
       config: initialSystemConfig,
       records: generateInitialRecords(initialStudents),
-      activeSunday: '2026-09-13'
+      activeSunday: '2026-09-13',
+      teachers: []
     };
   }
 }
@@ -236,6 +241,7 @@ export function saveLocalData(data: {
   records?: AttendanceRecord[];
   activeSunday?: string;
   accounts?: AdminAccount[];
+  teachers?: Teacher[];
 }) {
   if (typeof window === 'undefined') return;
   try {
@@ -249,6 +255,7 @@ export function saveLocalData(data: {
     if (data.records) localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(data.records));
     if (data.activeSunday) localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, data.activeSunday);
     if (data.accounts) localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(data.accounts));
+    if (data.teachers) localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(data.teachers));
     localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
   } catch (e) {
     console.warn('Failed saving to localStorage', e);
@@ -266,6 +273,7 @@ export function resetLocalData() {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, '2026-09-13');
     localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(DEFAULT_ACCOUNTS));
     localStorage.removeItem(STORAGE_KEYS.HIDDEN_CLASS_IDS);
+    localStorage.removeItem(STORAGE_KEYS.TEACHERS);
     localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     return {
       classes: initialClasses,
@@ -273,7 +281,8 @@ export function resetLocalData() {
       config: initialSystemConfig,
       records,
       accounts: DEFAULT_ACCOUNTS,
-      activeSunday: '2026-09-13'
+      activeSunday: '2026-09-13',
+      teachers: []
     };
   } catch (e) {
     console.warn('Failed resetting localStorage', e);

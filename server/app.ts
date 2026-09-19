@@ -24,7 +24,8 @@ import {
   syncVersion,
   lastModifiedTimestamp,
   mergeClientData,
-  onDataChange
+  onDataChange,
+  teachers
 } from './dataStore';
 
 const app = express();
@@ -54,6 +55,7 @@ export function getCurrentStatePayload(eventType: string = 'state_update', extra
     })),
     students,
     records,
+    teachers,
     accounts: adminAccounts.map(a => ({
       id: a.id,
       username: a.username,
@@ -265,6 +267,7 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
     })),
     students,
     records,
+    teachers,
     accounts: adminAccounts.map(a => ({
       id: a.id,
       username: a.username,
@@ -996,6 +999,83 @@ apiRouter.delete('/students/:id', (req: Request, res: Response) => {
   }
 });
 
+// 7.1 Manage Teachers (添加/修改/删除教师资料) - 仅限总管理员
+apiRouter.post('/teachers', (req: Request, res: Response) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message });
+    }
+
+    const { id, name, gender, phone, wechat, classId, roleTitle, joinDate, notes } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: '教师姓名均为必填项' });
+    }
+
+    const idx = teachers.findIndex(t => id && t.id === id);
+    if (idx !== -1) {
+      teachers[idx] = {
+        ...teachers[idx],
+        name,
+        gender: gender || 'boy',
+        phone: phone || '',
+        wechat: wechat || '',
+        classId: classId || '',
+        roleTitle: roleTitle || '主日学老师',
+        joinDate: joinDate || teachers[idx].joinDate || new Date().toISOString().split('T')[0],
+        notes: notes || ''
+      };
+      saveDataToFile();
+      // Broadcast real-time update
+      broadcastRealtimeState('teachers_updated');
+      return res.json({ success: true, teacher: teachers[idx], message: '教师资料已更新' });
+    }
+
+    const newTeacher = {
+      id: `t-${Date.now().toString().slice(-6)}`,
+      name,
+      gender: gender || 'boy',
+      phone: phone || '',
+      wechat: wechat || '',
+      classId: classId || '',
+      roleTitle: roleTitle || '主日学老师',
+      joinDate: joinDate || new Date().toISOString().split('T')[0],
+      notes: notes || ''
+    };
+    teachers.push(newTeacher);
+    saveDataToFile();
+    // Broadcast real-time update
+    broadcastRealtimeState('teachers_updated');
+    return res.json({ success: true, teacher: newTeacher, message: '成功添加教师资料' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.delete('/teachers/:id', (req: Request, res: Response) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message });
+    }
+
+    const { id } = req.params;
+    const idx = teachers.findIndex(t => t.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: '未找到该教师资料' });
+    }
+
+    const removed = teachers[idx];
+    teachers.splice(idx, 1);
+    saveDataToFile();
+    // Broadcast real-time update
+    broadcastRealtimeState('teachers_updated');
+    return res.json({ success: true, message: `教师【${removed.name}】已成功从名册中彻底删除！` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 8. Update System Config & Default Options - 仅限总管理员
 apiRouter.post('/config', (req: Request, res: Response) => {
   try {
@@ -1266,7 +1346,7 @@ app.use('/api', (req: Request, res: Response) => {
   res.status(404).json({
     error: `接口未找到: ${req.method} ${req.url}`,
     status: 404,
-    validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/config']
+    validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/teachers', '/api/config']
   });
 });
 

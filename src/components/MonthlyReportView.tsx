@@ -465,7 +465,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <CalendarCheck className="w-5 h-5 text-amber-700" />
-            <span>主日学月度出勤统计表</span>
+            <span>月度出勤统计表</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             精美图表、全勤榜单与逐周出席明细，支持一键打印发布
@@ -498,11 +498,11 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
           <select
             value={filterClassId}
             onChange={e => setFilterClassId(e.target.value)}
-            className="text-xs px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-700 font-medium cursor-pointer"
+            className="text-sm px-3.5 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-700 font-medium cursor-pointer"
           >
-            <option value="all">全部班级 ({students.length}人)</option>
+            <option value="all" className="text-sm font-semibold">全部班级 ({students.length}人)</option>
             {classes.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id} className="text-sm">{c.name}</option>
             ))}
           </select>
 

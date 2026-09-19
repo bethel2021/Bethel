@@ -101,3 +101,15 @@ export interface AttendanceStats {
   attendanceRate: number;
   verseCompletedCount: number;
 }
+
+export interface Teacher {
+  id: string;
+  name: string;
+  gender: 'boy' | 'girl';
+  phone: string;
+  wechat?: string;
+  classId?: string;
+  roleTitle?: string;
+  joinDate?: string;
+  notes?: string;
+}

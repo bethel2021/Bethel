@@ -5,13 +5,14 @@ import type { Request } from 'express';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types';
 import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccounts, ServerAdminAccount } from './initialData';
 
-// Active in-memory state
-export let classes: ClassGroup[] = [...initialClasses];
-export let students: Student[] = [...initialStudents];
-export let records: AttendanceRecord[] = [];
-export let systemConfig: SystemConfig = { ...initialSystemConfig };
-export let adminAccounts: ServerAdminAccount[] = [...initialAdminAccounts];
+// Active in-memory state (Using const to ensure stable reference bindings across ES modules & CommonJS bundles)
+export const classes: ClassGroup[] = [...initialClasses];
+export const students: Student[] = [...initialStudents];
+export const records: AttendanceRecord[] = [];
+export const systemConfig: SystemConfig = { ...initialSystemConfig };
+export const adminAccounts: ServerAdminAccount[] = [...initialAdminAccounts];
 export const activeSessions = new Map<string, AdminUser>();
+export const teachers: any[] = [];
 export let syncVersion = 1;
 export let lastModifiedTimestamp = new Date().toISOString();
 
@@ -155,6 +156,7 @@ type DataChangeListener = (data: {
   activeSunday: string;
   syncVersion: number;
   lastModifiedTimestamp: string;
+  teachers?: any[];
 }) => void;
 
 const changeListeners = new Set<DataChangeListener>();
@@ -168,10 +170,12 @@ export function saveDataToFile() {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   const hiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
-  systemConfig = {
+  const updatedConfig = {
     ...systemConfig,
     hiddenClassIds: hiddenIds
   };
+  Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
+  Object.assign(systemConfig, updatedConfig);
 
   const payload = {
     systemConfig,
@@ -182,6 +186,7 @@ export function saveDataToFile() {
     activeSunday,
     syncVersion,
     hiddenClassIds: hiddenIds,
+    teachers,
     updatedAt: lastModifiedTimestamp
   };
 
@@ -211,7 +216,8 @@ export function saveDataToFile() {
         adminAccounts,
         activeSunday,
         syncVersion,
-        lastModifiedTimestamp
+        lastModifiedTimestamp,
+        teachers
       });
     } catch (err) {
       console.warn('[Realtime Sync Error] Listener callback failed:', err);
@@ -223,7 +229,7 @@ export function saveDataToFile() {
 }
 
 export function generateHistoricalRecords() {
-  records = [];
+  records.length = 0;
   const pastSundays = [
     '2026-06-07', '2026-06-14', '2026-06-21', '2026-06-28',
     '2026-07-05', '2026-07-12', '2026-07-19', '2026-07-26',
@@ -277,9 +283,17 @@ export function generateHistoricalRecords() {
 let isInitialized = false;
 
 function sanitizeYageData() {
-  classes = classes.filter(c => c.id !== 'class-8' && c.name !== '雅歌团契');
-  students = students.filter(s => s.classId !== 'class-8' && s.id !== 's-801' && s.id !== 's-802');
-  records = records.filter(r => r.classId !== 'class-8' && r.studentId !== 's-801' && r.studentId !== 's-802');
+  const filteredClasses = classes.filter(c => c.id !== 'class-8' && c.name !== '雅歌团契');
+  classes.length = 0;
+  classes.push(...filteredClasses);
+
+  const filteredStudents = students.filter(s => s.classId !== 'class-8' && s.id !== 's-801' && s.id !== 's-802');
+  students.length = 0;
+  students.push(...filteredStudents);
+
+  const filteredRecords = records.filter(r => r.classId !== 'class-8' && r.studentId !== 's-801' && r.studentId !== 's-802');
+  records.length = 0;
+  records.push(...filteredRecords);
 }
 
 export function loadFromDisk(): boolean {
@@ -303,21 +317,58 @@ export function loadFromDisk(): boolean {
         data.hiddenClassIds.forEach((id: string) => hiddenSet.add(id));
       }
       if (Array.isArray(data.classes) && data.classes.length > 0) {
-        classes = data.classes.map((c: any) => ({
+        const mappedClasses = data.classes.map((c: any) => ({
           ...c,
           isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
+        classes.length = 0;
+        classes.push(...mappedClasses);
       } else {
-        classes = classes.map(c => ({
+        const mappedClasses = classes.map(c => ({
           ...c,
           isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
+        classes.length = 0;
+        classes.push(...mappedClasses);
       }
-      if (Array.isArray(data.students) && data.students.length > 0) students = data.students;
-      if (Array.isArray(data.records)) records = data.records;
-      if (Array.isArray(data.adminAccounts) && data.adminAccounts.length > 0) adminAccounts = data.adminAccounts;
+      if (Array.isArray(data.students) && data.students.length > 0) {
+        students.length = 0;
+        students.push(...data.students);
+      }
+      if (Array.isArray(data.records)) {
+        const originalCount = data.records.length;
+        const cleanedRecords = data.records.filter((r: any) => r.date !== '2026-09-06' && r.date !== '2026-09-13');
+        records.length = 0;
+        records.push(...cleanedRecords);
+        if (originalCount !== cleanedRecords.length) {
+          console.log(`[Storage Cleanup] Reset ${originalCount - cleanedRecords.length} records for September 6th and 13th, 2026.`);
+          setTimeout(() => saveDataToFile(), 100);
+        }
+      }
+      if (Array.isArray(data.adminAccounts) && data.adminAccounts.length > 0) {
+        adminAccounts.length = 0;
+        adminAccounts.push(...data.adminAccounts);
+      }
+      if (Array.isArray(data.teachers)) {
+        teachers.length = 0;
+        teachers.push(...data.teachers);
+      } else {
+        const defaultTeachers = [
+          { id: 't-1', name: '春来 老师', gender: 'boy', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+          { id: 't-2', name: '秋娟 老师', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+          { id: 't-3', name: '若雪 老师', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+          { id: 't-4', name: '上好 老师', gender: 'boy', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+          { id: 't-5', name: '雪成 老师', gender: 'boy', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+          { id: 't-6', name: '志安 老师', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+          { id: 't-7', name: '东丽 老师', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '主日学班主任', joinDate: '2026-01-01' }
+        ];
+        teachers.length = 0;
+        teachers.push(...defaultTeachers);
+      }
       if (data.systemConfig) {
-        systemConfig = { ...initialSystemConfig, ...data.systemConfig, hiddenClassIds: Array.from(hiddenSet) };
+        const mergedConfig = { ...initialSystemConfig, ...data.systemConfig, hiddenClassIds: Array.from(hiddenSet) };
+        Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
+        Object.assign(systemConfig, mergedConfig);
       }
       if (data.activeSunday) activeSunday = data.activeSunday;
       if (typeof data.syncVersion === 'number') syncVersion = data.syncVersion;
@@ -325,10 +376,26 @@ export function loadFromDisk(): boolean {
       sanitizeYageData();
       return true;
     } else if (hiddenSet.size > 0) {
-      classes = classes.map(c => ({
+      const mappedClasses = classes.map(c => ({
         ...c,
         isHiddenFromHome: hiddenSet.has(c.id)
       }));
+      classes.length = 0;
+      classes.push(...mappedClasses);
+    }
+
+    if (!fs.existsSync(filePath)) {
+      const defaultTeachers = [
+        { id: 't-1', name: '春来 老师', gender: 'boy', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+        { id: 't-2', name: '秋娟 老师', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+        { id: 't-3', name: '若雪 老师', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+        { id: 't-4', name: '上好 老师', gender: 'boy', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+        { id: 't-5', name: '雪成 老师', gender: 'boy', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+        { id: 't-6', name: '志安 老师', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '主日学班主任', joinDate: '2026-01-01' },
+        { id: 't-7', name: '东丽 老师', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '主日学班主任', joinDate: '2026-01-01' }
+      ];
+      teachers.length = 0;
+      teachers.push(...defaultTeachers);
     }
   } catch (err) {
     console.warn('[Storage Notice] Could not read disk cache:', err);
@@ -374,15 +441,34 @@ export async function initOrLoadDataAsync() {
         cloudData.hiddenClassIds.forEach((id: string) => currentHiddenSet.add(id));
       }
       if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
-        classes = cloudData.classes.map((c: any) => ({
+        const mappedClasses = cloudData.classes.map((c: any) => ({
           ...c,
           isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : currentHiddenSet.has(c.id)
         }));
+        classes.length = 0;
+        classes.push(...mappedClasses);
       }
-      if (Array.isArray(cloudData.students) && cloudData.students.length > 0) students = cloudData.students;
-      if (Array.isArray(cloudData.records)) records = cloudData.records;
-      if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) adminAccounts = cloudData.adminAccounts;
-      if (cloudData.systemConfig) systemConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(currentHiddenSet) };
+      if (Array.isArray(cloudData.students) && cloudData.students.length > 0) {
+        students.length = 0;
+        students.push(...cloudData.students);
+      }
+      if (Array.isArray(cloudData.records)) {
+        records.length = 0;
+        records.push(...cloudData.records);
+      }
+      if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) {
+        adminAccounts.length = 0;
+        adminAccounts.push(...cloudData.adminAccounts);
+      }
+      if (Array.isArray(cloudData.teachers)) {
+        teachers.length = 0;
+        teachers.push(...cloudData.teachers);
+      }
+      if (cloudData.systemConfig) {
+        const mergedConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(currentHiddenSet) };
+        Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
+        Object.assign(systemConfig, mergedConfig);
+      }
       if (cloudData.activeSunday) activeSunday = cloudData.activeSunday;
       syncVersion = cloudData.syncVersion;
       if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
@@ -450,23 +536,28 @@ export function verifySuperAdminPermission(req: Request): { allowed: boolean; ro
 
 // Mutators for clean external usage
 export function setClasses(newClasses: ClassGroup[]) {
-  classes = newClasses;
+  classes.length = 0;
+  classes.push(...newClasses);
 }
 
 export function setStudents(newStudents: Student[]) {
-  students = newStudents;
+  students.length = 0;
+  students.push(...newStudents);
 }
 
 export function setRecords(newRecords: AttendanceRecord[]) {
-  records = newRecords;
+  records.length = 0;
+  records.push(...newRecords);
 }
 
 export function setSystemConfig(newConfig: SystemConfig) {
-  systemConfig = newConfig;
+  Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
+  Object.assign(systemConfig, newConfig);
 }
 
 export function setAdminAccounts(newAccounts: ServerAdminAccount[]) {
-  adminAccounts = newAccounts;
+  adminAccounts.length = 0;
+  adminAccounts.push(...newAccounts);
 }
 
 export interface SyncPayload {
@@ -526,7 +617,9 @@ export function mergeClientData(payload: SyncPayload): {
         }
       }
     }
-    classes = Array.from(classMap.values());
+    const mergedClasses = Array.from(classMap.values());
+    classes.length = 0;
+    classes.push(...mergedClasses);
   }
 
   // 2. Merge students (by ID)
@@ -544,7 +637,9 @@ export function mergeClientData(payload: SyncPayload): {
         }
       }
     }
-    students = Array.from(studentMap.values());
+    const mergedStudents = Array.from(studentMap.values());
+    students.length = 0;
+    students.push(...mergedStudents);
   }
 
   // 3. Merge attendance records (by unique ID)
@@ -562,10 +657,32 @@ export function mergeClientData(payload: SyncPayload): {
         }
       }
     }
-    records = Array.from(recordMap.values());
+    const mergedRecords = Array.from(recordMap.values());
+    records.length = 0;
+    records.push(...mergedRecords);
   }
 
   // 4. System config & classes are server-authoritative and master-managed via /api/config & /api/classes
+
+  // Merge teachers (by ID)
+  if (Array.isArray((payload as any).teachers) && (payload as any).teachers.length > 0) {
+    const teacherMap = new Map<string, any>(teachers.map(t => [t.id, t]));
+    for (const t of (payload as any).teachers) {
+      if (!teacherMap.has(t.id)) {
+        teacherMap.set(t.id, t);
+        changed = true;
+      } else {
+        const existing = teacherMap.get(t.id)!;
+        if (JSON.stringify(existing) !== JSON.stringify(t)) {
+          teacherMap.set(t.id, { ...existing, ...t });
+          changed = true;
+        }
+      }
+    }
+    const mergedTeachers = Array.from(teacherMap.values());
+    teachers.length = 0;
+    teachers.push(...mergedTeachers);
+  }
 
   if (payload.activeSunday) {
     activeSunday = payload.activeSunday;
@@ -582,7 +699,8 @@ export function mergeClientData(payload: SyncPayload): {
     config: systemConfig,
     activeSunday,
     syncVersion,
-    lastModifiedTimestamp
-  };
+    lastModifiedTimestamp,
+    teachers
+  } as any;
 }
 
