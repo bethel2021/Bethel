@@ -266,6 +266,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
             border: 1px solid #e2e8f0;
             padding: 10px 8px;
             text-align: center;
+            white-space: nowrap;
           }
           th {
             background-color: #f1f5f9;
@@ -347,7 +348,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
       <body>
         <div class="header">
           <div class="church-title">${config.churchName}</div>
-          <div class="report-subtitle">${targetClass.name} - ${classMonthName}月度出勤与成长进度公报</div>
+          <div class="report-subtitle">${targetClass.name} - ${classMonthName}月度出勤统计表</div>
         </div>
 
         <div class="stats-grid">
@@ -464,7 +465,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <CalendarCheck className="w-5 h-5 text-amber-700" />
-            <span>主日学月度出勤与成长进度公报</span>
+            <span>主日学月度出勤统计表</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             精美图表、全勤榜单与逐周出席明细，支持一键打印发布
@@ -722,17 +723,17 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 border-b border-slate-200/80">
               <tr>
-                <th className="px-4 py-3 font-semibold w-12 text-center">序号</th>
-                <th className="px-4 py-3 font-semibold">学员姓名</th>
-                <th className="px-4 py-3 font-semibold">所属班级</th>
+                <th className="px-4 py-3 font-semibold w-12 text-center whitespace-nowrap">序号</th>
+                <th className="px-4 py-3 font-semibold whitespace-nowrap">姓名</th>
+                <th className="px-4 py-3 font-semibold whitespace-nowrap">所属班级</th>
                 {sundaysInMonth.map(sun => (
                   <th key={sun} className="px-3 py-3 font-semibold text-center whitespace-nowrap">
                     {formatShortChineseDate(sun)} (主日)
                   </th>
                 ))}
-                <th className="px-3 py-3 font-semibold text-center">出勤/总周</th>
-                <th className="px-3 py-3 font-semibold text-center">月度出勤率</th>
-                <th className="px-4 py-3 font-semibold text-center">评级</th>
+                <th className="px-3 py-3 font-semibold text-center whitespace-nowrap">出勤数/总周</th>
+                <th className="px-3 py-3 font-semibold text-center whitespace-nowrap">出勤率</th>
+                <th className="px-4 py-3 font-semibold text-center whitespace-nowrap">表现评价</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -740,30 +741,30 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
                 const cls = classes.find(c => c.id === item.student.classId);
                 return (
                   <tr key={item.student.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-4 py-3 text-center text-slate-400 font-mono">
+                    <td className="px-4 py-3 text-center text-slate-400 font-mono whitespace-nowrap">
                       {idx + 1}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      <div className="flex items-center gap-1.5">
-                        <span>{item.student.name}</span>
+                    <td className="px-4 py-3 font-bold text-slate-900 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="whitespace-nowrap">{item.student.name}</span>
                         {item.isFullAttendance && (
-                          <span className="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded-full font-medium">
+                          <span className="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded-full font-medium whitespace-nowrap">
                             全勤
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">
+                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                       {cls?.name.split(' ')[0]}
                     </td>
                     
                     {/* Each Sunday Status */}
                     {item.sundayRecords.map(({ date, record }) => (
-                      <td key={date} className="px-3 py-3 text-center">
+                      <td key={date} className="px-3 py-3 text-center whitespace-nowrap">
                         {record ? (
-                          <div className="inline-flex flex-col items-center">
+                          <div className="inline-flex flex-col items-center whitespace-nowrap">
                             <span 
-                              className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-[10px] font-bold ${
+                              className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-[10px] font-bold whitespace-nowrap ${
                                 record.status === 'present'
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : record.status === 'late'
@@ -776,25 +777,25 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
                             </span>
                           </div>
                         ) : (
-                          <span className="w-5 h-5 rounded-full inline-flex items-center justify-center text-slate-300 font-mono">
+                          <span className="w-5 h-5 rounded-full inline-flex items-center justify-center text-slate-300 font-mono whitespace-nowrap">
                             -
                           </span>
                         )}
                       </td>
                     ))}
 
-                    <td className="px-3 py-3 text-center font-semibold text-slate-800 font-mono">
+                    <td className="px-3 py-3 text-center font-semibold text-slate-800 font-mono whitespace-nowrap">
                       {item.attendedCount} / {sundaysInMonth.length}
                     </td>
 
-                    <td className="px-3 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span className="font-bold text-slate-900 font-mono">{item.rate}%</span>
+                    <td className="px-3 py-3 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                        <span className="font-bold text-slate-900 font-mono whitespace-nowrap">{item.rate}%</span>
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
                         item.rate >= 100
                           ? 'bg-amber-100 text-amber-900 border border-amber-300'
                           : item.rate >= 75

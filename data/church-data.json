@@ -232,18 +232,6 @@
       "joinDate": "2026-09-01"
     },
     {
-      "id": "s-611",
-      "name": "何馨怡 (Emily)",
-      "gender": "girl",
-      "birthDate": "2011-05-19",
-      "age": 15,
-      "classId": "class-6",
-      "parentName": "家长",
-      "parentPhone": "3889589029",
-      "memberCode": "BTL-26",
-      "joinDate": "2026-09-01"
-    },
-    {
       "id": "s-612",
       "name": "余舒涵 (Sara)",
       "gender": "girl",
@@ -3730,9 +3718,9 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 104,
+  "syncVersion": 106,
   "hiddenClassIds": [
     "class-1"
   ],
-  "updatedAt": "2026-09-19T02:18:39.198Z"
+  "updatedAt": "2026-09-19T06:50:36.147Z"
 }

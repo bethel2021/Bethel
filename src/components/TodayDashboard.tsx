@@ -81,7 +81,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     if (isNonWindow) {
       setNoticeDialog({
         title: '温馨提醒',
-        content: '非主日签到开放时段，请等待下一个主日！\n（可联系管理员开启｛测试模式｝）',
+        content: '非主日签到开放时段，请等待下一个主日！',
       });
     } else {
       setNoticeDialog({
@@ -797,7 +797,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
             </div>
 
             <div className="p-5">
-              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold whitespace-pre-line">
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold whitespace-pre-line text-center">
                 {noticeDialog.content}
               </p>
             </div>
