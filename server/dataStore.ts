@@ -511,12 +511,13 @@ export function mergeClientData(payload: SyncPayload): {
         changed = true;
       } else {
         const existing = classMap.get(c.id)!;
-        const authoritativeHidden = typeof c.isHiddenFromHome === 'boolean'
-          ? c.isHiddenFromHome
-          : (typeof existing.isHiddenFromHome === 'boolean' ? existing.isHiddenFromHome : diskHiddenSet.has(c.id));
+        // The server's settings (including isHiddenFromHome, teachers, and classroom) are authoritative for existing classes.
+        // We preserve the server's existing isHiddenFromHome status instead of letting clients overwrite it.
+        const authoritativeHidden = typeof existing.isHiddenFromHome === 'boolean'
+          ? existing.isHiddenFromHome
+          : diskHiddenSet.has(c.id);
         const mergedClass: ClassGroup = {
           ...existing,
-          ...c,
           isHiddenFromHome: authoritativeHidden
         };
         if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {

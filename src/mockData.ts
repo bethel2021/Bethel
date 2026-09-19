@@ -106,7 +106,20 @@ export const initialStudents: Student[] = [
   { id: 's-615', name: '翁诗雅 (Gionna)', gender: 'girl', birthDate: '2011-01-20', age: 15, classId: 'class-6', parentName: '张若慧', parentPhone: '3289497239', memberCode: 'BTL-30', joinDate: '2026-09-01' },
   { id: 's-616', name: '王若萱 (Jessy)', gender: 'girl', birthDate: '2011-06-21', age: 15, classId: 'class-6', parentName: '黄淑珍', parentPhone: '3881852616', memberCode: 'BTL-31', joinDate: '2026-09-01' },
   { id: 's-617', name: '徐凌霏 (Fiona)', gender: 'girl', birthDate: '2011-07-15', age: 15, classId: 'class-6', parentName: '黄庆伟', parentPhone: '3501329726', memberCode: 'BTL-32', joinDate: '2026-09-01' },
-  { id: 's-618', name: '张金旭 (Davide)', gender: 'boy', birthDate: '2011-10-05', age: 15, classId: 'class-6', parentName: '张若慧', parentPhone: '3242898504', memberCode: 'BTL-33', joinDate: '2026-09-01' }
+  { id: 's-618', name: '张金旭 (Davide)', gender: 'boy', birthDate: '2011-10-05', age: 15, classId: 'class-6', parentName: '张若慧', parentPhone: '3242898504', memberCode: 'BTL-33', joinDate: '2026-09-01' },
+  { id: 's-619', name: '林慕妍 (Monica)', gender: 'girl', birthDate: '2011-11-11', age: 15, classId: 'class-6', parentName: '徐秀', parentPhone: '3279131933', memberCode: 'BTL-34', joinDate: '2026-09-01' },
+  { id: 's-620', name: '蒋心语 (Chiara)', gender: 'girl', birthDate: '2011-11-25', age: 15, classId: 'class-6', parentName: '家长', parentPhone: '3331671680', memberCode: 'BTL-35', joinDate: '2026-09-01' },
+  { id: 's-621', name: '李恩惜 (Rebecca)', gender: 'girl', birthDate: '2011-11-28', age: 15, classId: 'class-6', parentName: '玉燕', parentPhone: '3295678897', memberCode: 'BTL-36', joinDate: '2026-09-01' },
+  { id: 's-622', name: '陈瀚源 (Giovanni)', gender: 'boy', birthDate: '2011-12-16', age: 15, classId: 'class-6', parentName: '陈帖', parentPhone: '3500180705', memberCode: 'BTL-37', joinDate: '2026-09-01' },
+  { id: 's-623', name: '朱景泽 (Alex)', gender: 'boy', birthDate: '2011-12-28', age: 15, classId: 'class-6', parentName: '梦思', parentPhone: '3801014182', memberCode: 'BTL-38', joinDate: '2026-09-01' },
+  { id: 's-624', name: '季恩韵', gender: 'girl', birthDate: '2012-01-28', age: 14, classId: 'class-6', parentName: '金丹', parentPhone: '3399060662', memberCode: 'BTL-39', joinDate: '2026-09-01' },
+  { id: 's-625', name: '潘恩言 (Lucia)', gender: 'girl', birthDate: '2012-03-04', age: 14, classId: 'class-6', parentName: '柯献利', parentPhone: '3778364808', memberCode: 'BTL-40', joinDate: '2026-09-01' },
+  { id: 's-626', name: '蔡煊 (Lucas)', gender: 'boy', birthDate: '2012-05-17', age: 14, classId: 'class-6', parentName: '芝慧', parentPhone: '3343551587', memberCode: 'BTL-41', joinDate: '2026-09-01' },
+  { id: 's-627', name: '施欣媛 (Angele)', gender: 'girl', birthDate: '2012-07-29', age: 14, classId: 'class-6', parentName: '郑晶晶', parentPhone: '', memberCode: 'BTL-42', joinDate: '2026-09-01' },
+  { id: 's-628', name: '邵熙佑 (Lucas)', gender: 'boy', birthDate: '2012-11-23', age: 14, classId: 'class-6', parentName: '亚非', parentPhone: '3348369286', memberCode: 'BTL-43', joinDate: '2026-09-01' },
+  { id: 's-629', name: '陈乐瑶 (Cristina)', gender: 'girl', birthDate: '2012-12-01', age: 14, classId: 'class-6', parentName: '春燕', parentPhone: '3778410034', memberCode: 'BTL-44', joinDate: '2026-09-01' },
+  { id: 's-630', name: '周铭哲 (Andy)', gender: 'boy', birthDate: '2012-09-07', age: 14, classId: 'class-6', parentName: '家长', parentPhone: '3274786535', memberCode: 'BTL-45', joinDate: '2026-09-01' },
+  { id: 's-631', name: '翁哲涵 (Johnny)', gender: 'boy', birthDate: '2012-12-07', age: 14, classId: 'class-6', parentName: '张若慧', parentPhone: '3289497239', memberCode: 'BTL-46', joinDate: '2026-09-01' }
 ];
 
 export const initialSystemConfig: SystemConfig = {

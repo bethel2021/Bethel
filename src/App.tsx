@@ -157,8 +157,6 @@ export default function App() {
       ]);
 
       const serverVersion = typeof data.syncVersion === 'number' ? data.syncVersion : 0;
-      const isServerNewer = serverVersion > syncVersionRef.current;
-
       const mergedClasses = data.classes.map((c: any) => {
         // 1. If this class has a local mutation in flight, preserve the pending state
         if (pendingClassMutationsRef.current.has(c.id)) {
@@ -168,19 +166,16 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : (serverHiddenIds.has(c.id) || localHiddenSet.has(c.id)))
+              : (c.isHiddenFromHome !== undefined ? !!c.isHiddenFromHome : serverHiddenIds.has(c.id))
           };
         }
 
         // 2. Class hidden status logic:
-        // If server version is strictly newer than client, trust server's boolean/sets.
-        // Otherwise (equal or lower version, e.g. default server state), merge localHiddenSet to preserve user's local hide setting across reloads.
-        let isHidden: boolean;
-        if (isServerNewer) {
-          isHidden = typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : serverHiddenIds.has(c.id);
-        } else {
-          isHidden = c.isHiddenFromHome === true || serverHiddenIds.has(c.id) || localHiddenSet.has(c.id);
-        }
+        // Since a persistent backend is available, the server is the single authoritative source of truth.
+        // We always trust the server's hidden status if defined, falling back to server's hidden sets.
+        const isHidden = typeof c.isHiddenFromHome === 'boolean' 
+          ? c.isHiddenFromHome 
+          : serverHiddenIds.has(c.id);
 
         return {
           ...c,
