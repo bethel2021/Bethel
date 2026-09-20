@@ -9,7 +9,18 @@ import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccou
 export const classes: ClassGroup[] = [...initialClasses];
 export const students: Student[] = [...initialStudents];
 export const records: AttendanceRecord[] = [];
+export const deletedRecordKeys = new Set<string>();
 export const systemConfig: SystemConfig = { ...initialSystemConfig };
+
+export function addDeletedRecordKey(key: string) {
+  if (!key) return;
+  deletedRecordKeys.add(key);
+}
+
+export function removeDeletedRecordKey(key: string) {
+  if (!key) return;
+  deletedRecordKeys.delete(key);
+}
 export const adminAccounts: ServerAdminAccount[] = [...initialAdminAccounts];
 export const activeSessions = new Map<string, AdminUser>();
 export const teachers: any[] = [];
@@ -157,6 +168,7 @@ type DataChangeListener = (data: {
   classes: ClassGroup[];
   students: Student[];
   records: AttendanceRecord[];
+  deletedRecordKeys?: string[];
   config: SystemConfig;
   adminAccounts: ServerAdminAccount[];
   activeSunday: string;
@@ -193,6 +205,7 @@ export function saveDataToFile() {
     classes,
     students,
     records,
+    deletedRecordKeys: Array.from(deletedRecordKeys),
     adminAccounts,
     activeSunday,
     syncVersion,
@@ -223,6 +236,7 @@ export function saveDataToFile() {
         classes,
         students,
         records,
+        deletedRecordKeys: Array.from(deletedRecordKeys),
         config: systemConfig,
         adminAccounts,
         activeSunday,
@@ -377,6 +391,12 @@ export function loadFromDisk(): boolean {
           console.log(`[Storage Cleanup] Reset ${originalCount - cleanedRecords.length} records for September 6th and 13th, 2026.`);
           setTimeout(() => saveDataToFile(), 100);
         }
+      }
+      if (Array.isArray(data.deletedRecordKeys)) {
+        deletedRecordKeys.clear();
+        data.deletedRecordKeys.forEach((k: string) => {
+          if (typeof k === 'string') deletedRecordKeys.add(k);
+        });
       }
       if (Array.isArray(data.adminAccounts) && data.adminAccounts.length > 0) {
         adminAccounts.length = 0;
@@ -683,9 +703,31 @@ export function mergeClientData(payload: SyncPayload): {
   }
 
   // 3. Merge attendance records (by unique ID)
-  if (Array.isArray(payload.records) && payload.records.length > 0) {
+  if (Array.isArray((payload as any).deletedRecordKeys)) {
+    (payload as any).deletedRecordKeys.forEach((k: string) => {
+      if (typeof k === 'string' && k) deletedRecordKeys.add(k);
+    });
+  }
+
+  if (Array.isArray(payload.records)) {
     const recordMap = new Map<string, AttendanceRecord>(records.map(r => [r.id, r]));
+
+    // Purge any server records matching deletedRecordKeys
+    for (const [id, r] of Array.from(recordMap.entries())) {
+      const studentDateKey = `${r.studentId}_${r.date}`;
+      if (deletedRecordKeys.has(id) || deletedRecordKeys.has(studentDateKey)) {
+        recordMap.delete(id);
+        changed = true;
+      }
+    }
+
     for (const r of payload.records) {
+      const studentDateKey = `${r.studentId}_${r.date}`;
+      // Skip if marked as deleted
+      if (deletedRecordKeys.has(r.id) || deletedRecordKeys.has(studentDateKey)) {
+        continue;
+      }
+
       if (!recordMap.has(r.id)) {
         recordMap.set(r.id, r);
         changed = true;
@@ -698,8 +740,11 @@ export function mergeClientData(payload: SyncPayload): {
       }
     }
     const mergedRecords = Array.from(recordMap.values());
-    records.length = 0;
-    records.push(...mergedRecords);
+    if (JSON.stringify(records) !== JSON.stringify(mergedRecords)) {
+      records.length = 0;
+      records.push(...mergedRecords);
+      changed = true;
+    }
   }
 
   // 4. System config & classes are server-authoritative and master-managed via /api/config & /api/classes
@@ -736,6 +781,7 @@ export function mergeClientData(payload: SyncPayload): {
     classes,
     students,
     records,
+    deletedRecordKeys: Array.from(deletedRecordKeys),
     config: systemConfig,
     activeSunday,
     syncVersion,

@@ -25,7 +25,10 @@ import {
   lastModifiedTimestamp,
   mergeClientData,
   onDataChange,
-  teachers
+  teachers,
+  deletedRecordKeys,
+  addDeletedRecordKey,
+  removeDeletedRecordKey
 } from './dataStore';
 
 const app = express();
@@ -270,6 +273,7 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
     })),
     students,
     records,
+    deletedRecordKeys: Array.from(deletedRecordKeys),
     teachers,
     accounts: adminAccounts.map(a => ({
       id: a.id,
@@ -303,6 +307,7 @@ apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
     })),
     students,
     records,
+    deletedRecordKeys: Array.from(deletedRecordKeys),
     config: systemConfig,
     activeSunday,
     serverTime: new Date().toISOString()
@@ -565,6 +570,7 @@ apiRouter.post('/checkin', (req: Request, res: Response) => {
       notes: notes ? String(notes).trim() : undefined
     };
 
+    removeDeletedRecordKey(`${student.id}_${targetDate}`);
     records.push(newRecord);
     saveDataToFile();
 
@@ -594,15 +600,20 @@ apiRouter.post('/manual-checkin', (req: Request, res: Response) => {
     }
 
     const targetDate = date || getActiveSundayDate();
+    const studentDateKey = `${studentId}_${targetDate}`;
     const existingIdx = records.findIndex(r => r.studentId === studentId && r.date === targetDate);
 
     if (status === 'absent') {
+      addDeletedRecordKey(studentDateKey);
       if (existingIdx !== -1) {
-        records.splice(existingIdx, 1);
-        saveDataToFile();
+        const removedRec = records.splice(existingIdx, 1)[0];
+        if (removedRec?.id) addDeletedRecordKey(removedRec.id);
       }
-      return res.json({ success: true, message: '已标记为缺席/未签到' });
+      saveDataToFile();
+      return res.json({ success: true, deletedKey: studentDateKey, message: '已标记为缺席/未签到' });
     }
+
+    removeDeletedRecordKey(studentDateKey);
 
     const now = new Date();
     const romeTime = getRomeTimeParts(now);
@@ -707,6 +718,7 @@ apiRouter.post('/batch-checkin', (req: Request, res: Response) => {
 
     let updatedCount = 0;
     targetStudents.forEach(stu => {
+      removeDeletedRecordKey(`${stu.id}_${targetDate}`);
       const existingIdx = records.findIndex(r => r.studentId === stu.id && r.date === targetDate);
       if (existingIdx !== -1) {
         records[existingIdx].status = finalStatus;
@@ -1323,34 +1335,11 @@ apiRouter.delete('/accounts/:username', (req: Request, res: Response) => {
 // 11. Bi-directional Sync API (Allows client to seed cloud serverless state from local cache or vice versa)
 apiRouter.post('/sync-data', (req: Request, res: Response) => {
   try {
-    const { classes: clientClasses, students: clientStudents, records: clientRecords, config: clientConfig, accounts: clientAccounts } = req.body;
-    
-    if (Array.isArray(clientClasses) && clientClasses.length > 0) {
-      setClasses(clientClasses);
-    }
-    if (Array.isArray(clientStudents) && clientStudents.length > 0) {
-      setStudents(clientStudents);
-    }
-    if (Array.isArray(clientRecords)) {
-      // Merge records by ID
-      const recordMap = new Map<string, AttendanceRecord>();
-      records.forEach(r => recordMap.set(r.id, r));
-      clientRecords.forEach(r => recordMap.set(r.id, r));
-      setRecords(Array.from(recordMap.values()));
-    }
-    if (clientConfig) {
-      setSystemConfig({ ...systemConfig, ...clientConfig });
-    }
-
-    saveDataToFile();
-
+    const result = mergeClientData(req.body);
     res.json({
       success: true,
       message: '云端动态服务数据已同步完成！',
-      classes,
-      students,
-      records,
-      config: systemConfig
+      ...result
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

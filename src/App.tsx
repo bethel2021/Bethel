@@ -25,7 +25,10 @@ import {
   exportLocalBackup,
   importLocalBackup,
   getLocalHiddenClassIds,
-  saveLocalHiddenClassIds
+  saveLocalHiddenClassIds,
+  getLocalDeletedRecordKeys,
+  addLocalDeletedRecordKey,
+  removeLocalDeletedRecordKey
 } from './utils/localStore';
 import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords, initialTeachers } from './mockData';
 import { getCurrentRomeTimeStr, getCurrentRomeFullTimeStr, getRomeTimeParts, checkIsWithinSundayWindow, getActiveSundayDate } from './utils/dateUtils';
@@ -224,9 +227,18 @@ export default function App() {
       setActiveSunday(prev => prev === data.activeSunday ? prev : data.activeSunday);
     }
 
+    if (Array.isArray(data.deletedRecordKeys)) {
+      data.deletedRecordKeys.forEach((k: string) => {
+        if (typeof k === 'string' && k) addLocalDeletedRecordKey(k);
+      });
+    }
+
     if (Array.isArray(data.records)) {
       setRecords(prev => {
-        let incomingRecords: AttendanceRecord[] = data.records;
+        const deletedSet = getLocalDeletedRecordKeys();
+        let incomingRecords: AttendanceRecord[] = data.records.filter((r: any) => 
+          !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
+        );
 
         // Preserve optimistic local updates if mutations are currently in flight
         if (pendingMutationsRef.current.size > 0) {
@@ -248,7 +260,9 @@ export default function App() {
               if (idx !== -1) merged.splice(idx, 1);
             }
           });
-          incomingRecords = merged;
+          incomingRecords = merged.filter((r: any) => 
+            !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
+          );
         }
 
         if (isDataEqual(prev, incomingRecords)) {
@@ -356,6 +370,7 @@ export default function App() {
           classes: classes.length > 0 ? classes : local.classes,
           students: students.length > 0 ? students : local.students,
           records: records.length > 0 ? records : local.records,
+          deletedRecordKeys: Array.from(getLocalDeletedRecordKeys()),
           config
         })
       });
@@ -677,10 +692,13 @@ export default function App() {
 
         // If absent, cleanly remove existing record from list
         if (data.status === 'absent') {
+          addLocalDeletedRecordKey(`${data.studentId}_${data.date}`);
           const updated = existingIdx !== -1 ? prev.filter((_, i) => i !== existingIdx) : prev;
-          saveLocalData({ records: updated });
+          saveLocalData({ records: updated, deletedRecordKeys: Array.from(getLocalDeletedRecordKeys()) });
           return updated;
         }
+
+        removeLocalDeletedRecordKey(`${data.studentId}_${data.date}`);
 
         const student = students.find(s => s.id === data.studentId);
         const studentName = student ? student.name : '';

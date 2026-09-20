@@ -11,8 +11,39 @@ const STORAGE_KEYS = {
   INITIALIZED: 'bethel_data_initialized',
   ACCOUNTS: 'bethel_admin_accounts',
   HIDDEN_CLASS_IDS: 'bethel_hidden_class_ids',
-  TEACHERS: 'bethel_teachers'
+  TEACHERS: 'bethel_teachers',
+  DELETED_RECORD_KEYS: 'bethel_deleted_record_keys'
 };
+
+export function getLocalDeletedRecordKeys(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DELETED_RECORD_KEYS);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function addLocalDeletedRecordKey(key: string) {
+  if (typeof window === 'undefined' || !key) return;
+  try {
+    const set = getLocalDeletedRecordKeys();
+    set.add(key);
+    localStorage.setItem(STORAGE_KEYS.DELETED_RECORD_KEYS, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+export function removeLocalDeletedRecordKey(key: string) {
+  if (typeof window === 'undefined' || !key) return;
+  try {
+    const set = getLocalDeletedRecordKeys();
+    set.delete(key);
+    localStorage.setItem(STORAGE_KEYS.DELETED_RECORD_KEYS, JSON.stringify(Array.from(set)));
+  } catch {}
+}
 
 export function getLocalHiddenClassIds(): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -223,6 +254,11 @@ export function getLocalData() {
     let records: AttendanceRecord[] = rawRecords ? JSON.parse(rawRecords) : generateInitialRecords(students);
     records = Array.isArray(records) ? records.filter(r => r.classId !== 'class-8' && r.studentId !== 's-801' && r.studentId !== 's-802') : [];
 
+    const delSet = getLocalDeletedRecordKeys();
+    if (delSet.size > 0) {
+      records = records.filter(r => !delSet.has(r.id) && !delSet.has(`${r.studentId}_${r.date}`));
+    }
+
     const rawSunday = localStorage.getItem(STORAGE_KEYS.ACTIVE_SUNDAY);
     const activeSunday = rawSunday || getActiveSundayDate();
 
@@ -268,6 +304,7 @@ export function saveLocalData(data: {
   activeSunday?: string;
   accounts?: AdminAccount[];
   teachers?: Teacher[];
+  deletedRecordKeys?: string[] | Set<string>;
 }) {
   if (typeof window === 'undefined') return;
   try {
@@ -282,6 +319,10 @@ export function saveLocalData(data: {
     if (data.activeSunday) localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, data.activeSunday);
     if (data.accounts) localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(data.accounts));
     if (data.teachers) localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(data.teachers));
+    if (data.deletedRecordKeys) {
+      const arr = Array.isArray(data.deletedRecordKeys) ? data.deletedRecordKeys : Array.from(data.deletedRecordKeys);
+      localStorage.setItem(STORAGE_KEYS.DELETED_RECORD_KEYS, JSON.stringify(arr));
+    }
     localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
   } catch (e) {
     console.warn('Failed saving to localStorage', e);
