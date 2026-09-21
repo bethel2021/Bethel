@@ -170,71 +170,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// URL normalizer middleware for Vercel Serverless routing variations
+// Standard path helper (removes any leading/trailing duplicate slashes)
 app.use((req: Request, res: Response, next: NextFunction) => {
-  let targetRoute = '';
-
-  // 1. Extract from query parameter __route
-  const qIndex = req.url.indexOf('?');
-  if (qIndex !== -1) {
-    const sp = new URLSearchParams(req.url.slice(qIndex + 1));
-    targetRoute = sp.get('__route') || '';
+  // Ensure req.url has standard formatting
+  if (!req.url.startsWith('/')) {
+    req.url = '/' + req.url;
   }
-  if (!targetRoute && (req.query as any)?.__route) {
-    targetRoute = String((req.query as any).__route);
-  }
-
-  // 2. Extract from Vercel capture group headers
-  if (!targetRoute) {
-    const routeMatches = req.headers['x-now-route-matches'] as string;
-    if (routeMatches) {
-      const match = routeMatches.match(/1=([^&]+)/);
-      if (match && match[1]) targetRoute = decodeURIComponent(match[1]);
-    }
-  }
-
-  // 3. Extract from Vercel matched path headers
-  if (!targetRoute) {
-    const matched = (req.headers['x-matched-path'] as string) || 
-                    (req.headers['x-vercel-matched-path'] as string) ||
-                    (req.headers['x-forwarded-uri'] as string) ||
-                    (req.headers['x-original-url'] as string);
-    if (matched) {
-      const clean = matched.split('?')[0];
-      if (clean.startsWith('/api/')) {
-        targetRoute = clean.replace(/^\/api\//, '');
-      } else if (clean.startsWith('/api')) {
-        targetRoute = clean.replace(/^\/api/, '');
-      }
-    }
-  }
-
-  // 4. Reconstruct req.url if targetRoute was found
-  if (targetRoute) {
-    if (targetRoute.startsWith('/')) targetRoute = targetRoute.slice(1);
-
-    // Clean query parameters by removing internal __route
-    let cleanQuery = '';
-    if (qIndex !== -1) {
-      const sp = new URLSearchParams(req.url.slice(qIndex + 1));
-      sp.delete('__route');
-      const qs = sp.toString();
-      if (qs) cleanQuery = '?' + qs;
-    }
-
-    req.url = `/api/${targetRoute}${cleanQuery}`;
-  } else {
-    // Normalization for /api/index, /index, or root /api calls
-    if (req.url === '/api/index' || req.url === '/api/index/' || req.url === '/index' || req.url === '/index/' || req.url === '/api' || req.url === '/api/') {
-      const query = qIndex !== -1 ? req.url.slice(qIndex) : '';
-      req.url = '/api/state' + query;
-    } else if (req.url.startsWith('/api/index/')) {
-      req.url = req.url.replace('/api/index/', '/api/');
-    } else if (req.url.startsWith('/index/')) {
-      req.url = req.url.replace('/index/', '/api/');
-    }
-  }
-
   next();
 });
 
@@ -1477,23 +1418,32 @@ app.use(apiRouter);
 
 // Fallback for unmatched /api routes (ensures JSON response, never HTML)
 app.use('/api', (req: Request, res: Response) => {
+  console.warn(`[Vercel Serverless Route 404]: No matching endpoint found for ${req.method} ${req.url}`);
   res.status(404).json({
-    error: `接口未找到: ${req.method} ${req.url}`,
-    status: 404,
+    status: 'error',
+    error: 'Endpoint not found',
+    path: req.url,
+    method: req.method,
     validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/teachers', '/api/config', '/api/ai/status', '/api/ai/generate']
   });
 });
 
-// Global error handling middleware (Prevents Vercel 500 FUNCTION_INVOCATION_FAILED)
+// Global error handling middleware (Prevents Vercel 500 FUNCTION_INVOCATION_FAILED and logs cleanly)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error('[Express Global Error]:', err);
+  console.error('[Vercel Serverless API Error]:', {
+    method: req.method,
+    url: req.url,
+    error: err?.message || String(err),
+    stack: err?.stack ? err.stack.split('\n').slice(0, 3).join('\n') : undefined
+  });
   if (res.headersSent) {
     return next(err);
   }
+  // Safe client response (no sensitive keys or environment variables leaked)
   res.status(500).json({
     status: 'error',
     error: 'Internal Server Error',
-    message: err?.message || String(err),
+    message: err?.message ? String(err.message) : 'Server processing exception',
     path: req.url,
     timestamp: new Date().toISOString()
   });
