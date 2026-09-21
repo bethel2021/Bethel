@@ -4,6 +4,9 @@ import os from 'os';
 import type { Request } from 'express';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types';
 import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccounts, ServerAdminAccount } from './initialData';
+import { saveToSupabase, loadFromSupabase, isSupabaseConfigured, ChurchStatePayload } from './supabaseDb';
+
+export { isSupabaseConfigured };
 
 // Active in-memory state (Using const to ensure stable reference bindings across ES modules & CommonJS bundles)
 export const classes: ClassGroup[] = [...initialClasses];
@@ -119,49 +122,27 @@ function getHiddenClassStoragePath(): string {
   }
 }
 
-// Vercel KV / Upstash Redis Persistent Cloud Database Sync (Zero-config on Vercel)
-async function saveToCloudKV(payload: any) {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return;
-
-  try {
-    const rawUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-    await fetch(`${rawUrl}/set/bethel_church_data`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(JSON.stringify(payload)),
-      signal: AbortSignal.timeout(2000)
-    });
-  } catch (err) {
-    console.warn('[Cloud KV Warning] Could not persist to Upstash/Vercel KV:', err);
-  }
+// Supabase PostgreSQL Persistent Cloud Database Sync
+export function getFullStatePayload(): ChurchStatePayload {
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  return {
+    systemConfig: { ...systemConfig, hiddenClassIds: hiddenIds },
+    classes: classes.map(c => ({ ...c, isHiddenFromHome: hiddenIds.includes(c.id) })),
+    students,
+    records,
+    deletedRecordKeys: Array.from(deletedRecordKeys),
+    adminAccounts,
+    activeSunday,
+    syncVersion,
+    hiddenClassIds: hiddenIds,
+    teachers,
+    updatedAt: lastModifiedTimestamp
+  };
 }
 
-async function loadFromCloudKV(): Promise<any | null> {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-
-  try {
-    const rawUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-    const res = await fetch(`${rawUrl}/get/bethel_church_data`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(2000)
-    });
-    if (res.ok) {
-      const json: any = await res.json();
-      if (json && json.result) {
-        return typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
-      }
-    }
-  } catch (err) {
-    console.warn('[Cloud KV Warning] Could not load from Upstash/Vercel KV:', err);
-  }
-  return null;
+export async function saveDataToDb(): Promise<boolean> {
+  const payload = getFullStatePayload();
+  return await saveToSupabase(payload);
 }
 
 type DataChangeListener = (data: {
@@ -184,7 +165,7 @@ export function onDataChange(listener: DataChangeListener): () => void {
   return () => changeListeners.delete(listener);
 }
 
-export function saveDataToFile() {
+export function saveDataToFile(): Promise<boolean> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
@@ -249,8 +230,12 @@ export function saveDataToFile() {
     }
   }
 
-  // Also persist to Vercel KV / Upstash Redis if configured
-  saveToCloudKV(payload).catch(() => {});
+  // Also persist to Supabase PostgreSQL database
+  const dbPromise = saveToSupabase(payload);
+  dbPromise.catch((err) => {
+    console.warn('[Supabase DB Notice] Background save failed:', err);
+  });
+  return dbPromise;
 }
 
 export function generateHistoricalRecords() {
@@ -485,14 +470,15 @@ export async function initOrLoadDataAsync() {
     loadFromDisk();
     isInitialized = true;
   }
-  const cloudData = await loadFromCloudKV();
-  if (cloudData && typeof cloudData.syncVersion === 'number') {
-    // Only apply cloud KV data if it is NEWER than current in-memory syncVersion
-    if (cloudData.syncVersion > syncVersion) {
+
+  // If Supabase is configured, fetch authoritative state from Supabase PostgreSQL
+  if (isSupabaseConfigured()) {
+    const cloudData = await loadFromSupabase();
+    if (cloudData && typeof cloudData.syncVersion === 'number') {
+      // Apply cloud Supabase data
       const cloudHiddenSet = new Set<string>([
         ...(Array.isArray(cloudData.hiddenClassIds) ? cloudData.hiddenClassIds : []),
-        ...(Array.isArray(cloudData.systemConfig?.hiddenClassIds) ? cloudData.systemConfig.hiddenClassIds : []),
-        ...(Array.isArray(cloudData.config?.hiddenClassIds) ? cloudData.config.hiddenClassIds : [])
+        ...(Array.isArray(cloudData.systemConfig?.hiddenClassIds) ? cloudData.systemConfig.hiddenClassIds : [])
       ]);
       if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
         const mappedClasses = cloudData.classes.map((c: any) => ({
@@ -510,11 +496,17 @@ export async function initOrLoadDataAsync() {
         records.length = 0;
         records.push(...cloudData.records);
       }
+      if (Array.isArray(cloudData.deletedRecordKeys)) {
+        deletedRecordKeys.clear();
+        cloudData.deletedRecordKeys.forEach(k => {
+          if (typeof k === 'string' && k) deletedRecordKeys.add(k);
+        });
+      }
       if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) {
         adminAccounts.length = 0;
         adminAccounts.push(...cloudData.adminAccounts);
       }
-      if (Array.isArray(cloudData.teachers)) {
+      if (Array.isArray(cloudData.teachers) && cloudData.teachers.length > 0) {
         teachers.length = 0;
         teachers.push(...cloudData.teachers);
       }
@@ -528,6 +520,10 @@ export async function initOrLoadDataAsync() {
       if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
       sanitizeYageData();
       saveDataToFile();
+    } else {
+      // Supabase is configured but database is freshly created / empty -> seed initial data!
+      console.log('[Supabase DB] Empty Supabase database detected. Seeding initial church data to PostgreSQL...');
+      await saveDataToDb();
     }
   }
 }

@@ -28,7 +28,8 @@ import {
   teachers,
   deletedRecordKeys,
   addDeletedRecordKey,
-  removeDeletedRecordKey
+  removeDeletedRecordKey,
+  isSupabaseConfigured
 } from './dataStore';
 
 const app = express();
@@ -233,6 +234,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Ensure Supabase data is loaded on serverless request invocations
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  if (isSupabaseConfigured() && req.url.startsWith('/api')) {
+    try {
+      await initOrLoadDataAsync();
+    } catch (e) {}
+  }
+  next();
+});
+
 // Ensure data is loaded on cold-starts
 initOrLoadData();
 
@@ -250,7 +261,9 @@ apiRouter.get('/health', (req: Request, res: Response) => {
     recordsCount: records.length,
     syncVersion,
     lastModified: lastModifiedTimestamp,
-    kvConnected: Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+    supabaseConnected: isSupabaseConfigured(),
+    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
+    kvConnected: isSupabaseConfigured() || Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
     serverTime: new Date().toISOString()
   });
 });
@@ -285,7 +298,9 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
     activeSunday: currentSunday,
     syncVersion,
     lastModified: lastModifiedTimestamp,
-    kvConnected: Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+    supabaseConnected: isSupabaseConfigured(),
+    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
+    kvConnected: isSupabaseConfigured() || Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
     serverTime: new Date().toISOString(),
     runtime: process.env.VERCEL ? 'vercel-serverless' : 'node-express'
   });
@@ -300,7 +315,9 @@ apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
     status: 'ok',
     syncVersion,
     lastModified: lastModifiedTimestamp,
-    kvConnected: Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+    supabaseConnected: isSupabaseConfigured(),
+    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
+    kvConnected: isSupabaseConfigured() || Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
     classes: classes.map(c => ({
       ...c,
       isHiddenFromHome: hiddenIds.includes(c.id)
@@ -314,18 +331,21 @@ apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
   });
 });
 
-apiRouter.post('/cloud-sync', (req: Request, res: Response) => {
+apiRouter.post('/cloud-sync', async (req: Request, res: Response) => {
   try {
     const payload = req.body;
     if (!payload || typeof payload !== 'object') {
       return res.status(400).json({ error: '无效的同步数据格式' });
     }
     const merged = mergeClientData(payload);
+    await saveDataToFile();
     res.json({
       success: true,
       message: '多设备终端云端数据已成功双向同步！',
       ...merged,
-      kvConnected: Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+      supabaseConnected: isSupabaseConfigured(),
+      database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
+      kvConnected: isSupabaseConfigured() || Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
       serverTime: new Date().toISOString()
     });
   } catch (err: any) {
@@ -1333,12 +1353,15 @@ apiRouter.delete('/accounts/:username', (req: Request, res: Response) => {
 });
 
 // 11. Bi-directional Sync API (Allows client to seed cloud serverless state from local cache or vice versa)
-apiRouter.post('/sync-data', (req: Request, res: Response) => {
+apiRouter.post('/sync-data', async (req: Request, res: Response) => {
   try {
     const result = mergeClientData(req.body);
+    await saveDataToFile();
     res.json({
       success: true,
       message: '云端动态服务数据已同步完成！',
+      supabaseConnected: isSupabaseConfigured(),
+      database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
       ...result
     });
   } catch (err: any) {
