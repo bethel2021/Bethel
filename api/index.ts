@@ -2,6 +2,16 @@ import type { Request, Response } from 'express';
 import app from '../server/app';
 
 export default function handler(req: Request, res: Response) {
+  // Normalize URL for Vercel Serverless environment if rewritten
+  if (req.query && (req.query as any).__route) {
+    const route = Array.isArray((req.query as any).__route) ? (req.query as any).__route[0] : (req.query as any).__route;
+    const urlParts = (req.url || '').split('?');
+    const searchParams = new URLSearchParams(urlParts[1] || '');
+    searchParams.delete('__route');
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    req.url = `/api/${route.replace(/^\//, '')}${qs}`;
+  }
+
   return new Promise((resolve) => {
     try {
       app(req, res, (err?: any) => {

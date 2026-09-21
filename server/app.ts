@@ -254,7 +254,7 @@ initOrLoadData();
 const apiRouter = express.Router();
 
 // 0. Health check endpoint (for Vercel & client status probing)
-apiRouter.get('/health', (req: Request, res: Response) => {
+apiRouter.get(['/health', '/', ''], (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     runtime: process.env.VERCEL ? 'vercel-serverless' : 'node-express',
