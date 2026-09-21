@@ -471,15 +471,13 @@ export function initOrLoadData() {
   const loaded = loadFromDisk();
   if (loaded) {
     sanitizeYageData();
-    saveDataToFile();
     initOrLoadDataAsync().catch(() => {});
     return;
   }
 
-  // If no file exists, initialize default records and write to file
+  // If no file exists, initialize default records in memory
   sanitizeYageData();
   generateHistoricalRecords();
-  saveDataToFile();
 
   // Load from Supabase PostgreSQL in background
   initOrLoadDataAsync().catch(() => {});
