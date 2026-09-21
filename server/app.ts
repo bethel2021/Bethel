@@ -31,25 +31,9 @@ import {
   addDeletedRecordKey,
   removeDeletedRecordKey,
   getFullStatePayload,
-  isSupabaseConfigured
+  isSupabaseConfigured,
+  dataStore
 } from './dataStore';
-import {
-  supabaseUpsertClass,
-  supabaseDeleteClass,
-  supabaseUpsertStudent,
-  supabaseUpsertStudentsBatch,
-  supabaseDeleteStudent,
-  supabaseUpsertTeacher,
-  supabaseDeleteTeacher,
-  supabaseUpsertAttendanceRecord,
-  supabaseDeleteAttendanceRecord,
-  supabaseUpsertAdminAccount,
-  supabaseDeleteAdminAccount,
-  supabaseUpdateAccountPassword,
-  supabaseUpsertSystemConfig,
-  supabaseResetAllData,
-  supabaseGetAccounts
-} from './supabaseDb';
 import { isGeminiConfigured, generateDevotionalOrSummary } from './geminiService';
 
 const app = express();
@@ -353,12 +337,7 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
 
 // Dedicated Resource GET Endpoints (100% backward-compatible with REST expectations)
 apiRouter.get('/classes', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
-  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
-  const mapped = classes.map(c => ({
-    ...c,
-    isHiddenFromHome: hiddenIds.includes(c.id)
-  }));
+  const mapped = await dataStore.getClasses();
   res.json({
     success: true,
     classes: mapped,
@@ -368,17 +347,15 @@ apiRouter.get('/classes', async (req: Request, res: Response) => {
 });
 
 apiRouter.get('/classes/:id', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
   const { id } = req.params;
-  const cls = classes.find(c => c.id === id || c.name === id);
+  const cls = await dataStore.getClassById(id);
   if (!cls) return res.status(404).json({ error: '班级不存在' });
   res.json({ success: true, class: cls, data: cls });
 });
 
 apiRouter.get('/students', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
   const classId = req.query.classId as string | undefined;
-  const filtered = classId ? students.filter(s => s.classId === classId) : students;
+  const filtered = await dataStore.getStudents(classId);
   res.json({
     success: true,
     students: filtered,
@@ -388,17 +365,15 @@ apiRouter.get('/students', async (req: Request, res: Response) => {
 });
 
 apiRouter.get('/students/:id', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
   const { id } = req.params;
-  const stu = students.find(s => s.id === id || s.memberCode === id || s.name === id);
+  const stu = await dataStore.getStudentById(id);
   if (!stu) return res.status(404).json({ error: '学员不存在' });
   res.json({ success: true, student: stu, data: stu });
 });
 
 apiRouter.get('/teachers', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
   const classId = req.query.classId as string | undefined;
-  const filtered = classId ? teachers.filter(t => t.classId === classId) : teachers;
+  const filtered = await dataStore.getTeachers(classId);
   res.json({
     success: true,
     teachers: filtered,
@@ -408,22 +383,17 @@ apiRouter.get('/teachers', async (req: Request, res: Response) => {
 });
 
 apiRouter.get('/teachers/:id', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
   const { id } = req.params;
-  const tch = teachers.find(t => t.id === id || t.name === id);
+  const tch = await dataStore.getTeacherById(id);
   if (!tch) return res.status(404).json({ error: '教师不存在' });
   res.json({ success: true, teacher: tch, data: tch });
 });
 
 const getRecordsHandler = async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
   const date = (req.query.date as string) || undefined;
   const studentId = (req.query.studentId as string) || undefined;
   const classId = (req.query.classId as string) || undefined;
-  let filtered = [...records];
-  if (date) filtered = filtered.filter(r => r.date === date);
-  if (studentId) filtered = filtered.filter(r => r.studentId === studentId);
-  if (classId) filtered = filtered.filter(r => r.classId === classId);
+  const filtered = await dataStore.getAttendanceRecords({ date, studentId, classId });
   res.json({
     success: true,
     records: filtered,
@@ -439,12 +409,7 @@ apiRouter.get('/attendance-records', getRecordsHandler);
 apiRouter.get('/attendance_records', getRecordsHandler);
 
 apiRouter.get('/config', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
-  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
-  const configPayload = {
-    ...systemConfig,
-    hiddenClassIds: hiddenIds
-  };
+  const configPayload = await dataStore.getSystemConfig();
   res.json({
     success: true,
     config: configPayload,
@@ -739,10 +704,7 @@ apiRouter.post('/checkin', async (req: Request, res: Response) => {
       notes: notes ? String(notes).trim() : undefined
     };
 
-    removeDeletedRecordKey(`${student.id}_${targetDate}`);
-    records.push(newRecord);
-    await supabaseUpsertAttendanceRecord(newRecord);
-    await saveDataToSupabase();
+    await dataStore.saveAttendanceRecord(newRecord);
 
     res.json({
       success: true,
@@ -774,17 +736,11 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
     const existingIdx = records.findIndex(r => r.studentId === studentId && r.date === targetDate);
 
     if (status === 'absent') {
-      addDeletedRecordKey(studentDateKey);
       let removedRecId: string | undefined;
       if (existingIdx !== -1) {
-        const removedRec = records.splice(existingIdx, 1)[0];
-        if (removedRec?.id) {
-          removedRecId = removedRec.id;
-          addDeletedRecordKey(removedRec.id);
-        }
+        removedRecId = records[existingIdx]?.id;
       }
-      await supabaseDeleteAttendanceRecord(studentId, targetDate, removedRecId);
-      await saveDataToSupabase();
+      await dataStore.deleteAttendanceRecord(studentId, targetDate, removedRecId);
       return res.json({ success: true, deletedKey: studentDateKey, message: '已标记为缺席/未签到' });
     }
 
@@ -817,16 +773,15 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
     }
 
     if (existingIdx !== -1) {
-      records[existingIdx] = {
+      const updatedRecord = {
         ...records[existingIdx],
         status: finalStatus,
         memoryVerseCompleted: memoryVerseCompleted !== undefined ? memoryVerseCompleted : records[existingIdx].memoryVerseCompleted,
         offeringCompleted: offeringCompleted !== undefined ? offeringCompleted : records[existingIdx].offeringCompleted,
         notes: notes !== undefined ? notes : records[existingIdx].notes
       };
-      await supabaseUpsertAttendanceRecord(records[existingIdx]);
-      await saveDataToSupabase();
-      return res.json({ success: true, record: records[existingIdx], message: '考勤记录已更新' });
+      await dataStore.saveAttendanceRecord(updatedRecord);
+      return res.json({ success: true, record: updatedRecord, message: '考勤记录已更新' });
     }
 
     const record: AttendanceRecord = {
@@ -843,9 +798,7 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
       offeringCompleted: offeringCompleted !== undefined ? Boolean(offeringCompleted) : systemConfig.defaultOfferingChecked,
       notes
     };
-    records.push(record);
-    await supabaseUpsertAttendanceRecord(record);
-    await saveDataToSupabase();
+    await dataStore.saveAttendanceRecord(record);
 
     res.json({ success: true, record, message: '老师/同工登记成功' });
   } catch (err: any) {
@@ -952,8 +905,7 @@ apiRouter.post('/classes', async (req: Request, res: Response) => {
         description: description !== undefined ? description : classes[idx].description,
         isHiddenFromHome: isHiddenFromHome !== undefined ? !!isHiddenFromHome : (classes[idx].isHiddenFromHome || false),
       };
-      await supabaseUpsertClass(classes[idx]);
-      await saveDataToSupabase();
+      await dataStore.saveClass(classes[idx]);
       return res.json({ success: true, class: classes[idx], classes, syncVersion, message: '班级信息修改成功' });
     }
 
@@ -969,9 +921,7 @@ apiRouter.post('/classes', async (req: Request, res: Response) => {
       description: description || '',
       isHiddenFromHome: !!isHiddenFromHome,
     };
-    classes.push(newClass);
-    await supabaseUpsertClass(newClass);
-    await saveDataToSupabase();
+    await dataStore.saveClass(newClass);
     res.json({ success: true, class: newClass, classes, syncVersion, message: '成功新增班级/团契' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1010,9 +960,8 @@ apiRouter.post('/classes/:id/visibility', async (req: Request, res: Response) =>
       });
     }
 
-    await supabaseUpsertClass(classes[idx]);
-    await supabaseUpsertSystemConfig(systemConfig);
-    await saveDataToSupabase();
+    await dataStore.saveClass(classes[idx]);
+    await dataStore.saveSystemConfig(systemConfig);
     res.json({
       success: true,
       class: classes[idx],
@@ -1045,12 +994,7 @@ apiRouter.delete('/classes/:id', async (req: Request, res: Response) => {
       const clsId = targetClass.id;
       const clsName = targetClass.name;
       const enrolledStudents = students.filter(s => s.classId === clsId);
-      const studentIdsToDelete = new Set(enrolledStudents.map(s => s.id));
-      setStudents(students.filter(s => s.classId !== clsId));
-      setRecords(records.filter(r => !studentIdsToDelete.has(r.studentId)));
-      setClasses(classes.filter(c => c.id !== clsId && c.name !== clsName));
-      await supabaseDeleteClass(clsId);
-      await saveDataToSupabase();
+      await dataStore.deleteClass(clsId);
       return res.json({ 
         success: true, 
         message: `班级【${clsName}】已成功删除${enrolledStudents.length > 0 ? `（同时清除了 ${enrolledStudents.length} 名在册学员档案）` : ''}` 
@@ -1104,8 +1048,7 @@ apiRouter.post('/students', async (req: Request, res: Response) => {
       };
       // Also update studentName in historical records
       setRecords(records.map(r => r.studentId === targetId ? { ...r, studentName: name, classId } : r));
-      await supabaseUpsertStudent(students[idx]);
-      await saveDataToSupabase();
+      await dataStore.saveStudent(students[idx]);
       return res.json({ success: true, student: students[idx], message: '学员信息已更新' });
     }
 
@@ -1122,9 +1065,7 @@ apiRouter.post('/students', async (req: Request, res: Response) => {
       memberCode: memberCode || `BTL-${String(nextCodeNum).padStart(2, '0')}`,
       joinDate: new Date().toISOString().split('T')[0]
     };
-    students.push(newStudent);
-    await supabaseUpsertStudent(newStudent);
-    await saveDataToSupabase();
+    await dataStore.saveStudent(newStudent);
     res.json({ success: true, student: newStudent, message: '学员档案建立成功' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1175,12 +1116,10 @@ apiRouter.post('/students/batch', async (req: Request, res: Response) => {
         memberCode: `BTL-${String(nextCodeNum).padStart(2, '0')}`,
         joinDate: new Date().toISOString().split('T')[0]
       };
-      students.push(stu);
       added.push(stu);
     });
 
-    await supabaseUpsertStudentsBatch(added);
-    await saveDataToSupabase();
+    await dataStore.saveStudentsBatch(added);
 
     res.json({ success: true, count: added.length, message: `成功批量录入 ${added.length} 名学员，已自动推算年龄为 ${computedAge} 岁！` });
   } catch (err: any) {
@@ -1203,10 +1142,7 @@ apiRouter.delete('/students/:id', async (req: Request, res: Response) => {
     }
     if (idx !== -1) {
       const removed = students[idx];
-      setStudents(students.filter(s => s.id !== removed.id && s.memberCode !== removed.memberCode));
-      setRecords(records.filter(r => r.studentId !== removed.id && r.studentName !== removed.name));
-      await supabaseDeleteStudent(removed.id);
-      await saveDataToSupabase();
+      await dataStore.deleteStudent(removed.id);
       return res.json({ success: true, message: `学员【${removed.name}】已成功从名册中彻底删除！` });
     }
     res.status(404).json({ error: '学员不存在或已被删除' });
@@ -1243,8 +1179,7 @@ apiRouter.post('/teachers', async (req: Request, res: Response) => {
         joinDate: joinDate || teachers[idx].joinDate || new Date().toISOString().split('T')[0],
         notes: notes || ''
       };
-      await supabaseUpsertTeacher(teachers[idx]);
-      await saveDataToSupabase();
+      await dataStore.saveTeacher(teachers[idx]);
       // Broadcast real-time update
       broadcastRealtimeState('teachers_updated');
       return res.json({ success: true, teacher: teachers[idx], message: '教师资料已更新' });
@@ -1261,9 +1196,7 @@ apiRouter.post('/teachers', async (req: Request, res: Response) => {
       joinDate: joinDate || new Date().toISOString().split('T')[0],
       notes: notes || ''
     };
-    teachers.push(newTeacher);
-    await supabaseUpsertTeacher(newTeacher);
-    await saveDataToSupabase();
+    await dataStore.saveTeacher(newTeacher);
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
     return res.json({ success: true, teacher: newTeacher, message: '成功添加教师资料' });
@@ -1286,9 +1219,7 @@ apiRouter.delete('/teachers/:id', async (req: Request, res: Response) => {
     }
 
     const removed = teachers[idx];
-    teachers.splice(idx, 1);
-    await supabaseDeleteTeacher(removed.id);
-    await saveDataToSupabase();
+    await dataStore.deleteTeacher(removed.id);
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
     return res.json({ success: true, message: `教师【${removed.name}】已成功从名册中彻底删除！` });
@@ -1306,9 +1237,7 @@ apiRouter.post('/config', async (req: Request, res: Response) => {
     }
 
     const updates = req.body;
-    setSystemConfig({ ...systemConfig, ...updates });
-    await supabaseUpsertSystemConfig(systemConfig);
-    await saveDataToSupabase();
+    await dataStore.saveSystemConfig(updates);
     res.json({ success: true, config: systemConfig, message: '系统设置与默认选项已成功保存！' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1329,8 +1258,7 @@ apiRouter.post('/reset-data', async (req: Request, res: Response) => {
       schoolTitle: '主日学与团契IMS',
     });
     generateHistoricalRecords();
-    await supabaseResetAllData(getFullStatePayload());
-    await saveDataToSupabase();
+    await dataStore.resetAllData(getFullStatePayload());
     res.json({ success: true, message: '已重置为伯特利教会主日学与团契官方示范数据' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1345,11 +1273,11 @@ apiRouter.get('/accounts', async (req: Request, res: Response) => {
       return res.status(403).json({ error: auth.message || '仅总管理员有权限管理后台账号' });
     }
 
-    await initOrLoadDataAsync(true);
+    const accs = await dataStore.getAdminAccounts();
 
     res.json({
       success: true,
-      accounts: adminAccounts.map(a => ({
+      accounts: accs.map(a => ({
         id: a.id,
         username: a.username,
         displayName: a.displayName,
@@ -1397,8 +1325,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
         systemConfig.adminPassword = String(password).trim();
       }
 
-      await supabaseUpsertAdminAccount(adminAccounts[existingIndex]);
-      await saveDataToSupabase();
+      await dataStore.saveAdminAccount(adminAccounts[existingIndex]);
 
       return res.json({
         success: true,
@@ -1425,9 +1352,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
         createdAt: new Date().toISOString().split('T')[0]
       };
 
-      adminAccounts.push(newAccount);
-      await supabaseUpsertAdminAccount(newAccount);
-      await saveDataToSupabase();
+      await dataStore.saveAdminAccount(newAccount);
 
       return res.json({
         success: true,
@@ -1469,13 +1394,7 @@ apiRouter.post('/accounts/password', async (req: Request, res: Response) => {
       return res.status(404).json({ error: `未找到账号【${username}】` });
     }
 
-    target.password = cleanPassword;
-    if (cleanUsername === 'admin') {
-      systemConfig.adminPassword = cleanPassword;
-    }
-
-    await supabaseUpdateAccountPassword(cleanUsername, cleanPassword);
-    await saveDataToSupabase();
+    await dataStore.updateAccountPassword(cleanUsername, cleanPassword);
 
     res.json({
       success: true,
@@ -1505,14 +1424,11 @@ apiRouter.delete('/accounts/:username', async (req: Request, res: Response) => {
       return res.status(400).json({ error: '禁止删除系统根总管理员账号（admin）' });
     }
 
-    const index = adminAccounts.findIndex(a => a.username.toLowerCase() === username);
-    if (index === -1) {
+    const deleted = await dataStore.deleteAdminAccount(username);
+    if (!deleted) {
       return res.status(404).json({ error: `未找到账号【${username}】` });
     }
 
-    const deleted = adminAccounts.splice(index, 1)[0];
-    await supabaseDeleteAdminAccount(username);
-    await saveDataToSupabase();
     res.json({
       success: true,
       message: `账号【${deleted.displayName} (${deleted.username})】已成功删除！`,

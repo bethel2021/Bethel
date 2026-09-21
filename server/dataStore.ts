@@ -4,9 +4,28 @@ import os from 'os';
 import type { Request } from 'express';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types';
 import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccounts, ServerAdminAccount } from './initialData';
-import { saveToSupabase, loadFromSupabase, isSupabaseConfigured, ChurchStatePayload } from './supabaseDb';
+import {
+  saveToSupabase,
+  loadFromSupabase,
+  ChurchStatePayload,
+  supabaseUpsertClass,
+  supabaseDeleteClass,
+  supabaseUpsertStudent,
+  supabaseUpsertStudentsBatch,
+  supabaseDeleteStudent,
+  supabaseUpsertTeacher,
+  supabaseDeleteTeacher,
+  supabaseUpsertAttendanceRecord,
+  supabaseDeleteAttendanceRecord,
+  supabaseUpsertAdminAccount,
+  supabaseDeleteAdminAccount,
+  supabaseUpdateAccountPassword,
+  supabaseUpsertSystemConfig,
+  supabaseResetAllData
+} from './supabaseDb';
+import { getSupabase, isSupabaseConfigured } from './supabase';
 
-export { isSupabaseConfigured };
+export { isSupabaseConfigured, getSupabase };
 
 // Active in-memory state (Using const to ensure stable reference bindings across ES modules & CommonJS bundles)
 export const classes: ClassGroup[] = [...initialClasses];
@@ -803,4 +822,329 @@ export function mergeClientData(payload: SyncPayload): {
     teachers
   } as any;
 }
+
+// =========================================================================
+// UNIFIED SUPABASE DATA ACCESS LAYER (DAL)
+// All business logic routes through these data access layer methods.
+// =========================================================================
+
+// --- Classes ---
+export async function getClasses(): Promise<ClassGroup[]> {
+  await initOrLoadDataAsync(true);
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  return classes.map(c => ({
+    ...c,
+    isHiddenFromHome: hiddenIds.includes(c.id)
+  }));
+}
+
+export async function getClassById(id: string): Promise<ClassGroup | undefined> {
+  await initOrLoadDataAsync(true);
+  return classes.find(c => c.id === id || c.name === id);
+}
+
+export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
+  const existingIdx = classes.findIndex(c => c.id === cls.id || c.name === cls.name);
+  if (existingIdx >= 0) {
+    classes[existingIdx] = { ...classes[existingIdx], ...cls };
+  } else {
+    classes.push(cls);
+  }
+  await supabaseUpsertClass(cls);
+  await saveDataToSupabase();
+  return cls;
+}
+
+export async function updateClass(id: string, updates: Partial<ClassGroup>): Promise<ClassGroup | null> {
+  const existingIdx = classes.findIndex(c => c.id === id || c.name === id);
+  if (existingIdx === -1) return null;
+  classes[existingIdx] = { ...classes[existingIdx], ...updates };
+  await supabaseUpsertClass(classes[existingIdx]);
+  await saveDataToSupabase();
+  return classes[existingIdx];
+}
+
+export async function deleteClass(id: string): Promise<boolean> {
+  const cls = classes.find(c => c.id === id || c.name === id);
+  if (!cls) return false;
+  const clsId = cls.id;
+  const clsName = cls.name;
+
+  const enrolledStudentIds = students.filter(s => s.classId === clsId).map(s => s.id);
+  setStudents(students.filter(s => s.classId !== clsId));
+  setRecords(records.filter(r => r.classId !== clsId && !enrolledStudentIds.includes(r.studentId)));
+  setClasses(classes.filter(c => c.id !== clsId && c.name !== clsName));
+
+  await supabaseDeleteClass(clsId);
+  await saveDataToSupabase();
+  return true;
+}
+
+// --- Students ---
+export async function getStudents(classId?: string): Promise<Student[]> {
+  await initOrLoadDataAsync(true);
+  return classId ? students.filter(s => s.classId === classId) : [...students];
+}
+
+export async function getStudentById(id: string): Promise<Student | undefined> {
+  await initOrLoadDataAsync(true);
+  return students.find(s => s.id === id || s.memberCode === id || s.name === id);
+}
+
+export async function saveStudent(student: Student): Promise<Student> {
+  const existingIdx = students.findIndex(s => s.id === student.id || (student.memberCode && s.memberCode === student.memberCode));
+  if (existingIdx >= 0) {
+    students[existingIdx] = { ...students[existingIdx], ...student };
+  } else {
+    students.push(student);
+  }
+  await supabaseUpsertStudent(student);
+  await saveDataToSupabase();
+  return student;
+}
+
+export async function saveStudentsBatch(newStudents: Student[]): Promise<Student[]> {
+  students.push(...newStudents);
+  await supabaseUpsertStudentsBatch(newStudents);
+  await saveDataToSupabase();
+  return newStudents;
+}
+
+export async function updateStudent(id: string, updates: Partial<Student>): Promise<Student | null> {
+  const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
+  if (existingIdx === -1) return null;
+  students[existingIdx] = { ...students[existingIdx], ...updates };
+  if (updates.name || updates.classId) {
+    setRecords(records.map(r => r.studentId === students[existingIdx].id ? {
+      ...r,
+      studentName: updates.name || r.studentName,
+      classId: updates.classId || r.classId
+    } : r));
+  }
+  await supabaseUpsertStudent(students[existingIdx]);
+  await saveDataToSupabase();
+  return students[existingIdx];
+}
+
+export async function deleteStudent(id: string): Promise<Student | null> {
+  const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
+  if (existingIdx === -1) return null;
+  const removed = students[existingIdx];
+  setStudents(students.filter(s => s.id !== removed.id && s.memberCode !== removed.memberCode));
+  setRecords(records.filter(r => r.studentId !== removed.id && r.studentName !== removed.name));
+  await supabaseDeleteStudent(removed.id);
+  await saveDataToSupabase();
+  return removed;
+}
+
+// --- Teachers ---
+export async function getTeachers(classId?: string): Promise<any[]> {
+  await initOrLoadDataAsync(true);
+  return classId ? teachers.filter(t => t.classId === classId) : [...teachers];
+}
+
+export async function getTeacherById(id: string): Promise<any | undefined> {
+  await initOrLoadDataAsync(true);
+  return teachers.find(t => t.id === id || t.name === id);
+}
+
+export async function saveTeacher(teacher: any): Promise<any> {
+  const existingIdx = teachers.findIndex(t => t.id === teacher.id);
+  if (existingIdx >= 0) {
+    teachers[existingIdx] = { ...teachers[existingIdx], ...teacher };
+  } else {
+    teachers.push(teacher);
+  }
+  await supabaseUpsertTeacher(teacher);
+  await saveDataToSupabase();
+  return teacher;
+}
+
+export async function updateTeacher(id: string, updates: any): Promise<any | null> {
+  const existingIdx = teachers.findIndex(t => t.id === id);
+  if (existingIdx === -1) return null;
+  teachers[existingIdx] = { ...teachers[existingIdx], ...updates };
+  await supabaseUpsertTeacher(teachers[existingIdx]);
+  await saveDataToSupabase();
+  return teachers[existingIdx];
+}
+
+export async function deleteTeacher(id: string): Promise<any | null> {
+  const existingIdx = teachers.findIndex(t => t.id === id);
+  if (existingIdx === -1) return null;
+  const removed = teachers.splice(existingIdx, 1)[0];
+  await supabaseDeleteTeacher(removed.id);
+  await saveDataToSupabase();
+  return removed;
+}
+
+// --- Attendance Records ---
+export async function getAttendanceRecords(filter?: { date?: string; studentId?: string; classId?: string }): Promise<AttendanceRecord[]> {
+  await initOrLoadDataAsync(true);
+  let res = [...records];
+  if (filter?.date) res = res.filter(r => r.date === filter.date);
+  if (filter?.studentId) res = res.filter(r => r.studentId === filter.studentId);
+  if (filter?.classId) res = res.filter(r => r.classId === filter.classId);
+  return res;
+}
+
+export async function saveAttendanceRecord(record: AttendanceRecord): Promise<AttendanceRecord> {
+  removeDeletedRecordKey(record.id);
+  removeDeletedRecordKey(`${record.studentId}_${record.date}`);
+
+  const existingIdx = records.findIndex(r => r.id === record.id || (r.studentId === record.studentId && r.date === record.date));
+  if (existingIdx >= 0) {
+    records[existingIdx] = { ...records[existingIdx], ...record };
+  } else {
+    records.push(record);
+  }
+  await supabaseUpsertAttendanceRecord(record);
+  await saveDataToSupabase();
+  return record;
+}
+
+export async function updateAttendanceRecord(record: AttendanceRecord): Promise<AttendanceRecord> {
+  return saveAttendanceRecord(record);
+}
+
+export async function deleteAttendanceRecord(studentId: string, date: string, recordId?: string): Promise<boolean> {
+  const recId = recordId || records.find(r => r.studentId === studentId && r.date === date)?.id || `rec-del-${studentId}-${date}`;
+  const studentDateKey = `${studentId}_${date}`;
+
+  addDeletedRecordKey(recId);
+  addDeletedRecordKey(studentDateKey);
+
+  setRecords(records.filter(r => {
+    if (r.id === recId) return false;
+    if (r.studentId === studentId && r.date === date) return false;
+    return true;
+  }));
+
+  await supabaseDeleteAttendanceRecord(studentId, date, recId);
+  await saveDataToSupabase();
+  return true;
+}
+
+// --- System Config ---
+export async function getSystemConfig(): Promise<SystemConfig> {
+  await initOrLoadDataAsync(true);
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  return {
+    ...systemConfig,
+    hiddenClassIds: hiddenIds
+  };
+}
+
+export async function saveSystemConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
+  setSystemConfig({ ...systemConfig, ...updates });
+  await supabaseUpsertSystemConfig(systemConfig);
+  await saveDataToSupabase();
+  return systemConfig;
+}
+
+// --- Admin Accounts ---
+export async function getAdminAccounts(): Promise<ServerAdminAccount[]> {
+  await initOrLoadDataAsync(true);
+  return [...adminAccounts];
+}
+
+export async function saveAdminAccount(account: ServerAdminAccount): Promise<ServerAdminAccount> {
+  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === account.username.toLowerCase());
+  if (existingIdx >= 0) {
+    adminAccounts[existingIdx] = { ...adminAccounts[existingIdx], ...account };
+  } else {
+    adminAccounts.push(account);
+  }
+  await supabaseUpsertAdminAccount(account);
+  await saveDataToSupabase();
+  return account;
+}
+
+export async function updateAdminAccount(username: string, updates: Partial<ServerAdminAccount>): Promise<ServerAdminAccount | null> {
+  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === username.toLowerCase());
+  if (existingIdx === -1) return null;
+  adminAccounts[existingIdx] = { ...adminAccounts[existingIdx], ...updates };
+  await supabaseUpsertAdminAccount(adminAccounts[existingIdx]);
+  await saveDataToSupabase();
+  return adminAccounts[existingIdx];
+}
+
+export async function updateAccountPassword(username: string, newPassword: string): Promise<boolean> {
+  const target = adminAccounts.find(a => a.username.toLowerCase() === username.toLowerCase());
+  if (!target) return false;
+  target.password = newPassword;
+  if (username.toLowerCase() === 'admin') {
+    systemConfig.adminPassword = newPassword;
+  }
+  await supabaseUpdateAccountPassword(username, newPassword);
+  await saveDataToSupabase();
+  return true;
+}
+
+export async function deleteAdminAccount(username: string): Promise<ServerAdminAccount | null> {
+  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === username.toLowerCase());
+  if (existingIdx === -1) return null;
+  const deleted = adminAccounts.splice(existingIdx, 1)[0];
+  await supabaseDeleteAdminAccount(username);
+  await saveDataToSupabase();
+  return deleted;
+}
+
+// --- State Reset & Sync ---
+export async function resetAllData(payload?: ChurchStatePayload): Promise<void> {
+  const resetPayload = payload || getFullStatePayload();
+  await supabaseResetAllData(resetPayload);
+  await saveDataToSupabase();
+}
+
+/**
+ * Unified Data Access Layer interface export
+ */
+export const dataStore = {
+  // Classes
+  getClasses,
+  getClassById,
+  saveClass,
+  updateClass,
+  deleteClass,
+
+  // Students
+  getStudents,
+  getStudentById,
+  saveStudent,
+  saveStudentsBatch,
+  updateStudent,
+  deleteStudent,
+
+  // Teachers
+  getTeachers,
+  getTeacherById,
+  saveTeacher,
+  updateTeacher,
+  deleteTeacher,
+
+  // Attendance Records
+  getAttendanceRecords,
+  saveAttendanceRecord,
+  updateAttendanceRecord,
+  deleteAttendanceRecord,
+
+  // System Config
+  getSystemConfig,
+  saveSystemConfig,
+
+  // Admin Accounts
+  getAdminAccounts,
+  saveAdminAccount,
+  updateAdminAccount,
+  updateAccountPassword,
+  deleteAdminAccount,
+
+  // State & Sync
+  resetAllData,
+  getFullState: getFullStatePayload,
+  initOrLoadDataAsync,
+  saveDataToSupabase,
+  mergeClientData
+};
 
