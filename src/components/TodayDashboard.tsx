@@ -707,9 +707,11 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                           {record.status === 'present' ? '已准时签到' : record.status === 'late' ? '迟到打卡' : '已请假'}
                         </span>
                       </span>
-                      <div className="text-[10px] text-slate-400 mt-0.5 font-mono leading-none">
-                        ⏰ {record.timeStr}
-                      </div>
+                      {record.status === 'late' && (
+                        <div className="text-[10px] text-amber-600 mt-0.5 font-mono leading-none font-medium">
+                          ⏰ {record.timeStr}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">

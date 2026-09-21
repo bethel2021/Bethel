@@ -503,14 +503,15 @@ export async function initOrLoadDataAsync(force = false) {
       lastSupabaseFetchTime = Date.now();
       if (cloudData && typeof cloudData.syncVersion === 'number') {
         // Apply cloud Supabase PostgreSQL data
-        const cloudHiddenSet = new Set<string>([
-          ...(Array.isArray(cloudData.hiddenClassIds) ? cloudData.hiddenClassIds : []),
-          ...(Array.isArray(cloudData.systemConfig?.hiddenClassIds) ? cloudData.systemConfig.hiddenClassIds : [])
-        ]);
         if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
+          const cloudHiddenList = Array.isArray(cloudData.systemConfig?.hiddenClassIds) 
+            ? cloudData.systemConfig.hiddenClassIds 
+            : (Array.isArray(cloudData.hiddenClassIds) ? cloudData.hiddenClassIds : []);
+          const cloudHiddenSet = new Set<string>(cloudHiddenList);
+
           const mappedClasses = cloudData.classes.map((c: any) => ({
             ...c,
-            isHiddenFromHome: c.isHiddenFromHome === true || cloudHiddenSet.has(c.id)
+            isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : cloudHiddenSet.has(c.id)
           }));
           classes.length = 0;
           classes.push(...mappedClasses);
@@ -537,8 +538,9 @@ export async function initOrLoadDataAsync(force = false) {
           teachers.length = 0;
           teachers.push(...cloudData.teachers);
         }
+        const authoritativeHiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
         if (cloudData.systemConfig) {
-          const mergedConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(cloudHiddenSet) };
+          const mergedConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: authoritativeHiddenIds };
           Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
           Object.assign(systemConfig, mergedConfig);
         }
@@ -698,7 +700,9 @@ export function mergeClientData(payload: SyncPayload): {
         const existing = classMap.get(c.id)!;
         // The server's settings (including isHiddenFromHome, teachers, and classroom) are authoritative for existing classes.
         // Routine client background syncs must preserve the server's existing isHiddenFromHome status.
-        const authoritativeHidden = existing.isHiddenFromHome === true || diskHiddenSet.has(c.id);
+        const authoritativeHidden = typeof existing.isHiddenFromHome === 'boolean' 
+          ? existing.isHiddenFromHome 
+          : (diskHiddenSet.has(c.id));
         const mergedClass: ClassGroup = {
           ...existing,
           ...c,
