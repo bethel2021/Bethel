@@ -1454,7 +1454,7 @@ export default function App() {
         setTeachers(restored.teachers);
       }
 
-      // Sync restored state directly with Vercel Serverless / Cloud KV
+      // Sync restored state directly with Supabase PostgreSQL cloud database
       try {
         await fetch('/api/cloud-sync', {
           method: 'POST',

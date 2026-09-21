@@ -220,41 +220,41 @@ export const MultiDeviceSyncModal: React.FC<MultiDeviceSyncModalProps> = ({
             </div>
           </div>
 
-          {/* Vercel KV Persistent Storage Guide (核心永久方案) */}
+          {/* Supabase PostgreSQL 官方云端持久化数据库 */}
           <div className="p-5 rounded-2xl bg-slate-900 text-white space-y-3.5 shadow-md">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
                 <Database className="w-4 h-4 text-amber-400" />
-                <span>Vercel KV / Upstash 永久云数据库极速连接</span>
+                <span>Supabase PostgreSQL 官方持久化云数据库</span>
               </div>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                推荐企业级持久化
+                企业级唯一持久化数据库
               </span>
             </div>
 
             <p className="text-slate-300 text-[11px] leading-relaxed">
-              部署到 Vercel 后，Serverless 函数本身属于无状态微容器（每次冷启动会自动刷新）。为了让多台手机、平板和电脑<strong>永久且实时共享同一个数据库</strong>，可一键挂载免费的 Vercel KV：
+              系统核心数据已全部接入 <strong>Supabase PostgreSQL</strong> 关系型数据库，完美支持 Vercel Serverless 无状态容器。多台手机、平板和电脑<strong>永久且实时共享同一个数据库</strong>，确保考勤记录与学生档案永久保存不丢失：
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-[11px]">
               <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1">
-                <div className="font-semibold text-amber-200">步骤 1：打开 Storage</div>
+                <div className="font-semibold text-amber-200">1. PostgreSQL 存储</div>
                 <p className="text-slate-400 text-[10px] leading-relaxed">
-                  在 Vercel 控制台打开当前项目，点击顶部的 <strong>Storage</strong> 标签。
+                  所有学生名单、签到历史、班级与账号全部存入 Supabase PostgreSQL 实体表，高可靠性保障。
                 </p>
               </div>
 
               <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1">
-                <div className="font-semibold text-emerald-200">步骤 2：创建 KV 数据库</div>
+                <div className="font-semibold text-emerald-200">2. 服务端安全鉴权</div>
                 <p className="text-slate-400 text-[10px] leading-relaxed">
-                  点击 <strong>Create Database</strong> 并选择 <strong>KV</strong>（官方免费提供每日 10,000 次请求）。
+                  Supabase Service Role Key 仅保存在服务器环境变量中，绝不暴露到前端浏览器，安全合规。
                 </p>
               </div>
 
               <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1">
-                <div className="font-semibold text-sky-200">步骤 3：一键关联项目</div>
+                <div className="font-semibold text-sky-200">3. 全端毫秒级同步</div>
                 <p className="text-slate-400 text-[10px] leading-relaxed">
-                  点击 <strong>Connect to Project</strong>，Vercel 会自动注入环境变量，秒级实现全端永久同步！
+                  老师在手机微信端扫码或快速登记考勤，数据瞬间存入数据库，主屏与所有终端同步呈现。
                 </p>
               </div>
             </div>

@@ -3705,7 +3705,7 @@
     }
   ],
   "activeSunday": "2026-09-13",
-  "syncVersion": 135,
+  "syncVersion": 145,
   "hiddenClassIds": [
     "class-1"
   ],
@@ -3781,5 +3781,5 @@
       "joinDate": "2026-01-01"
     }
   ],
-  "updatedAt": "2026-09-20T20:07:16.226Z"
+  "updatedAt": "2026-09-21T12:16:38.568Z"
 }

@@ -11,6 +11,7 @@ import {
   activeSunday,
   getActiveSundayDate,
   getRomeTimeParts,
+  saveDataToSupabase,
   saveDataToFile,
   initOrLoadData,
   initOrLoadDataAsync,
@@ -29,8 +30,27 @@ import {
   deletedRecordKeys,
   addDeletedRecordKey,
   removeDeletedRecordKey,
+  getFullStatePayload,
   isSupabaseConfigured
 } from './dataStore';
+import {
+  supabaseUpsertClass,
+  supabaseDeleteClass,
+  supabaseUpsertStudent,
+  supabaseUpsertStudentsBatch,
+  supabaseDeleteStudent,
+  supabaseUpsertTeacher,
+  supabaseDeleteTeacher,
+  supabaseUpsertAttendanceRecord,
+  supabaseDeleteAttendanceRecord,
+  supabaseUpsertAdminAccount,
+  supabaseDeleteAdminAccount,
+  supabaseUpdateAccountPassword,
+  supabaseUpsertSystemConfig,
+  supabaseResetAllData,
+  supabaseGetAccounts
+} from './supabaseDb';
+import { isGeminiConfigured, generateDevotionalOrSummary } from './geminiService';
 
 const app = express();
 
@@ -262,15 +282,39 @@ apiRouter.get('/health', (req: Request, res: Response) => {
     syncVersion,
     lastModified: lastModifiedTimestamp,
     supabaseConnected: isSupabaseConfigured(),
-    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
-    kvConnected: isSupabaseConfigured() || Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache-migration',
+    storageEngine: isSupabaseConfigured() ? 'Supabase PostgreSQL (Official Persistent Database)' : 'Local File (Migration & Offline Fallback)',
+    isOfficialDatabase: isSupabaseConfigured(),
+    geminiConnected: isGeminiConfigured(),
     serverTime: new Date().toISOString()
   });
 });
 
+// 0.1 AI Service endpoints (Strictly Server-Side: Browser -> Vercel/Node API -> Gemini API)
+apiRouter.get('/ai/status', (req: Request, res: Response) => {
+  res.json({
+    configured: isGeminiConfigured(),
+    model: 'gemini-3.8-flash',
+    architecture: 'Server-Side API Proxy (Secure, Zero Client-side Key Exposure)'
+  });
+});
+
+apiRouter.post('/ai/generate', async (req: Request, res: Response) => {
+  const { prompt, context } = req.body || {};
+  if (!prompt || typeof prompt !== 'string') {
+    return res.status(400).json({ success: false, error: '缺少有效的 prompt 生成需求参数' });
+  }
+
+  const result = await generateDevotionalOrSummary(prompt, context);
+  if (!result.success) {
+    return res.status(500).json(result);
+  }
+  return res.json(result);
+});
+
 // 1. Get entire app state
 apiRouter.get('/state', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync();
+  await initOrLoadDataAsync(true);
   const currentSunday = getActiveSundayDate();
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   systemConfig.hiddenClassIds = hiddenIds;
@@ -299,16 +343,118 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
     syncVersion,
     lastModified: lastModifiedTimestamp,
     supabaseConnected: isSupabaseConfigured(),
-    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
-    kvConnected: isSupabaseConfigured() || Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache-migration',
+    storageEngine: isSupabaseConfigured() ? 'Supabase PostgreSQL (Official Persistent Database)' : 'Local File (Migration & Offline Fallback)',
+    isOfficialDatabase: isSupabaseConfigured(),
     serverTime: new Date().toISOString(),
     runtime: process.env.VERCEL ? 'vercel-serverless' : 'node-express'
   });
 });
 
+// Dedicated Resource GET Endpoints (100% backward-compatible with REST expectations)
+apiRouter.get('/classes', async (req: Request, res: Response) => {
+  await initOrLoadDataAsync(true);
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  const mapped = classes.map(c => ({
+    ...c,
+    isHiddenFromHome: hiddenIds.includes(c.id)
+  }));
+  res.json({
+    success: true,
+    classes: mapped,
+    data: mapped,
+    count: mapped.length
+  });
+});
+
+apiRouter.get('/classes/:id', async (req: Request, res: Response) => {
+  await initOrLoadDataAsync(true);
+  const { id } = req.params;
+  const cls = classes.find(c => c.id === id || c.name === id);
+  if (!cls) return res.status(404).json({ error: '班级不存在' });
+  res.json({ success: true, class: cls, data: cls });
+});
+
+apiRouter.get('/students', async (req: Request, res: Response) => {
+  await initOrLoadDataAsync(true);
+  const classId = req.query.classId as string | undefined;
+  const filtered = classId ? students.filter(s => s.classId === classId) : students;
+  res.json({
+    success: true,
+    students: filtered,
+    data: filtered,
+    count: filtered.length
+  });
+});
+
+apiRouter.get('/students/:id', async (req: Request, res: Response) => {
+  await initOrLoadDataAsync(true);
+  const { id } = req.params;
+  const stu = students.find(s => s.id === id || s.memberCode === id || s.name === id);
+  if (!stu) return res.status(404).json({ error: '学员不存在' });
+  res.json({ success: true, student: stu, data: stu });
+});
+
+apiRouter.get('/teachers', async (req: Request, res: Response) => {
+  await initOrLoadDataAsync(true);
+  const classId = req.query.classId as string | undefined;
+  const filtered = classId ? teachers.filter(t => t.classId === classId) : teachers;
+  res.json({
+    success: true,
+    teachers: filtered,
+    data: filtered,
+    count: filtered.length
+  });
+});
+
+apiRouter.get('/teachers/:id', async (req: Request, res: Response) => {
+  await initOrLoadDataAsync(true);
+  const { id } = req.params;
+  const tch = teachers.find(t => t.id === id || t.name === id);
+  if (!tch) return res.status(404).json({ error: '教师不存在' });
+  res.json({ success: true, teacher: tch, data: tch });
+});
+
+const getRecordsHandler = async (req: Request, res: Response) => {
+  await initOrLoadDataAsync(true);
+  const date = (req.query.date as string) || undefined;
+  const studentId = (req.query.studentId as string) || undefined;
+  const classId = (req.query.classId as string) || undefined;
+  let filtered = [...records];
+  if (date) filtered = filtered.filter(r => r.date === date);
+  if (studentId) filtered = filtered.filter(r => r.studentId === studentId);
+  if (classId) filtered = filtered.filter(r => r.classId === classId);
+  res.json({
+    success: true,
+    records: filtered,
+    data: filtered,
+    count: filtered.length,
+    activeSunday: getActiveSundayDate()
+  });
+};
+
+apiRouter.get('/records', getRecordsHandler);
+apiRouter.get('/attendance', getRecordsHandler);
+apiRouter.get('/attendance-records', getRecordsHandler);
+apiRouter.get('/attendance_records', getRecordsHandler);
+
+apiRouter.get('/config', async (req: Request, res: Response) => {
+  await initOrLoadDataAsync(true);
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  const configPayload = {
+    ...systemConfig,
+    hiddenClassIds: hiddenIds
+  };
+  res.json({
+    success: true,
+    config: configPayload,
+    data: configPayload
+  });
+});
+
 // 1.1 Cloud Multi-Device Sync endpoints
 apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync();
+  await initOrLoadDataAsync(true);
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   systemConfig.hiddenClassIds = hiddenIds;
   res.json({
@@ -316,8 +462,9 @@ apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
     syncVersion,
     lastModified: lastModifiedTimestamp,
     supabaseConnected: isSupabaseConfigured(),
-    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
-    kvConnected: isSupabaseConfigured() || Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+    database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache-migration',
+    storageEngine: isSupabaseConfigured() ? 'Supabase PostgreSQL (Official Persistent Database)' : 'Local File (Migration & Offline Fallback)',
+    isOfficialDatabase: isSupabaseConfigured(),
     classes: classes.map(c => ({
       ...c,
       isHiddenFromHome: hiddenIds.includes(c.id)
@@ -338,14 +485,15 @@ apiRouter.post('/cloud-sync', async (req: Request, res: Response) => {
       return res.status(400).json({ error: '无效的同步数据格式' });
     }
     const merged = mergeClientData(payload);
-    await saveDataToFile();
+    await saveDataToSupabase();
     res.json({
       success: true,
       message: '多设备终端云端数据已成功双向同步！',
       ...merged,
       supabaseConnected: isSupabaseConfigured(),
-      database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
-      kvConnected: isSupabaseConfigured() || Boolean(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+      database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache-migration',
+      storageEngine: isSupabaseConfigured() ? 'Supabase PostgreSQL (Official Persistent Database)' : 'Local File (Migration & Offline Fallback)',
+      isOfficialDatabase: isSupabaseConfigured(),
       serverTime: new Date().toISOString()
     });
   } catch (err: any) {
@@ -423,8 +571,9 @@ apiRouter.get('/realtime-poll', async (req: Request, res: Response) => {
 });
 
 // 2. Admin Authentication Login
-apiRouter.post('/login', (req: Request, res: Response) => {
+apiRouter.post('/login', async (req: Request, res: Response) => {
   try {
+    await initOrLoadDataAsync(true);
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: '请输入用户名和登录密码' });
@@ -514,7 +663,7 @@ function isServerCheckinAllowed(now: Date = new Date()): { isAllowed: boolean; m
 }
 
 // 3. Student / Member check-in (WeChat scan / mobile QR / quick attendance)
-apiRouter.post('/checkin', (req: Request, res: Response) => {
+apiRouter.post('/checkin', async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const check = isServerCheckinAllowed(now);
@@ -592,7 +741,8 @@ apiRouter.post('/checkin', (req: Request, res: Response) => {
 
     removeDeletedRecordKey(`${student.id}_${targetDate}`);
     records.push(newRecord);
-    saveDataToFile();
+    await supabaseUpsertAttendanceRecord(newRecord);
+    await saveDataToSupabase();
 
     res.json({
       success: true,
@@ -606,7 +756,7 @@ apiRouter.post('/checkin', (req: Request, res: Response) => {
 });
 
 // 4. Manual checkin / excuse / absent
-apiRouter.post('/manual-checkin', (req: Request, res: Response) => {
+apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
   try {
     const check = isServerCheckinAllowed();
     if (!check.isAllowed) {
@@ -625,11 +775,16 @@ apiRouter.post('/manual-checkin', (req: Request, res: Response) => {
 
     if (status === 'absent') {
       addDeletedRecordKey(studentDateKey);
+      let removedRecId: string | undefined;
       if (existingIdx !== -1) {
         const removedRec = records.splice(existingIdx, 1)[0];
-        if (removedRec?.id) addDeletedRecordKey(removedRec.id);
+        if (removedRec?.id) {
+          removedRecId = removedRec.id;
+          addDeletedRecordKey(removedRec.id);
+        }
       }
-      saveDataToFile();
+      await supabaseDeleteAttendanceRecord(studentId, targetDate, removedRecId);
+      await saveDataToSupabase();
       return res.json({ success: true, deletedKey: studentDateKey, message: '已标记为缺席/未签到' });
     }
 
@@ -669,7 +824,8 @@ apiRouter.post('/manual-checkin', (req: Request, res: Response) => {
         offeringCompleted: offeringCompleted !== undefined ? offeringCompleted : records[existingIdx].offeringCompleted,
         notes: notes !== undefined ? notes : records[existingIdx].notes
       };
-      saveDataToFile();
+      await supabaseUpsertAttendanceRecord(records[existingIdx]);
+      await saveDataToSupabase();
       return res.json({ success: true, record: records[existingIdx], message: '考勤记录已更新' });
     }
 
@@ -688,7 +844,8 @@ apiRouter.post('/manual-checkin', (req: Request, res: Response) => {
       notes
     };
     records.push(record);
-    saveDataToFile();
+    await supabaseUpsertAttendanceRecord(record);
+    await saveDataToSupabase();
 
     res.json({ success: true, record, message: '老师/同工登记成功' });
   } catch (err: any) {
@@ -697,7 +854,7 @@ apiRouter.post('/manual-checkin', (req: Request, res: Response) => {
 });
 
 // 5. Batch Check-in
-apiRouter.post('/batch-checkin', (req: Request, res: Response) => {
+apiRouter.post('/batch-checkin', async (req: Request, res: Response) => {
   try {
     const check = isServerCheckinAllowed();
     if (!check.isAllowed) {
@@ -760,7 +917,7 @@ apiRouter.post('/batch-checkin', (req: Request, res: Response) => {
       updatedCount++;
     });
 
-    saveDataToFile();
+    await saveDataToSupabase();
 
     res.json({ success: true, message: `已成功为 ${updatedCount} 位学员登记到校！` });
   } catch (err: any) {
@@ -769,7 +926,7 @@ apiRouter.post('/batch-checkin', (req: Request, res: Response) => {
 });
 
 // 6. Manage Classes (添加/修改班级) - 仅限总管理员
-apiRouter.post('/classes', (req: Request, res: Response) => {
+apiRouter.post('/classes', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -795,7 +952,8 @@ apiRouter.post('/classes', (req: Request, res: Response) => {
         description: description !== undefined ? description : classes[idx].description,
         isHiddenFromHome: isHiddenFromHome !== undefined ? !!isHiddenFromHome : (classes[idx].isHiddenFromHome || false),
       };
-      saveDataToFile();
+      await supabaseUpsertClass(classes[idx]);
+      await saveDataToSupabase();
       return res.json({ success: true, class: classes[idx], classes, syncVersion, message: '班级信息修改成功' });
     }
 
@@ -812,7 +970,8 @@ apiRouter.post('/classes', (req: Request, res: Response) => {
       isHiddenFromHome: !!isHiddenFromHome,
     };
     classes.push(newClass);
-    saveDataToFile();
+    await supabaseUpsertClass(newClass);
+    await saveDataToSupabase();
     res.json({ success: true, class: newClass, classes, syncVersion, message: '成功新增班级/团契' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -820,7 +979,7 @@ apiRouter.post('/classes', (req: Request, res: Response) => {
 });
 
 // Update Class Home Visibility - 仅限总管理员
-apiRouter.post('/classes/:id/visibility', (req: Request, res: Response) => {
+apiRouter.post('/classes/:id/visibility', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -851,7 +1010,9 @@ apiRouter.post('/classes/:id/visibility', (req: Request, res: Response) => {
       });
     }
 
-    saveDataToFile();
+    await supabaseUpsertClass(classes[idx]);
+    await supabaseUpsertSystemConfig(systemConfig);
+    await saveDataToSupabase();
     res.json({
       success: true,
       class: classes[idx],
@@ -866,7 +1027,7 @@ apiRouter.post('/classes/:id/visibility', (req: Request, res: Response) => {
 });
 
 // Delete Class - 仅限总管理员
-apiRouter.delete('/classes/:id', (req: Request, res: Response) => {
+apiRouter.delete('/classes/:id', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -888,7 +1049,8 @@ apiRouter.delete('/classes/:id', (req: Request, res: Response) => {
       setStudents(students.filter(s => s.classId !== clsId));
       setRecords(records.filter(r => !studentIdsToDelete.has(r.studentId)));
       setClasses(classes.filter(c => c.id !== clsId && c.name !== clsName));
-      saveDataToFile();
+      await supabaseDeleteClass(clsId);
+      await saveDataToSupabase();
       return res.json({ 
         success: true, 
         message: `班级【${clsName}】已成功删除${enrolledStudents.length > 0 ? `（同时清除了 ${enrolledStudents.length} 名在册学员档案）` : ''}` 
@@ -901,7 +1063,7 @@ apiRouter.delete('/classes/:id', (req: Request, res: Response) => {
 });
 
 // 7. Manage Students (添加/修改学员) - 仅限总管理员
-apiRouter.post('/students', (req: Request, res: Response) => {
+apiRouter.post('/students', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -942,7 +1104,8 @@ apiRouter.post('/students', (req: Request, res: Response) => {
       };
       // Also update studentName in historical records
       setRecords(records.map(r => r.studentId === targetId ? { ...r, studentName: name, classId } : r));
-      saveDataToFile();
+      await supabaseUpsertStudent(students[idx]);
+      await saveDataToSupabase();
       return res.json({ success: true, student: students[idx], message: '学员信息已更新' });
     }
 
@@ -960,7 +1123,8 @@ apiRouter.post('/students', (req: Request, res: Response) => {
       joinDate: new Date().toISOString().split('T')[0]
     };
     students.push(newStudent);
-    saveDataToFile();
+    await supabaseUpsertStudent(newStudent);
+    await saveDataToSupabase();
     res.json({ success: true, student: newStudent, message: '学员档案建立成功' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -968,7 +1132,7 @@ apiRouter.post('/students', (req: Request, res: Response) => {
 });
 
 // Batch Import Students - 仅限总管理员
-apiRouter.post('/students/batch', (req: Request, res: Response) => {
+apiRouter.post('/students/batch', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1015,7 +1179,8 @@ apiRouter.post('/students/batch', (req: Request, res: Response) => {
       added.push(stu);
     });
 
-    saveDataToFile();
+    await supabaseUpsertStudentsBatch(added);
+    await saveDataToSupabase();
 
     res.json({ success: true, count: added.length, message: `成功批量录入 ${added.length} 名学员，已自动推算年龄为 ${computedAge} 岁！` });
   } catch (err: any) {
@@ -1024,7 +1189,7 @@ apiRouter.post('/students/batch', (req: Request, res: Response) => {
 });
 
 // Delete student - 仅限总管理员
-apiRouter.delete('/students/:id', (req: Request, res: Response) => {
+apiRouter.delete('/students/:id', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1040,7 +1205,8 @@ apiRouter.delete('/students/:id', (req: Request, res: Response) => {
       const removed = students[idx];
       setStudents(students.filter(s => s.id !== removed.id && s.memberCode !== removed.memberCode));
       setRecords(records.filter(r => r.studentId !== removed.id && r.studentName !== removed.name));
-      saveDataToFile();
+      await supabaseDeleteStudent(removed.id);
+      await saveDataToSupabase();
       return res.json({ success: true, message: `学员【${removed.name}】已成功从名册中彻底删除！` });
     }
     res.status(404).json({ error: '学员不存在或已被删除' });
@@ -1050,7 +1216,7 @@ apiRouter.delete('/students/:id', (req: Request, res: Response) => {
 });
 
 // 7.1 Manage Teachers (添加/修改/删除教师资料) - 仅限总管理员
-apiRouter.post('/teachers', (req: Request, res: Response) => {
+apiRouter.post('/teachers', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1077,7 +1243,8 @@ apiRouter.post('/teachers', (req: Request, res: Response) => {
         joinDate: joinDate || teachers[idx].joinDate || new Date().toISOString().split('T')[0],
         notes: notes || ''
       };
-      saveDataToFile();
+      await supabaseUpsertTeacher(teachers[idx]);
+      await saveDataToSupabase();
       // Broadcast real-time update
       broadcastRealtimeState('teachers_updated');
       return res.json({ success: true, teacher: teachers[idx], message: '教师资料已更新' });
@@ -1095,7 +1262,8 @@ apiRouter.post('/teachers', (req: Request, res: Response) => {
       notes: notes || ''
     };
     teachers.push(newTeacher);
-    saveDataToFile();
+    await supabaseUpsertTeacher(newTeacher);
+    await saveDataToSupabase();
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
     return res.json({ success: true, teacher: newTeacher, message: '成功添加教师资料' });
@@ -1104,7 +1272,7 @@ apiRouter.post('/teachers', (req: Request, res: Response) => {
   }
 });
 
-apiRouter.delete('/teachers/:id', (req: Request, res: Response) => {
+apiRouter.delete('/teachers/:id', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1119,7 +1287,8 @@ apiRouter.delete('/teachers/:id', (req: Request, res: Response) => {
 
     const removed = teachers[idx];
     teachers.splice(idx, 1);
-    saveDataToFile();
+    await supabaseDeleteTeacher(removed.id);
+    await saveDataToSupabase();
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
     return res.json({ success: true, message: `教师【${removed.name}】已成功从名册中彻底删除！` });
@@ -1129,7 +1298,7 @@ apiRouter.delete('/teachers/:id', (req: Request, res: Response) => {
 });
 
 // 8. Update System Config & Default Options - 仅限总管理员
-apiRouter.post('/config', (req: Request, res: Response) => {
+apiRouter.post('/config', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1138,7 +1307,8 @@ apiRouter.post('/config', (req: Request, res: Response) => {
 
     const updates = req.body;
     setSystemConfig({ ...systemConfig, ...updates });
-    saveDataToFile();
+    await supabaseUpsertSystemConfig(systemConfig);
+    await saveDataToSupabase();
     res.json({ success: true, config: systemConfig, message: '系统设置与默认选项已成功保存！' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1146,7 +1316,7 @@ apiRouter.post('/config', (req: Request, res: Response) => {
 });
 
 // 9. Reset data with default dataset - 仅限总管理员
-apiRouter.post('/reset-data', (req: Request, res: Response) => {
+apiRouter.post('/reset-data', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1159,7 +1329,8 @@ apiRouter.post('/reset-data', (req: Request, res: Response) => {
       schoolTitle: '主日学与团契IMS',
     });
     generateHistoricalRecords();
-    saveDataToFile();
+    await supabaseResetAllData(getFullStatePayload());
+    await saveDataToSupabase();
     res.json({ success: true, message: '已重置为伯特利教会主日学与团契官方示范数据' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1167,12 +1338,14 @@ apiRouter.post('/reset-data', (req: Request, res: Response) => {
 });
 
 // 10. Account Management - 仅限总管理员
-apiRouter.get('/accounts', (req: Request, res: Response) => {
+apiRouter.get('/accounts', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
       return res.status(403).json({ error: auth.message || '仅总管理员有权限管理后台账号' });
     }
+
+    await initOrLoadDataAsync(true);
 
     res.json({
       success: true,
@@ -1189,7 +1362,7 @@ apiRouter.get('/accounts', (req: Request, res: Response) => {
   }
 });
 
-apiRouter.post('/accounts', (req: Request, res: Response) => {
+apiRouter.post('/accounts', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1224,7 +1397,8 @@ apiRouter.post('/accounts', (req: Request, res: Response) => {
         systemConfig.adminPassword = String(password).trim();
       }
 
-      saveDataToFile();
+      await supabaseUpsertAdminAccount(adminAccounts[existingIndex]);
+      await saveDataToSupabase();
 
       return res.json({
         success: true,
@@ -1252,7 +1426,8 @@ apiRouter.post('/accounts', (req: Request, res: Response) => {
       };
 
       adminAccounts.push(newAccount);
-      saveDataToFile();
+      await supabaseUpsertAdminAccount(newAccount);
+      await saveDataToSupabase();
 
       return res.json({
         success: true,
@@ -1271,7 +1446,7 @@ apiRouter.post('/accounts', (req: Request, res: Response) => {
   }
 });
 
-apiRouter.post('/accounts/password', (req: Request, res: Response) => {
+apiRouter.post('/accounts/password', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1299,7 +1474,8 @@ apiRouter.post('/accounts/password', (req: Request, res: Response) => {
       systemConfig.adminPassword = cleanPassword;
     }
 
-    saveDataToFile();
+    await supabaseUpdateAccountPassword(cleanUsername, cleanPassword);
+    await saveDataToSupabase();
 
     res.json({
       success: true,
@@ -1317,7 +1493,7 @@ apiRouter.post('/accounts/password', (req: Request, res: Response) => {
   }
 });
 
-apiRouter.delete('/accounts/:username', (req: Request, res: Response) => {
+apiRouter.delete('/accounts/:username', async (req: Request, res: Response) => {
   try {
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
@@ -1335,7 +1511,8 @@ apiRouter.delete('/accounts/:username', (req: Request, res: Response) => {
     }
 
     const deleted = adminAccounts.splice(index, 1)[0];
-    saveDataToFile();
+    await supabaseDeleteAdminAccount(username);
+    await saveDataToSupabase();
     res.json({
       success: true,
       message: `账号【${deleted.displayName} (${deleted.username})】已成功删除！`,
@@ -1356,12 +1533,14 @@ apiRouter.delete('/accounts/:username', (req: Request, res: Response) => {
 apiRouter.post('/sync-data', async (req: Request, res: Response) => {
   try {
     const result = mergeClientData(req.body);
-    await saveDataToFile();
+    await saveDataToSupabase();
     res.json({
       success: true,
       message: '云端动态服务数据已同步完成！',
       supabaseConnected: isSupabaseConfigured(),
-      database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache',
+      database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache-migration',
+      storageEngine: isSupabaseConfigured() ? 'Supabase PostgreSQL (Official Persistent Database)' : 'Local File (Migration & Offline Fallback)',
+      isOfficialDatabase: isSupabaseConfigured(),
       ...result
     });
   } catch (err: any) {
@@ -1378,7 +1557,7 @@ app.use('/api', (req: Request, res: Response) => {
   res.status(404).json({
     error: `接口未找到: ${req.method} ${req.url}`,
     status: 404,
-    validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/teachers', '/api/config']
+    validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/teachers', '/api/config', '/api/ai/status', '/api/ai/generate']
   });
 });
 

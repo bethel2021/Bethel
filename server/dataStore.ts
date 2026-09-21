@@ -165,7 +165,9 @@ export function onDataChange(listener: DataChangeListener): () => void {
   return () => changeListeners.delete(listener);
 }
 
-export function saveDataToFile(): Promise<boolean> {
+let lastSupabaseFetchTime = 0;
+
+export async function saveDataToSupabase(): Promise<boolean> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
@@ -181,36 +183,37 @@ export function saveDataToFile(): Promise<boolean> {
   Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
   Object.assign(systemConfig, updatedConfig);
 
-  const payload = {
-    systemConfig,
-    classes,
-    students,
-    records,
-    deletedRecordKeys: Array.from(deletedRecordKeys),
-    adminAccounts,
-    activeSunday,
-    syncVersion,
-    hiddenClassIds: hiddenIds,
-    teachers,
-    updatedAt: lastModifiedTimestamp
-  };
+  const payload = getFullStatePayload();
 
-  try {
-    const filePath = getStoragePath();
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+  // 1. Supabase PostgreSQL is the AUTHORITATIVE, REQUIRED persistent database
+  let dbSuccess = false;
+  if (isSupabaseConfigured()) {
+    try {
+      dbSuccess = await saveToSupabase(payload);
+      lastSupabaseFetchTime = Date.now();
+    } catch (err) {
+      console.warn('[Supabase DB Error] Formal data write failed:', err);
     }
-    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
-
-    // Also persist dedicated hidden classes file for fast fallback
-    const hiddenPath = getHiddenClassStoragePath();
-    fs.writeFileSync(hiddenPath, JSON.stringify(hiddenIds, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('[Storage Notice] Could not write to disk cache (normal in read-only serverless environment):', err);
   }
 
-  // Notify all real-time listeners (WebSocket, SSE, Long-polling)
+  // 2. Only write to local file if Supabase is not configured (offline / local dev fallback)
+  if (!isSupabaseConfigured()) {
+    try {
+      const filePath = getStoragePath();
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+
+      const hiddenPath = getHiddenClassStoragePath();
+      fs.writeFileSync(hiddenPath, JSON.stringify(hiddenIds, null, 2), 'utf-8');
+    } catch (err) {
+      // Normal in serverless read-only environment
+    }
+  }
+
+  // 3. Notify all real-time listeners (WebSocket, SSE, Long-polling)
   for (const listener of changeListeners) {
     try {
       listener({
@@ -230,13 +233,11 @@ export function saveDataToFile(): Promise<boolean> {
     }
   }
 
-  // Also persist to Supabase PostgreSQL database
-  const dbPromise = saveToSupabase(payload);
-  dbPromise.catch((err) => {
-    console.warn('[Supabase DB Notice] Background save failed:', err);
-  });
-  return dbPromise;
+  return dbSuccess;
 }
+
+// Backward-compatibility alias
+export const saveDataToFile = saveDataToSupabase;
 
 export function generateHistoricalRecords() {
   records.length = 0;
@@ -461,69 +462,86 @@ export function initOrLoadData() {
   generateHistoricalRecords();
   saveDataToFile();
 
-  // Try loading from Cloud KV in background
+  // Load from Supabase PostgreSQL in background
   initOrLoadDataAsync().catch(() => {});
 }
 
-export async function initOrLoadDataAsync() {
+export async function initOrLoadDataAsync(force = false) {
   if (!isInitialized) {
     loadFromDisk();
     isInitialized = true;
   }
 
-  // If Supabase is configured, fetch authoritative state from Supabase PostgreSQL
+  // If Supabase is configured, Supabase PostgreSQL is the sole authoritative persistent database
   if (isSupabaseConfigured()) {
-    const cloudData = await loadFromSupabase();
-    if (cloudData && typeof cloudData.syncVersion === 'number') {
-      // Apply cloud Supabase data
-      const cloudHiddenSet = new Set<string>([
-        ...(Array.isArray(cloudData.hiddenClassIds) ? cloudData.hiddenClassIds : []),
-        ...(Array.isArray(cloudData.systemConfig?.hiddenClassIds) ? cloudData.systemConfig.hiddenClassIds : [])
-      ]);
-      if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
-        const mappedClasses = cloudData.classes.map((c: any) => ({
-          ...c,
-          isHiddenFromHome: c.isHiddenFromHome === true || cloudHiddenSet.has(c.id)
-        }));
-        classes.length = 0;
-        classes.push(...mappedClasses);
+    const now = Date.now();
+    if (!force && lastSupabaseFetchTime > 0 && (now - lastSupabaseFetchTime < 1000)) {
+      return;
+    }
+
+    try {
+      const cloudData = await loadFromSupabase();
+      lastSupabaseFetchTime = Date.now();
+      if (cloudData && typeof cloudData.syncVersion === 'number') {
+        // Apply cloud Supabase PostgreSQL data
+        const cloudHiddenSet = new Set<string>([
+          ...(Array.isArray(cloudData.hiddenClassIds) ? cloudData.hiddenClassIds : []),
+          ...(Array.isArray(cloudData.systemConfig?.hiddenClassIds) ? cloudData.systemConfig.hiddenClassIds : [])
+        ]);
+        if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
+          const mappedClasses = cloudData.classes.map((c: any) => ({
+            ...c,
+            isHiddenFromHome: c.isHiddenFromHome === true || cloudHiddenSet.has(c.id)
+          }));
+          classes.length = 0;
+          classes.push(...mappedClasses);
+        }
+        if (Array.isArray(cloudData.students) && cloudData.students.length > 0) {
+          students.length = 0;
+          students.push(...cloudData.students);
+        }
+        if (Array.isArray(cloudData.records)) {
+          records.length = 0;
+          records.push(...cloudData.records);
+        }
+        if (Array.isArray(cloudData.deletedRecordKeys)) {
+          deletedRecordKeys.clear();
+          cloudData.deletedRecordKeys.forEach(k => {
+            if (typeof k === 'string' && k) deletedRecordKeys.add(k);
+          });
+        }
+        if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) {
+          adminAccounts.length = 0;
+          adminAccounts.push(...cloudData.adminAccounts);
+        }
+        if (Array.isArray(cloudData.teachers) && cloudData.teachers.length > 0) {
+          teachers.length = 0;
+          teachers.push(...cloudData.teachers);
+        }
+        if (cloudData.systemConfig) {
+          const mergedConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(cloudHiddenSet) };
+          Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
+          Object.assign(systemConfig, mergedConfig);
+        }
+        if (cloudData.activeSunday) activeSunday = cloudData.activeSunday;
+        syncVersion = cloudData.syncVersion;
+        if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
+        sanitizeYageData();
+
+        // Write local backup copy purely for offline migration compatibility
+        try {
+          const filePath = getStoragePath();
+          const dir = path.dirname(filePath);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(filePath, JSON.stringify(getFullStatePayload(), null, 2), 'utf-8');
+        } catch {}
+      } else {
+        // Supabase is configured but database is freshly created / empty -> seed initial data!
+        console.log('[Supabase DB] Fresh Supabase database detected. Seeding initial church roster to PostgreSQL...');
+        await saveDataToDb();
       }
-      if (Array.isArray(cloudData.students) && cloudData.students.length > 0) {
-        students.length = 0;
-        students.push(...cloudData.students);
-      }
-      if (Array.isArray(cloudData.records)) {
-        records.length = 0;
-        records.push(...cloudData.records);
-      }
-      if (Array.isArray(cloudData.deletedRecordKeys)) {
-        deletedRecordKeys.clear();
-        cloudData.deletedRecordKeys.forEach(k => {
-          if (typeof k === 'string' && k) deletedRecordKeys.add(k);
-        });
-      }
-      if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) {
-        adminAccounts.length = 0;
-        adminAccounts.push(...cloudData.adminAccounts);
-      }
-      if (Array.isArray(cloudData.teachers) && cloudData.teachers.length > 0) {
-        teachers.length = 0;
-        teachers.push(...cloudData.teachers);
-      }
-      if (cloudData.systemConfig) {
-        const mergedConfig = { ...initialSystemConfig, ...cloudData.systemConfig, hiddenClassIds: Array.from(cloudHiddenSet) };
-        Object.keys(systemConfig).forEach(key => delete (systemConfig as any)[key]);
-        Object.assign(systemConfig, mergedConfig);
-      }
-      if (cloudData.activeSunday) activeSunday = cloudData.activeSunday;
-      syncVersion = cloudData.syncVersion;
-      if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
-      sanitizeYageData();
-      saveDataToFile();
-    } else {
-      // Supabase is configured but database is freshly created / empty -> seed initial data!
-      console.log('[Supabase DB] Empty Supabase database detected. Seeding initial church data to PostgreSQL...');
-      await saveDataToDb();
+    } catch (err) {
+      console.warn('[Supabase DB] Error in initOrLoadDataAsync:', err);
     }
   }
 }

@@ -113,3 +113,21 @@ export interface Teacher {
   joinDate?: string;
   notes?: string;
 }
+
+export interface DeletedAttendanceRecord {
+  id: string; // e.g. "s-601_2026-09-20" or record id
+  recordId?: string;
+  studentId?: string;
+  date?: string;
+  deletedAt?: string;
+}
+
+export interface AppSyncState {
+  id: string; // 'bethel_sync_state'
+  syncVersion: number;
+  activeSunday?: string;
+  lastSyncTime?: string;
+  snapshot?: any;
+  updatedAt?: string;
+}
+

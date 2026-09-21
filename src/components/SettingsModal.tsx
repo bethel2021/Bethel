@@ -2422,7 +2422,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                针对 Vercel 无服务器 (Serverless) 部署环境、移动端（微信浏览器/手机）与桌面设备协同设计。支持 JSON 文件下载/上传，以及数据文本快捷复制与粘贴导入，导入后同步强推写回 Vercel 云端数据库 (Cloud KV)。
+                针对 Vercel 无服务器 (Serverless) 部署环境、移动端（微信浏览器/手机）与桌面设备协同设计。支持 JSON 文件下载/上传，以及数据文本快捷复制与粘贴导入，导入后同步强推写回 Supabase PostgreSQL 官方云端数据库。
               </p>
             </div>
           </div>
@@ -2528,7 +2528,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-[11px] text-slate-500 leading-relaxed">
-            💡 <strong>Vercel 云端部署与多端同步说明：</strong>本系统已针对 Vercel 无服务器 (Serverless) 架构与云端数据库（Cloud KV）进行全量数据同步调优。执行数据导入恢复后，最新名册将即刻推送到 Vercel 云端服务端，所有在线访问的手机端与电脑端均可秒级无缝同步。建议在进行大规模学员调整前先导出 JSON 备份。
+            💡 <strong>Vercel 云端部署与多端同步说明：</strong>本系统已全面接入 Supabase PostgreSQL 官方持久化数据库，完美兼容 Vercel 无服务器 (Serverless) 架构。执行数据导入恢复后，最新名册将即刻写入 Supabase PostgreSQL 并推送到云端服务，所有在线访问的手机端与电脑端均可秒级无缝同步。建议在进行大规模学员调整前先导出 JSON 备份。
           </div>
         </div>
       </div>
