@@ -371,14 +371,14 @@ export function loadFromDisk(): boolean {
       if (Array.isArray(data.classes) && data.classes.length > 0) {
         const mappedClasses = data.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome === true || hiddenSet.has(c.id)
+          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
         classes.length = 0;
         classes.push(...mappedClasses);
       } else {
         const mappedClasses = classes.map(c => ({
           ...c,
-          isHiddenFromHome: c.isHiddenFromHome === true || hiddenSet.has(c.id)
+          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
         }));
         classes.length = 0;
         classes.push(...mappedClasses);

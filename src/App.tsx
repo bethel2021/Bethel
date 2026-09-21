@@ -181,13 +181,15 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : (c.isHiddenFromHome === true || serverHiddenIds.has(c.id))
+              : (typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : serverHiddenIds.has(c.id))
           };
         }
 
         // 2. Class hidden status:
-        // When connected, the server's state is authoritative across all logged-in devices
-        const isHidden = c.isHiddenFromHome === true || serverHiddenIds.has(c.id);
+        // When connected, the explicit boolean property on the class is authoritative
+        const isHidden = typeof c.isHiddenFromHome === 'boolean' 
+          ? c.isHiddenFromHome 
+          : serverHiddenIds.has(c.id);
 
         return {
           ...c,
@@ -196,7 +198,7 @@ export default function App() {
       });
 
       // Synchronize persistent hidden class IDs with authoritative merged result
-      const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => !!c.isHiddenFromHome).map((c: any) => c.id as string));
+      const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => c.isHiddenFromHome === true).map((c: any) => c.id as string));
       saveLocalHiddenClassIds(newHiddenSet);
 
       mergedClassesForCache = mergedClasses;

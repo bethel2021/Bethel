@@ -906,6 +906,8 @@ apiRouter.post('/classes', async (req: Request, res: Response) => {
         isHiddenFromHome: isHiddenFromHome !== undefined ? !!isHiddenFromHome : (classes[idx].isHiddenFromHome || false),
       };
       await dataStore.saveClass(classes[idx]);
+      systemConfig.hiddenClassIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+      await dataStore.saveSystemConfig(systemConfig);
       return res.json({ success: true, class: classes[idx], classes, syncVersion, message: '班级信息修改成功' });
     }
 
@@ -922,6 +924,8 @@ apiRouter.post('/classes', async (req: Request, res: Response) => {
       isHiddenFromHome: !!isHiddenFromHome,
     };
     await dataStore.saveClass(newClass);
+    systemConfig.hiddenClassIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+    await dataStore.saveSystemConfig(systemConfig);
     res.json({ success: true, class: newClass, classes, syncVersion, message: '成功新增班级/团契' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -960,7 +964,10 @@ apiRouter.post('/classes/:id/visibility', async (req: Request, res: Response) =>
       });
     }
 
-    await dataStore.saveClass(classes[idx]);
+    systemConfig.hiddenClassIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+    for (const c of classes) {
+      await dataStore.saveClass(c);
+    }
     await dataStore.saveSystemConfig(systemConfig);
     res.json({
       success: true,

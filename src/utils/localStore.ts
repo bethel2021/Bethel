@@ -227,14 +227,10 @@ export function getLocalData() {
     if (config.checkinEndTime === '12:30') config.checkinEndTime = '16:00';
     if (config.lateThresholdTime === '09:30') config.lateThresholdTime = '15:00';
 
-    // Ensure hidden status preserved across classes and hidden sets
-    const hiddenSet = getLocalHiddenClassIds();
-    if (Array.isArray(config.hiddenClassIds)) {
-      config.hiddenClassIds.forEach(id => hiddenSet.add(id));
-    }
-
     classes = classes.map(c => {
-      const isHidden = c.isHiddenFromHome === true || hiddenSet.has(c.id);
+      const isHidden = typeof c.isHiddenFromHome === 'boolean'
+        ? c.isHiddenFromHome
+        : (Array.isArray(config.hiddenClassIds) ? config.hiddenClassIds.includes(c.id) : false);
       const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);
       return {
         ...c,
@@ -245,7 +241,7 @@ export function getLocalData() {
     
     // Always persist normalized state
     localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
-    const allHiddenIds = classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
+    const allHiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
     saveLocalHiddenClassIds(allHiddenIds);
     config.hiddenClassIds = allHiddenIds;
     localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
