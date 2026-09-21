@@ -1484,4 +1484,19 @@ app.use('/api', (req: Request, res: Response) => {
   });
 });
 
+// Global error handling middleware (Prevents Vercel 500 FUNCTION_INVOCATION_FAILED)
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error('[Express Global Error]:', err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({
+    status: 'error',
+    error: 'Internal Server Error',
+    message: err?.message || String(err),
+    path: req.url,
+    timestamp: new Date().toISOString()
+  });
+});
+
 export default app;

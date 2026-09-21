@@ -15,14 +15,14 @@ let hasLoggedConfigStatus = false;
  * 5. Service Role Key is used solely by server-side APIs.
  */
 export function getSupabase(): SupabaseClient | null {
-  const url = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const fallbackKey = process.env.SUPABASE_ANON_KEY;
-  const key = serviceRoleKey || fallbackKey;
+  let url = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim().replace(/^['"]|['"]$/g, '') : '';
+  let serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.trim().replace(/^['"]|['"]$/g, '') : '';
+  let fallbackKey = process.env.SUPABASE_ANON_KEY ? process.env.SUPABASE_ANON_KEY.trim().replace(/^['"]|['"]$/g, '') : '';
+  let key = serviceRoleKey || fallbackKey;
 
-  if (!url || !key) {
+  if (!url || !key || !url.startsWith('http')) {
     if (!hasLoggedConfigStatus) {
-      console.log('[Supabase Client] Notice: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured.');
+      console.log('[Supabase Client] Notice: Valid SUPABASE_URL (starting with http/https) or SUPABASE_SERVICE_ROLE_KEY not configured.');
       hasLoggedConfigStatus = true;
     }
     return null;
@@ -56,7 +56,7 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 export function isSupabaseConfigured(): boolean {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-  return Boolean(url && key);
+  const url = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim().replace(/^['"]|['"]$/g, '') : '';
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '').trim().replace(/^['"]|['"]$/g, '');
+  return Boolean(url && key && url.startsWith('http'));
 }
