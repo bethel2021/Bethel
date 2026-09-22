@@ -102,6 +102,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Feedback notices
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [isSaveSuccessModalOpen, setIsSaveSuccessModalOpen] = useState(false);
 
   const showNotice = (type: 'success' | 'error', msg: string) => {
     setFeedbackNotice({ type, msg });
@@ -413,6 +414,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setIsClassModalOpen(false);
       setEditingClass(null);
       showNotice('success', '班级/团契信息已成功更新！');
+      setIsSaveSuccessModalOpen(true);
     } catch (err: any) {
       showNotice('error', err.message || '操作失败');
     }
@@ -3065,6 +3067,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span>确认删除</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 保存成功弹窗提示 */}
+      {isSaveSuccessModalOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-center animate-in zoom-in-95 duration-200">
+            <div className="mx-auto w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900">
+                保存成功
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                班级/团契的数据已被成功同步，所有关联的名册和打卡状态已即时更新。
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsSaveSuccessModalOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              >
+                确定
               </button>
             </div>
           </div>
