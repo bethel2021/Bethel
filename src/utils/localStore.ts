@@ -446,6 +446,7 @@ export function localLogin(username: string, password: string): AdminUser | null
         username: matched.username,
         displayName: matched.displayName,
         role: matched.role,
+        assignedClassId: matched.assignedClassId,
         token: `local-${matched.username}-token-${Date.now()}`
       };
     }

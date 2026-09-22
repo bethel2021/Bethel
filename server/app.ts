@@ -192,6 +192,61 @@ app.use(async (req: Request, res: Response, next: NextFunction) => {
 // Ensure data is loaded on cold-starts
 initOrLoadData();
 
+export function getAuthContext(req: Request): {
+  isSuperAdmin: boolean;
+  role?: string;
+  username?: string;
+  assignedClassId?: string;
+} {
+  const authHeader = req.headers['authorization'];
+  const tokenHeader = req.headers['x-admin-token'] as string;
+  const userRoleHeader = req.headers['x-user-role'] as string;
+  const usernameHeader = req.headers['x-username'] as string;
+
+  let token = tokenHeader;
+  if (!token && authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7).trim();
+  }
+
+  if (token && activeSessions.has(token)) {
+    const session = activeSessions.get(token)!;
+    const isSuper = session.role === 'superadmin' || session.username.toLowerCase() === 'admin';
+    return {
+      isSuperAdmin: isSuper,
+      role: session.role,
+      username: session.username,
+      assignedClassId: session.assignedClassId
+    };
+  }
+
+  if (usernameHeader) {
+    const acc = adminAccounts.find(a => a.username.toLowerCase() === usernameHeader.toLowerCase());
+    if (acc) {
+      const isSuper = acc.role === 'superadmin' || acc.username.toLowerCase() === 'admin';
+      return {
+        isSuperAdmin: isSuper,
+        role: acc.role,
+        username: acc.username,
+        assignedClassId: acc.assignedClassId
+      };
+    }
+  }
+
+  if (userRoleHeader === 'superadmin' || (usernameHeader && usernameHeader.toLowerCase() === 'admin')) {
+    return { isSuperAdmin: true, role: 'superadmin', username: usernameHeader || 'admin' };
+  }
+
+  if (userRoleHeader === 'teacher' || userRoleHeader === 'fellowship_leader') {
+    return {
+      isSuperAdmin: false,
+      role: userRoleHeader,
+      username: usernameHeader
+    };
+  }
+
+  return { isSuperAdmin: true };
+}
+
 const apiRouter = express.Router();
 
 // 0. Health check endpoint (for Vercel & client status probing)
@@ -240,21 +295,35 @@ apiRouter.post('/ai/generate', async (req: Request, res: Response) => {
 // 1. Get entire app state
 apiRouter.get('/state', async (req: Request, res: Response) => {
   await initOrLoadDataAsync(true);
+  const auth = getAuthContext(req);
+  const assignedClassId = !auth.isSuperAdmin ? auth.assignedClassId : undefined;
+
   const currentSunday = getActiveSundayDate();
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   systemConfig.hiddenClassIds = hiddenIds;
+
+  let stateClasses = classes.map(c => ({
+    ...c,
+    isHiddenFromHome: hiddenIds.includes(c.id)
+  }));
+  let stateStudents = students;
+  let stateRecords = records;
+
+  if (assignedClassId) {
+    stateClasses = stateClasses.filter(c => c.id === assignedClassId);
+    stateStudents = students.filter(s => s.classId === assignedClassId);
+    stateRecords = records.filter(r => r.classId === assignedClassId);
+  }
+
   res.json({
     config: {
       ...systemConfig,
       hiddenClassIds: hiddenIds
     },
     hiddenClassIds: hiddenIds,
-    classes: classes.map(c => ({
-      ...c,
-      isHiddenFromHome: hiddenIds.includes(c.id)
-    })),
-    students,
-    records,
+    classes: stateClasses,
+    students: stateStudents,
+    records: stateRecords,
     deletedRecordKeys: Array.from(deletedRecordKeys),
     teachers,
     accounts: adminAccounts.map(a => ({
@@ -262,6 +331,7 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
       username: a.username,
       displayName: a.displayName,
       role: a.role,
+      assignedClassId: a.assignedClassId,
       createdAt: a.createdAt
     })),
     activeSunday: currentSunday,
@@ -278,7 +348,9 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
 
 // Dedicated Resource GET Endpoints (100% backward-compatible with REST expectations)
 apiRouter.get('/classes', async (req: Request, res: Response) => {
-  const mapped = await dataStore.getClasses();
+  const auth = getAuthContext(req);
+  const assignedClassId = !auth.isSuperAdmin ? auth.assignedClassId : undefined;
+  const mapped = await dataStore.getClasses(assignedClassId);
   res.json({
     success: true,
     classes: mapped,
@@ -288,15 +360,21 @@ apiRouter.get('/classes', async (req: Request, res: Response) => {
 });
 
 apiRouter.get('/classes/:id', async (req: Request, res: Response) => {
+  const auth = getAuthContext(req);
   const { id } = req.params;
+  if (!auth.isSuperAdmin && auth.assignedClassId && id !== auth.assignedClassId) {
+    return res.status(403).json({ error: '权限不足：无法访问非负责班级信息' });
+  }
   const cls = await dataStore.getClassById(id);
   if (!cls) return res.status(404).json({ error: '班级不存在' });
   res.json({ success: true, class: cls, data: cls });
 });
 
 apiRouter.get('/students', async (req: Request, res: Response) => {
+  const auth = getAuthContext(req);
+  const assignedClassId = !auth.isSuperAdmin ? auth.assignedClassId : undefined;
   const classId = req.query.classId as string | undefined;
-  const filtered = await dataStore.getStudents(classId);
+  const filtered = await dataStore.getStudents(classId, assignedClassId);
   res.json({
     success: true,
     students: filtered,
@@ -331,10 +409,12 @@ apiRouter.get('/teachers/:id', async (req: Request, res: Response) => {
 });
 
 const getRecordsHandler = async (req: Request, res: Response) => {
+  const auth = getAuthContext(req);
+  const assignedClassId = !auth.isSuperAdmin ? auth.assignedClassId : undefined;
   const date = (req.query.date as string) || undefined;
   const studentId = (req.query.studentId as string) || undefined;
   const classId = (req.query.classId as string) || undefined;
-  const filtered = await dataStore.getAttendanceRecords({ date, studentId, classId });
+  const filtered = await dataStore.getAttendanceRecords({ date, studentId, classId }, assignedClassId);
   res.json({
     success: true,
     records: filtered,
@@ -498,6 +578,7 @@ apiRouter.post('/login', async (req: Request, res: Response) => {
           username: targetAccount.username,
           displayName: targetAccount.displayName,
           role: targetAccount.role,
+          assignedClassId: targetAccount.assignedClassId,
           token: `btl_session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
         };
         activeSessions.set(userSession.token, userSession);
@@ -588,6 +669,13 @@ apiRouter.post('/checkin', async (req: Request, res: Response) => {
       return res.status(404).json({ error: '未在伯特利教会名册中找到该学员，请联系老师登记' });
     }
 
+    const auth = getAuthContext(req);
+    if (!auth.isSuperAdmin && auth.assignedClassId) {
+      if (student.classId !== auth.assignedClassId) {
+        return res.status(403).json({ error: '权限受限：您只能为您负责的班级学员进行打卡签到' });
+      }
+    }
+
     const targetDate = getActiveSundayDate();
     const existing = records.find(r => r.studentId === studentId && r.date === targetDate);
     if (existing) {
@@ -670,6 +758,13 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
     const student = students.find(s => s.id === studentId);
     if (!student) {
       return res.status(404).json({ error: '学员不存在' });
+    }
+
+    const auth = getAuthContext(req);
+    if (!auth.isSuperAdmin && auth.assignedClassId) {
+      if (student.classId !== auth.assignedClassId) {
+        return res.status(403).json({ error: '权限受限：您只能记录或修改您负责班级的考勤信息' });
+      }
     }
 
     const targetDate = date || getActiveSundayDate();
@@ -756,6 +851,13 @@ apiRouter.post('/batch-checkin', async (req: Request, res: Response) => {
     }
 
     const { classId, date, status = 'present' } = req.body;
+    const auth = getAuthContext(req);
+    if (!auth.isSuperAdmin && auth.assignedClassId) {
+      if (classId && classId !== 'all' && classId !== auth.assignedClassId) {
+        return res.status(403).json({ error: '权限受限：您只能为您负责的班级进行批量打卡' });
+      }
+    }
+
     const targetDate = date || getActiveSundayDate();
     const now = new Date();
     const romeTime = getRomeTimeParts(now);
@@ -783,8 +885,9 @@ apiRouter.post('/batch-checkin', async (req: Request, res: Response) => {
       }
     }
 
-    const targetStudents = classId && classId !== 'all'
-      ? students.filter(s => s.classId === classId)
+    const effectiveClassId = (!auth.isSuperAdmin && auth.assignedClassId) ? auth.assignedClassId : classId;
+    const targetStudents = effectiveClassId && effectiveClassId !== 'all'
+      ? students.filter(s => s.classId === effectiveClassId)
       : students;
 
     let updatedCount = 0;
@@ -1230,6 +1333,7 @@ apiRouter.get('/accounts', async (req: Request, res: Response) => {
         username: a.username,
         displayName: a.displayName,
         role: a.role,
+        assignedClassId: a.assignedClassId,
         createdAt: a.createdAt
       }))
     });
@@ -1245,7 +1349,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
       return res.status(403).json({ error: auth.message || '仅总管理员有权限添加或修改账号' });
     }
 
-    const { username, displayName, role, password } = req.body;
+    const { username, displayName, role, password, assignedClassId } = req.body;
     if (!username || !displayName) {
       return res.status(400).json({ error: '用户名和显示称谓不能为空' });
     }
@@ -1255,6 +1359,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
     const cleanRole = (role === 'superadmin' || role === 'teacher' || role === 'fellowship_leader') 
       ? role 
       : 'teacher';
+    const cleanAssignedClassId = cleanRole === 'superadmin' ? undefined : (assignedClassId ? String(assignedClassId).trim() : undefined);
 
     const existingIndex = adminAccounts.findIndex(a => a.username.toLowerCase() === cleanUsername);
 
@@ -1266,6 +1371,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
         ...existing,
         displayName: cleanDisplayName,
         role: finalRole,
+        assignedClassId: finalRole === 'superadmin' ? undefined : cleanAssignedClassId,
         password: password ? String(password).trim() : existing.password
       };
 
@@ -1283,6 +1389,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
           username: a.username,
           displayName: a.displayName,
           role: a.role,
+          assignedClassId: a.assignedClassId,
           createdAt: a.createdAt
         }))
       });
@@ -1296,6 +1403,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
         username: cleanUsername,
         displayName: cleanDisplayName,
         role: cleanRole,
+        assignedClassId: cleanRole === 'superadmin' ? undefined : cleanAssignedClassId,
         password: String(password).trim(),
         createdAt: new Date().toISOString().split('T')[0]
       };
@@ -1310,6 +1418,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
           username: a.username,
           displayName: a.displayName,
           role: a.role,
+          assignedClassId: a.assignedClassId,
           createdAt: a.createdAt
         }))
       });

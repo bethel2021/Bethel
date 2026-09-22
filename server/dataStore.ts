@@ -312,6 +312,18 @@ export function generateHistoricalRecords() {
 
 let isInitialized = false;
 
+export function reconcileInitialStudents(): boolean {
+  let changed = false;
+  for (const initStu of initialStudents) {
+    const exists = students.some(s => s.id === initStu.id || (s.name === initStu.name && s.classId === initStu.classId));
+    if (!exists) {
+      students.push({ ...initStu });
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function sanitizeYageData() {
   const filteredClasses = classes.filter(c => c.id !== 'class-8' && c.name !== '雅歌团契');
   classes.length = 0;
@@ -340,6 +352,8 @@ function sanitizeYageData() {
       else if (!t.roleTitle) t.roleTitle = '班主任';
     }
   });
+
+  reconcileInitialStudents();
 }
 
 export function loadFromDisk(): boolean {
@@ -432,6 +446,9 @@ export function loadFromDisk(): boolean {
       if (typeof data.syncVersion === 'number') syncVersion = data.syncVersion;
       if (data.updatedAt) lastModifiedTimestamp = data.updatedAt;
       sanitizeYageData();
+      if (reconcileInitialStudents()) {
+        setTimeout(() => saveDataToFile(), 100);
+      }
       return true;
     } else if (hiddenSet.size > 0) {
       const mappedClasses = classes.map(c => ({
@@ -546,6 +563,11 @@ export async function initOrLoadDataAsync(force = false) {
         syncVersion = cloudData.syncVersion;
         if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
         sanitizeYageData();
+
+        if (reconcileInitialStudents()) {
+          console.log('[Roster Sync] Reconciled initial students into Supabase DB state.');
+          await saveDataToSupabase();
+        }
 
         // Write local backup copy purely for offline migration compatibility
         try {
@@ -831,13 +853,17 @@ export function mergeClientData(payload: SyncPayload): {
 // =========================================================================
 
 // --- Classes ---
-export async function getClasses(): Promise<ClassGroup[]> {
+export async function getClasses(assignedClassId?: string): Promise<ClassGroup[]> {
   await initOrLoadDataAsync(true);
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
-  return classes.map(c => ({
+  const mapped = classes.map(c => ({
     ...c,
     isHiddenFromHome: hiddenIds.includes(c.id)
   }));
+  if (assignedClassId) {
+    return mapped.filter(c => c.id === assignedClassId);
+  }
+  return mapped;
 }
 
 export async function getClassById(id: string): Promise<ClassGroup | undefined> {
@@ -883,9 +909,16 @@ export async function deleteClass(id: string): Promise<boolean> {
 }
 
 // --- Students ---
-export async function getStudents(classId?: string): Promise<Student[]> {
+export async function getStudents(classId?: string, assignedClassId?: string): Promise<Student[]> {
   await initOrLoadDataAsync(true);
-  return classId ? students.filter(s => s.classId === classId) : [...students];
+  let res = [...students];
+  if (assignedClassId) {
+    res = res.filter(s => s.classId === assignedClassId);
+  }
+  if (classId) {
+    res = res.filter(s => s.classId === classId);
+  }
+  return res;
 }
 
 export async function getStudentById(id: string): Promise<Student | undefined> {
@@ -981,9 +1014,12 @@ export async function deleteTeacher(id: string): Promise<any | null> {
 }
 
 // --- Attendance Records ---
-export async function getAttendanceRecords(filter?: { date?: string; studentId?: string; classId?: string }): Promise<AttendanceRecord[]> {
+export async function getAttendanceRecords(filter?: { date?: string; studentId?: string; classId?: string }, assignedClassId?: string): Promise<AttendanceRecord[]> {
   await initOrLoadDataAsync(true);
   let res = [...records];
+  if (assignedClassId) {
+    res = res.filter(r => r.classId === assignedClassId);
+  }
   if (filter?.date) res = res.filter(r => r.date === filter.date);
   if (filter?.studentId) res = res.filter(r => r.studentId === filter.studentId);
   if (filter?.classId) res = res.filter(r => r.classId === filter.classId);

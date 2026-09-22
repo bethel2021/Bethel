@@ -81,6 +81,7 @@ export interface AdminUser {
   role: 'superadmin' | 'teacher' | 'fellowship_leader';
   avatar?: string;
   token?: string;
+  assignedClassId?: string;
 }
 
 export interface AdminAccount {
@@ -90,6 +91,7 @@ export interface AdminAccount {
   role: 'superadmin' | 'teacher' | 'fellowship_leader';
   password?: string;
   createdAt?: string;
+  assignedClassId?: string;
 }
 
 export interface AttendanceStats {

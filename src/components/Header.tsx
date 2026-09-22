@@ -4,6 +4,7 @@ import {
   Users, 
   CalendarCheck, 
   Cake,
+  Contact,
   Award, 
   Settings, 
   Clock, 
@@ -245,8 +246,8 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <Cake className="w-4 h-4 text-inherit" />
-            <span>生日关怀</span>
+            <Contact className="w-4 h-4 text-inherit" />
+            <span>学生档案</span>
             {upcomingBirthdayCount > 0 && (
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
                 activeTab === 'birthday' 

@@ -7,6 +7,7 @@ export interface ServerAdminAccount {
   role: 'superadmin' | 'teacher' | 'fellowship_leader';
   password: string;
   createdAt: string;
+  assignedClassId?: string;
 }
 
 // Initial Classes for Bethel Church (伯特利教会主日学与团契)

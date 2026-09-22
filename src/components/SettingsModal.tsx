@@ -129,6 +129,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [accountUsername, setAccountUsername] = useState('');
   const [accountDisplayName, setAccountDisplayName] = useState('');
   const [accountRole, setAccountRole] = useState<'superadmin' | 'teacher' | 'fellowship_leader'>('teacher');
+  const [accountAssignedClassId, setAccountAssignedClassId] = useState<string>('');
   const [accountPassword, setAccountPassword] = useState('');
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [showPasswordText, setShowPasswordText] = useState(false);
@@ -507,6 +508,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setAccountUsername('');
     setAccountDisplayName('');
     setAccountRole('teacher');
+    setAccountAssignedClassId(classes[0]?.id || '');
     setAccountPassword('');
     setShowPasswordText(false);
     setIsAccountModalOpen(true);
@@ -522,6 +524,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setAccountUsername(acc.username);
     setAccountDisplayName(acc.displayName);
     setAccountRole(acc.role);
+    setAccountAssignedClassId(acc.assignedClassId || '');
     setAccountPassword('');
     setShowPasswordText(false);
     setIsAccountModalOpen(true);
@@ -567,6 +570,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           username: cleanUsername,
           displayName: cleanDisplayName,
           role: accountRole,
+          assignedClassId: accountRole === 'superadmin' ? undefined : (accountAssignedClassId || undefined),
           password: accountPassword.trim() || undefined,
         });
         showNotice('success', editingAccount ? `账号【${cleanDisplayName}】资料已成功更新！` : `新管理账号【${cleanDisplayName}】已成功创建！`);
@@ -1969,13 +1973,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         {/* Permission Description */}
                         <td className="py-3 px-4 text-slate-600">
                           {acc.role === 'superadmin' ? (
-                            <span className="text-[11px] text-amber-900">
-                              拥有最高全权：增删班级、增删学员、管理所有账号及系统设置
+                            <span className="text-[11px] text-amber-900 font-medium">
+                              全权管理：增删班级、学员、账号及系统设置
                             </span>
                           ) : (
-                            <span className="text-[11px] text-slate-500">
-                              受保护权限：仅限日常签到点名与考勤报告，无权删改班级或学员
-                            </span>
+                            <div className="space-y-0.5">
+                              <div className="text-[11px] text-slate-500">
+                                考勤点名：仅限负责班级日常签到与考勤报告
+                              </div>
+                              <div className="text-[10px]">
+                                {acc.assignedClassId ? (
+                                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200/80 px-1.5 py-0.2 rounded font-medium">
+                                    指定班级: {classes.find(c => c.id === acc.assignedClassId)?.name || acc.assignedClassId}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">指定班级: 全校所有班级 (通用)</span>
+                                )}
+                              </div>
+                            </div>
                           )}
                         </td>
 
@@ -3133,6 +3148,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   💡 <strong>安全设计：</strong>除总管理员外，其他账号仅具备签到权限，无法删除班级或移除在册学生档案，防止多端误触丢失资料。
                 </p>
               </div>
+
+              {accountRole !== 'superadmin' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    绑定管理班级/团契 (班级级别数据隔离)
+                  </label>
+                  <select
+                    value={accountAssignedClassId}
+                    onChange={e => setAccountAssignedClassId(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-amber-300 bg-amber-50/50 focus:bg-white focus:ring-2 focus:ring-amber-500 font-medium text-amber-950"
+                  >
+                    <option value="">全校所有班级 (不作数据隔离)</option>
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.ageRange || '所有年龄'})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                    📌 绑定特定班级后，该账号登录系统时<strong>只能看到并管理所绑定的班级与该班学生</strong>，其他班级数据自动隔离隐藏。
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">

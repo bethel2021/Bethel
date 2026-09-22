@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Cake,
+  Contact,
   Gift,
   Calendar,
   Clock,
@@ -142,7 +143,7 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
       periodLabel = selectedMonthFilter === 'all' ? '全体学员' : `${selectedMonthFilter}月份学员`;
     }
 
-    let text = `🎂【${config.churchName} • 主日学生日关怀汇总】\n`;
+    let text = `📁【${config.churchName} • 主日学生档关怀汇总】\n`;
     text += `视图范围：${periodLabel} | 统计日期：${currentRomeTime.dateStr} | 共计 ${filteredList.length} 位寿星\n\n`;
 
     filteredList.forEach((info, idx) => {
@@ -174,9 +175,9 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
         <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-4">
           <Lock className="w-7 h-7" />
         </div>
-        <h3 className="text-base font-bold text-slate-900 mb-2">学生生日关怀档案受权限保护</h3>
+        <h3 className="text-base font-bold text-slate-900 mb-2">学生档案受权限保护</h3>
         <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-          为保护主日学未成年孩童与家长隐私信息，生日关怀、联系方式及祝福短信受权限保护。请使用教师或管理员账号登录后查阅。
+          为保护主日学未成年孩童与家长隐私信息，学生档案、联系方式及生日祝福受权限保护。请使用教师或管理员账号登录后查阅。
         </p>
         <button
           onClick={onOpenLogin}
@@ -196,11 +197,11 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-800 flex items-center justify-center shrink-0 border border-amber-300 shadow-2xs">
-            <Cake className="w-6 h-6" />
+            <Contact className="w-6 h-6" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900 font-serif tracking-tight">学生生日关怀与主内祝福</h2>
+              <h2 className="text-lg font-bold text-slate-900 font-serif tracking-tight">学生档案与生日关怀</h2>
               <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
                 主爱相伴 • 年岁冠冕
               </span>

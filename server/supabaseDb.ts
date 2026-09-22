@@ -346,7 +346,8 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
         display_name: a.displayName,
         role: a.role,
         password: a.password,
-        created_at: a.createdAt
+        created_at: a.createdAt,
+        ...(a.assignedClassId ? { assigned_class_id: a.assignedClassId } : {})
       }));
       await Promise.resolve(client.from('admin_accounts').upsert(adminRows, { onConflict: 'id' }));
 
@@ -686,7 +687,8 @@ export async function supabaseUpsertAdminAccount(a: ServerAdminAccount): Promise
       display_name: a.displayName,
       role: a.role,
       password: a.password,
-      created_at: a.createdAt
+      created_at: a.createdAt,
+      ...(a.assignedClassId ? { assigned_class_id: a.assignedClassId } : {})
     }, { onConflict: 'id' });
     return true;
   } catch (err) {
@@ -731,7 +733,8 @@ export async function supabaseGetAccounts(): Promise<ServerAdminAccount[] | null
       displayName: a.display_name,
       role: a.role,
       password: a.password,
-      createdAt: a.created_at
+      createdAt: a.created_at,
+      assignedClassId: a.assigned_class_id || a.assignedClassId || undefined
     }));
   } catch {
     return null;
