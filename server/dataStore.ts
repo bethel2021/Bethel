@@ -184,7 +184,7 @@ export function onDataChange(listener: DataChangeListener): () => void {
   return () => changeListeners.delete(listener);
 }
 
-let lastSupabaseFetchTime = 0;
+export let lastSupabaseFetchTime = 0;
 
 export async function saveDataToSupabase(): Promise<boolean> {
   syncVersion++;
@@ -509,7 +509,7 @@ export async function initOrLoadDataAsync(force = false) {
   // If Supabase is configured, Supabase PostgreSQL is the sole authoritative persistent database
   if (isSupabaseConfigured()) {
     const now = Date.now();
-    if (!force && lastSupabaseFetchTime > 0 && (now - lastSupabaseFetchTime < 1000)) {
+    if (!force && lastSupabaseFetchTime > 0 && (now - lastSupabaseFetchTime < 15000)) {
       return;
     }
 
@@ -984,15 +984,21 @@ export async function getTeacherById(id: string): Promise<any | undefined> {
 }
 
 export async function saveTeacher(teacher: any): Promise<any> {
-  const existingIdx = teachers.findIndex(t => t.id === teacher.id);
+  const existingIdx = teachers.findIndex(t => (teacher.id && t.id === teacher.id) || (teacher.name && t.name === teacher.name));
+  let savedTeacher: any;
   if (existingIdx >= 0) {
     teachers[existingIdx] = { ...teachers[existingIdx], ...teacher };
+    savedTeacher = teachers[existingIdx];
   } else {
-    teachers.push(teacher);
+    savedTeacher = {
+      id: teacher.id || `t-${Date.now().toString().slice(-6)}`,
+      ...teacher
+    };
+    teachers.push(savedTeacher);
   }
-  await supabaseUpsertTeacher(teacher);
+  await supabaseUpsertTeacher(savedTeacher);
   await saveDataToSupabase();
-  return teacher;
+  return savedTeacher;
 }
 
 export async function updateTeacher(id: string, updates: any): Promise<any | null> {
@@ -1129,6 +1135,10 @@ export async function deleteAdminAccount(username: string): Promise<ServerAdminA
 }
 
 // --- State Reset & Sync ---
+export function getLastSupabaseFetchTime(): number {
+  return lastSupabaseFetchTime;
+}
+
 export async function resetAllData(payload?: ChurchStatePayload): Promise<void> {
   const resetPayload = payload || getFullStatePayload();
   await supabaseResetAllData(resetPayload);
@@ -1183,6 +1193,7 @@ export const dataStore = {
   getFullState: getFullStatePayload,
   initOrLoadDataAsync,
   saveDataToSupabase,
-  mergeClientData
+  mergeClientData,
+  getLastSupabaseFetchTime
 };
 

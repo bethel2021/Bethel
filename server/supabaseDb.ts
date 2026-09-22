@@ -97,7 +97,7 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
         joinDate: s.join_date || '2026-01-01'
       }));
 
-      const mappedTeachers: Teacher[] = rawTeachers.map(t => ({
+      let mappedTeachers: Teacher[] = rawTeachers.map(t => ({
         id: t.id,
         name: t.name,
         gender: t.gender || 'girl',
@@ -108,6 +108,27 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
         joinDate: t.join_date || '2026-01-01',
         notes: t.notes || undefined
       }));
+
+      // Fallback & merge with snapshot teachers if snapshot has teachers
+      const snapshotTeachers = rawSyncState?.snapshot?.teachers || rawLegacyState?.teachers || rawConfig?.config?.teachers;
+      if (Array.isArray(snapshotTeachers) && snapshotTeachers.length > 0) {
+        if (mappedTeachers.length === 0) {
+          mappedTeachers = snapshotTeachers;
+        } else {
+          const teacherMap = new Map<string, Teacher>(mappedTeachers.map(t => [t.id, t]));
+          for (const st of snapshotTeachers) {
+            if (st && st.id) {
+              const existing = teacherMap.get(st.id);
+              if (!existing) {
+                teacherMap.set(st.id, st);
+              } else {
+                teacherMap.set(st.id, { ...st, ...existing });
+              }
+            }
+          }
+          mappedTeachers = Array.from(teacherMap.values());
+        }
+      }
 
       const mappedRecords: AttendanceRecord[] = rawRecords.map(r => ({
         id: r.id,
@@ -255,22 +276,31 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
         gender: t.gender || 'girl',
         phone: t.phone || null,
         wechat: t.wechat || null,
-        class_id: t.classId || null,
+        class_id: (t.classId && String(t.classId).trim() !== '') ? String(t.classId).trim() : null,
         role_title: t.roleTitle || '班主任',
         join_date: t.joinDate || '2026-01-01',
         notes: t.notes || null,
         updated_at: new Date().toISOString()
       }));
-      await Promise.resolve(client.from('teachers').upsert(teacherRows, { onConflict: 'id' }));
+      const { error: upsertError } = await client.from('teachers').upsert(teacherRows, { onConflict: 'id' });
+      if (upsertError) {
+        console.warn('[Supabase DB Error] saveToSupabase teachers upsert failed:', upsertError);
+      }
 
       // Reconcile deleted teachers in Supabase
       try {
-        const { data: existingTeachers } = await client.from('teachers').select('id');
+        const { data: existingTeachers, error: selectError } = await client.from('teachers').select('id');
+        if (selectError) {
+          console.warn('[Supabase DB Error] saveToSupabase teachers select failed:', selectError);
+        }
         if (existingTeachers && existingTeachers.length > 0) {
           const keepSet = new Set(payload.teachers.map(t => t.id));
           const toDelete = existingTeachers.map(t => t.id).filter(id => !keepSet.has(id));
           if (toDelete.length > 0) {
-            await client.from('teachers').delete().in('id', toDelete);
+            const { error: deleteError } = await client.from('teachers').delete().in('id', toDelete);
+            if (deleteError) {
+              console.warn('[Supabase DB Error] saveToSupabase teachers delete failed:', deleteError);
+            }
           }
         }
       } catch (e) {}
@@ -586,18 +616,23 @@ export async function supabaseUpsertTeacher(t: Teacher): Promise<boolean> {
   const client = getSupabase();
   if (!client) return false;
   try {
-    await client.from('teachers').upsert({
+    const classIdVal = (t.classId && String(t.classId).trim() !== '') ? String(t.classId).trim() : null;
+    const { error } = await client.from('teachers').upsert({
       id: t.id,
       name: t.name,
       gender: t.gender || 'girl',
       phone: t.phone || null,
       wechat: t.wechat || null,
-      class_id: t.classId || null,
+      class_id: classIdVal,
       role_title: t.roleTitle || '班主任',
       join_date: t.joinDate || '2026-01-01',
       notes: t.notes || null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'id' });
+    if (error) {
+      console.warn('[Supabase DB Error] supabaseUpsertTeacher failed with error:', error);
+      return false;
+    }
     return true;
   } catch (err) {
     console.warn('[Supabase DB] supabaseUpsertTeacher failed:', err);
@@ -609,7 +644,11 @@ export async function supabaseDeleteTeacher(teacherId: string): Promise<boolean>
   const client = getSupabase();
   if (!client) return false;
   try {
-    await client.from('teachers').delete().eq('id', teacherId);
+    const { error } = await client.from('teachers').delete().eq('id', teacherId);
+    if (error) {
+      console.warn('[Supabase DB Error] supabaseDeleteTeacher failed with error:', error);
+      return false;
+    }
     return true;
   } catch (err) {
     console.warn('[Supabase DB] supabaseDeleteTeacher failed:', err);

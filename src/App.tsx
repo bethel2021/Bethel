@@ -48,7 +48,7 @@ function isDataEqual(a: any, b: any): boolean {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'today' | 'attendance' | 'birthday' | 'settings'>('today');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [newCheckinAlert, setNewCheckinAlert] = useState<string | null>(null);
 
   // Detect whether backend server is online or running in static environment (e.g. GitHub Pages)
@@ -525,10 +525,10 @@ export default function App() {
     setupSSE();
     runLongPoll();
 
-    // 5. Safety Heartbeat Poll (every 5 seconds)
+    // 5. Safety Heartbeat Poll (every 15 seconds)
     const fallbackInterval = setInterval(() => {
       if (isMounted) loadState(false);
-    }, 5000);
+    }, 15000);
 
     // 6. Cross-tab BroadcastChannel listener (0ms intra-browser sync)
     let bc: BroadcastChannel | null = null;
@@ -1247,6 +1247,21 @@ export default function App() {
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data.teacher) {
+          setTeachers(prev => {
+            const idx = prev.findIndex(t => (data.teacher.id && t.id === data.teacher.id) || (data.teacher.name && t.name === data.teacher.name));
+            let updated;
+            if (idx !== -1) {
+              updated = [...prev];
+              updated[idx] = { ...updated[idx], ...data.teacher };
+            } else {
+              updated = [...prev, data.teacher];
+            }
+            saveLocalData({ teachers: updated } as any);
+            return updated;
+          });
+        }
         setIsServerAvailable(true);
         await loadState(false);
       }

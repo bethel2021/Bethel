@@ -155,14 +155,19 @@ export function registerWebSocketClient(ws: any) {
 // Enable JSON parsing
 app.use(express.json());
 
-// Enable CORS and disable caching for real-time consistency across cloud and client
+// Enable CORS and cache controls for high-speed performance & consistency
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Token, X-User-Role, X-Username');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+
+  if (req.url.startsWith('/api')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  } else if (req.url.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot)$/i) || req.url.startsWith('/assets/')) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  }
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -179,12 +184,18 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Ensure Supabase data is loaded on serverless request invocations
+// Ensure Supabase data is fully loaded on the very first request to avoid serving stale/empty data, then non-blocking thereafter
 app.use(async (req: Request, res: Response, next: NextFunction) => {
   if (isSupabaseConfigured() && req.url.startsWith('/api')) {
-    try {
-      await initOrLoadDataAsync();
-    } catch (e) {}
+    if (dataStore.getLastSupabaseFetchTime() === 0) {
+      try {
+        await dataStore.initOrLoadDataAsync();
+      } catch (err) {
+        console.warn('[Supabase DB Error] Initial blocking load failed:', err);
+      }
+    } else {
+      dataStore.initOrLoadDataAsync().catch(() => {});
+    }
   }
   next();
 });
@@ -1217,27 +1228,8 @@ apiRouter.post('/teachers', async (req: Request, res: Response) => {
 
     const cleanName = String(name).trim().replace(/\s*老师$/, '');
 
-    const idx = teachers.findIndex(t => id && t.id === id);
-    if (idx !== -1) {
-      teachers[idx] = {
-        ...teachers[idx],
-        name: cleanName,
-        gender: gender || 'boy',
-        phone: phone || '',
-        wechat: wechat || '',
-        classId: classId || '',
-        roleTitle: roleTitle || '班主任',
-        joinDate: joinDate || teachers[idx].joinDate || new Date().toISOString().split('T')[0],
-        notes: notes || ''
-      };
-      await dataStore.saveTeacher(teachers[idx]);
-      // Broadcast real-time update
-      broadcastRealtimeState('teachers_updated');
-      return res.json({ success: true, teacher: teachers[idx], message: '教师资料已更新' });
-    }
-
-    const newTeacher = {
-      id: `t-${Date.now().toString().slice(-6)}`,
+    const savedTeacher = await dataStore.saveTeacher({
+      id,
       name: cleanName,
       gender: gender || 'boy',
       phone: phone || '',
@@ -1246,11 +1238,11 @@ apiRouter.post('/teachers', async (req: Request, res: Response) => {
       roleTitle: roleTitle || '班主任',
       joinDate: joinDate || new Date().toISOString().split('T')[0],
       notes: notes || ''
-    };
-    await dataStore.saveTeacher(newTeacher);
+    });
+
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
-    return res.json({ success: true, teacher: newTeacher, message: '成功添加教师资料' });
+    return res.json({ success: true, teacher: savedTeacher, message: '教师资料已已成功保存' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1264,13 +1256,11 @@ apiRouter.delete('/teachers/:id', async (req: Request, res: Response) => {
     }
 
     const { id } = req.params;
-    const idx = teachers.findIndex(t => t.id === id);
-    if (idx === -1) {
+    const removed = await dataStore.deleteTeacher(id);
+    if (!removed) {
       return res.status(404).json({ error: '未找到该教师资料' });
     }
 
-    const removed = teachers[idx];
-    await dataStore.deleteTeacher(removed.id);
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
     return res.json({ success: true, message: `教师【${removed.name}】已成功从名册中彻底删除！` });
