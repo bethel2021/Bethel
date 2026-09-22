@@ -109,25 +109,10 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
         notes: t.notes || undefined
       }));
 
-      // Fallback & merge with snapshot teachers if snapshot has teachers
+      // Fallback to snapshot teachers only if the relational table is completely empty
       const snapshotTeachers = rawSyncState?.snapshot?.teachers || rawLegacyState?.teachers || rawConfig?.config?.teachers;
-      if (Array.isArray(snapshotTeachers) && snapshotTeachers.length > 0) {
-        if (mappedTeachers.length === 0) {
-          mappedTeachers = snapshotTeachers;
-        } else {
-          const teacherMap = new Map<string, Teacher>(mappedTeachers.map(t => [t.id, t]));
-          for (const st of snapshotTeachers) {
-            if (st && st.id) {
-              const existing = teacherMap.get(st.id);
-              if (!existing) {
-                teacherMap.set(st.id, st);
-              } else {
-                teacherMap.set(st.id, { ...st, ...existing });
-              }
-            }
-          }
-          mappedTeachers = Array.from(teacherMap.values());
-        }
+      if (mappedTeachers.length === 0 && Array.isArray(snapshotTeachers) && snapshotTeachers.length > 0) {
+        mappedTeachers = snapshotTeachers;
       }
 
       const mappedRecords: AttendanceRecord[] = rawRecords.map(r => ({

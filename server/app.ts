@@ -997,40 +997,22 @@ apiRouter.post('/classes/:id/visibility', async (req: Request, res: Response) =>
 
     const { id } = req.params;
     const { isHiddenFromHome, hiddenClassIds: clientHiddenIds } = req.body;
-    const idx = classes.findIndex(c => c.id === id);
-    if (idx === -1) {
+
+    // Use the optimized and atomic batch save in dataStore to avoid slow nested loops
+    await dataStore.saveClassVisibility(id, !!isHiddenFromHome, clientHiddenIds);
+
+    const updatedClass = classes.find(c => c.id === id);
+    if (!updatedClass) {
       return res.status(404).json({ error: '未找到指定班级' });
     }
 
-    classes[idx] = {
-      ...classes[idx],
-      isHiddenFromHome: !!isHiddenFromHome,
-    };
-
-    if (Array.isArray(clientHiddenIds)) {
-      const reconciledSet = new Set<string>(clientHiddenIds.map((item: any) => String(item)));
-      if (isHiddenFromHome) {
-        reconciledSet.add(id);
-      } else {
-        reconciledSet.delete(id);
-      }
-      classes.forEach(c => {
-        c.isHiddenFromHome = reconciledSet.has(c.id);
-      });
-    }
-
-    systemConfig.hiddenClassIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
-    for (const c of classes) {
-      await dataStore.saveClass(c);
-    }
-    await dataStore.saveSystemConfig(systemConfig);
     res.json({
       success: true,
-      class: classes[idx],
+      class: updatedClass,
       classes,
       config: systemConfig,
       syncVersion,
-      message: `班级【${classes[idx].name}】已成功设置为首页${isHiddenFromHome ? '隐藏' : '显示'}`
+      message: `班级【${updatedClass.name}】已成功设置为首页${isHiddenFromHome ? '隐藏' : '显示'}`
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

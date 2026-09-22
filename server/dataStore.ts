@@ -806,24 +806,24 @@ export function mergeClientData(payload: SyncPayload): {
 
   // 4. System config & classes are server-authoritative and master-managed via /api/config & /api/classes
 
-  // Merge teachers (by ID)
+  // Teachers are server-authoritative and master-managed via /api/teachers.
+  // We do NOT let the client overwrite existing server teacher records to prevent stale client syncs from reverting server-side edits.
+  // We only add teachers if they do not exist on the server (e.g. initial setup fallback).
   if (Array.isArray((payload as any).teachers) && (payload as any).teachers.length > 0) {
     const teacherMap = new Map<string, any>(teachers.map(t => [t.id, t]));
+    let teachersChanged = false;
     for (const t of (payload as any).teachers) {
-      if (!teacherMap.has(t.id)) {
+      if (t && t.id && !teacherMap.has(t.id)) {
         teacherMap.set(t.id, t);
+        teachersChanged = true;
         changed = true;
-      } else {
-        const existing = teacherMap.get(t.id)!;
-        if (JSON.stringify(existing) !== JSON.stringify(t)) {
-          teacherMap.set(t.id, { ...existing, ...t });
-          changed = true;
-        }
       }
     }
-    const mergedTeachers = Array.from(teacherMap.values());
-    teachers.length = 0;
-    teachers.push(...mergedTeachers);
+    if (teachersChanged) {
+      const mergedTeachers = Array.from(teacherMap.values());
+      teachers.length = 0;
+      teachers.push(...mergedTeachers);
+    }
   }
 
   if (payload.activeSunday) {
@@ -890,6 +890,43 @@ export async function updateClass(id: string, updates: Partial<ClassGroup>): Pro
   await supabaseUpsertClass(classes[existingIdx]);
   await saveDataToSupabase();
   return classes[existingIdx];
+}
+
+export async function saveClassVisibility(classId: string, isHidden: boolean, clientHiddenIds?: string[]): Promise<void> {
+  await initOrLoadDataAsync(true);
+  
+  const idx = classes.findIndex(c => c.id === classId);
+  if (idx !== -1) {
+    classes[idx] = {
+      ...classes[idx],
+      isHiddenFromHome: isHidden
+    };
+  }
+
+  if (Array.isArray(clientHiddenIds)) {
+    const reconciledSet = new Set<string>(clientHiddenIds.map(item => String(item)));
+    if (isHidden) {
+      reconciledSet.add(classId);
+    } else {
+      reconciledSet.delete(classId);
+    }
+    classes.forEach(c => {
+      c.isHiddenFromHome = reconciledSet.has(c.id);
+    });
+  }
+
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  setSystemConfig({ ...systemConfig, hiddenClassIds: hiddenIds });
+
+  // Persist only the changed class(es) and the system config to database in parallel
+  const changedClasses = classes.filter(c => c.id === classId || (Array.isArray(clientHiddenIds) && clientHiddenIds.includes(c.id)));
+  
+  await Promise.all([
+    ...changedClasses.map(c => supabaseUpsertClass(c)),
+    supabaseUpsertSystemConfig(systemConfig)
+  ]);
+
+  await saveDataToSupabase();
 }
 
 export async function deleteClass(id: string): Promise<boolean> {
@@ -1154,6 +1191,7 @@ export const dataStore = {
   getClassById,
   saveClass,
   updateClass,
+  saveClassVisibility,
   deleteClass,
 
   // Students
