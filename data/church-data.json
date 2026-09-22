@@ -4342,19 +4342,6 @@
       "offeringCompleted": false
     },
     {
-      "id": "rec-2026-09-06-s-609",
-      "studentId": "s-609",
-      "studentName": "陈翰源 (Giovanni)",
-      "classId": "class-6",
-      "date": "2026-09-06",
-      "timestamp": "2026-09-06T08:54:00.000Z",
-      "timeStr": "08:54",
-      "status": "present",
-      "method": "attendance",
-      "memoryVerseCompleted": true,
-      "offeringCompleted": false
-    },
-    {
       "id": "rec-2026-07-05-s-623",
       "studentId": "s-623",
       "studentName": "邵熙佑 (Lucas)",
@@ -4362,6 +4349,19 @@
       "date": "2026-07-05",
       "timestamp": "2026-07-05T08:51:00.000Z",
       "timeStr": "08:51",
+      "status": "present",
+      "method": "attendance",
+      "memoryVerseCompleted": true,
+      "offeringCompleted": false
+    },
+    {
+      "id": "rec-2026-09-06-s-609",
+      "studentId": "s-609",
+      "studentName": "陈翰源 (Giovanni)",
+      "classId": "class-6",
+      "date": "2026-09-06",
+      "timestamp": "2026-09-06T08:54:00.000Z",
+      "timeStr": "08:54",
       "status": "present",
       "method": "attendance",
       "memoryVerseCompleted": true,
@@ -5011,11 +5011,6 @@
     }
   ],
   "deletedRecordKeys": [
-    "rec-2026-09-27-s-625-1790013853908",
-    "rec-2026-09-27-s-601-1790013654726",
-    "rec-2026-09-27-s-601-1790013659004",
-    "rec-2026-09-27-s-601-1790013665140",
-    "rec-2026-09-27-s-601-1790013680542",
     "rec-2026-09-27-s-601-1790013756455",
     "rec-2026-09-27-s-601-1790013873724",
     "s-601_2026-09-27",
@@ -5026,7 +5021,12 @@
     "rec-2026-09-27-s-601-1790013690139",
     "rec-2026-09-27-s-601-1790013789289",
     "rec-2026-09-27-s-625-1790013849600",
-    "rec-2026-09-27-s-601-1790013650975"
+    "rec-2026-09-27-s-601-1790013650975",
+    "rec-2026-09-27-s-625-1790013853908",
+    "rec-2026-09-27-s-601-1790013654726",
+    "rec-2026-09-27-s-601-1790013659004",
+    "rec-2026-09-27-s-601-1790013665140",
+    "rec-2026-09-27-s-601-1790013680542"
   ],
   "adminAccounts": [
     {
@@ -5055,7 +5055,7 @@
     }
   ],
   "activeSunday": "2026-09-27",
-  "syncVersion": 55,
+  "syncVersion": 57,
   "hiddenClassIds": [
     "class-1"
   ],
@@ -5131,5 +5131,5 @@
       "joinDate": "2026-01-01"
     }
   ],
-  "updatedAt": "2026-09-21T21:28:49.074+00:00"
+  "updatedAt": "2026-09-22T05:10:31.011+00:00"
 }

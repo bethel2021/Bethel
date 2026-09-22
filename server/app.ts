@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
-import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types';
-import { calculateAge, initialSystemConfig, ServerAdminAccount } from './initialData';
+import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types.js';
+import { calculateAge, initialSystemConfig, ServerAdminAccount } from './initialData.js';
 import {
   classes,
   students,
@@ -33,8 +33,8 @@ import {
   getFullStatePayload,
   isSupabaseConfigured,
   dataStore
-} from './dataStore';
-import { isGeminiConfigured, generateDevotionalOrSummary } from './geminiService';
+} from './dataStore.js';
+import { isGeminiConfigured, generateDevotionalOrSummary } from './geminiService.js';
 
 const app = express();
 

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Student, ClassGroup, AttendanceRecord, SystemConfig, Teacher } from '../src/types';
-import type { ServerAdminAccount } from './initialData';
-import { getSupabase, isSupabaseConfigured } from './supabase';
+import type { Student, ClassGroup, AttendanceRecord, SystemConfig, Teacher } from '../src/types.js';
+import type { ServerAdminAccount } from './initialData.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
 
 export { getSupabase, isSupabaseConfigured };
 

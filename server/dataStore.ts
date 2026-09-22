@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { Request } from 'express';
-import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types';
-import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccounts, ServerAdminAccount } from './initialData';
+import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types.js';
+import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccounts, ServerAdminAccount } from './initialData.js';
 import {
   saveToSupabase,
   loadFromSupabase,
@@ -22,8 +22,8 @@ import {
   supabaseUpdateAccountPassword,
   supabaseUpsertSystemConfig,
   supabaseResetAllData
-} from './supabaseDb';
-import { getSupabase, isSupabaseConfigured } from './supabase';
+} from './supabaseDb.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
 
 export { isSupabaseConfigured, getSupabase };
 

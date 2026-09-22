@@ -1,4 +1,4 @@
-import type { Student, ClassGroup, SystemConfig, AdminUser } from '../src/types';
+import type { Student, ClassGroup, SystemConfig, AdminUser } from '../src/types.js';
 
 export interface ServerAdminAccount {
   id: string;
