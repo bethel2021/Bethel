@@ -1008,9 +1008,8 @@ export default function App() {
             return updated;
           });
         }
-        // Force an immediate reload and local storage rewrite from authoritative state
+        // Update mutation state without full state reload
         pendingClassMutationsRef.current.delete(classId);
-        await loadState(false);
       } else {
         // Fallback to /api/classes
         const fallbackRes = await fetch('/api/classes', {
@@ -1024,7 +1023,6 @@ export default function App() {
             syncVersionRef.current = fallbackData.syncVersion;
           }
           pendingClassMutationsRef.current.delete(classId);
-          await loadState(false);
         }
       }
     } catch {
