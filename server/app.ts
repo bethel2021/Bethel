@@ -195,7 +195,7 @@ initOrLoadData();
 const apiRouter = express.Router();
 
 // 0. Health check endpoint (for Vercel & client status probing)
-apiRouter.get(['/health', '/', ''], (req: Request, res: Response) => {
+apiRouter.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     runtime: process.env.VERCEL ? 'vercel-serverless' : 'node-express',
@@ -1412,9 +1412,8 @@ apiRouter.post('/sync-data', async (req: Request, res: Response) => {
   }
 });
 
-// Mount router on BOTH '/api' AND '/' to handle any Vercel routing variations
+// Mount router on '/api'
 app.use('/api', apiRouter);
-app.use(apiRouter);
 
 // Fallback for unmatched /api routes (ensures JSON response, never HTML)
 app.use('/api', (req: Request, res: Response) => {

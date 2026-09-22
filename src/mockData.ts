@@ -88,7 +88,7 @@ export const initialClasses: ClassGroup[] = [
 ];
 
 export const initialStudents: Student[] = [
-  // 高中班 (从照片数据全新导入，共 26 位学员)
+  // 高中班 (从照片数据全新导入，共 27 位学员)
   { id: 's-601', name: '潘恩言 (Lucia)', gender: 'girl', birthDate: '2012-03-04', age: 14, classId: 'class-6', parentName: '柯献利', parentPhone: '3778364308', memberCode: 'BTL-14', joinDate: '2026-09-01' },
   { id: 's-602', name: '涂意豪 (Matteo)', gender: 'boy', birthDate: '2010-07-08', age: 16, classId: 'class-6', parentName: '戴少萍', parentPhone: '3312696885', memberCode: 'BTL-15', joinDate: '2026-09-01' },
   { id: 's-603', name: '周铭哲 (Andy)', gender: 'boy', birthDate: '2012-09-07', age: 14, classId: 'class-6', parentName: '家长', parentPhone: '3274786535', memberCode: 'BTL-16', joinDate: '2026-09-01' },
@@ -114,7 +114,8 @@ export const initialStudents: Student[] = [
   { id: 's-623', name: '邵熙佑 (Lucas)', gender: 'boy', birthDate: '2012-11-23', age: 13, classId: 'class-6', parentName: '亚非', parentPhone: '3348369286', memberCode: 'BTL-36', joinDate: '2026-09-01' },
   { id: 's-624', name: '陈乐瑶 (Cristina)', gender: 'girl', birthDate: '2012-12-01', age: 13, classId: 'class-6', parentName: '春燕', parentPhone: '3760061715', memberCode: 'BTL-37', joinDate: '2026-09-01' },
   { id: 's-625', name: '木彦歆 (Ivy)', gender: 'girl', birthDate: '2011-12-04', age: 14, classId: 'class-6', parentName: '家长', parentPhone: '3505988103', memberCode: 'BTL-38', joinDate: '2026-09-01' },
-  { id: 's-626', name: '木彦皓 (Alex)', gender: 'boy', birthDate: '2010-05-23', age: 16, classId: 'class-6', parentName: '家长', parentPhone: '3501303703', memberCode: 'BTL-39', joinDate: '2026-09-01' }
+  { id: 's-626', name: '木彦皓 (Alex)', gender: 'boy', birthDate: '2010-05-23', age: 16, classId: 'class-6', parentName: '家长', parentPhone: '3501303703', memberCode: 'BTL-39', joinDate: '2026-09-01' },
+  { id: 's-627', name: '木迦熠 (Jonny)', gender: 'boy', birthDate: '2011-08-29', age: 15, classId: 'class-6', parentName: '肖伶俐', parentPhone: '3778349376', memberCode: 'BTL-40', joinDate: '2026-09-01' }
 ];
 
 export const initialSystemConfig: SystemConfig = {
