@@ -32,6 +32,7 @@ import {
   removeDeletedRecordKey,
   getFullStatePayload,
   isSupabaseConfigured,
+  comparePassword,
   dataStore
 } from './dataStore.js';
 import { isGeminiConfigured, generateDevotionalOrSummary } from './geminiService.js';
@@ -481,6 +482,7 @@ apiRouter.post('/cloud-sync', async (req: Request, res: Response) => {
     if (!payload || typeof payload !== 'object') {
       return res.status(400).json({ error: '无效的同步数据格式' });
     }
+    await dataStore.initOrLoadDataAsync(true);
     const merged = mergeClientData(payload);
     await saveDataToSupabase();
     res.json({
@@ -581,8 +583,8 @@ apiRouter.post('/login', async (req: Request, res: Response) => {
     const targetAccount = adminAccounts.find(a => a.username.toLowerCase() === trimmedUser.toLowerCase());
 
     if (targetAccount) {
-      const isMatch = targetAccount.password === cleanPassword ||
-        (targetAccount.role === 'superadmin' && cleanPassword === (systemConfig.adminPassword || 'bethel2026'));
+      const isMatch = comparePassword(cleanPassword, targetAccount.password) ||
+        (targetAccount.role === 'superadmin' && comparePassword(cleanPassword, systemConfig.adminPassword || 'bethel2026'));
 
       if (isMatch) {
         const userSession: AdminUser = {
@@ -599,7 +601,7 @@ apiRouter.post('/login', async (req: Request, res: Response) => {
     }
 
     // Generic match if user enters custom username with correct admin password
-    if (cleanPassword === (systemConfig.adminPassword || 'bethel2026')) {
+    if (comparePassword(cleanPassword, systemConfig.adminPassword || 'bethel2026')) {
       const userSession: AdminUser = {
         username: trimmedUser,
         displayName: `伯特利教会管理员 (${trimmedUser})`,
@@ -1477,6 +1479,7 @@ apiRouter.delete('/accounts/:username', async (req: Request, res: Response) => {
 // 11. Bi-directional Sync API (Allows client to seed cloud serverless state from local cache or vice versa)
 apiRouter.post('/sync-data', async (req: Request, res: Response) => {
   try {
+    await dataStore.initOrLoadDataAsync(true);
     const result = mergeClientData(req.body);
     await saveDataToSupabase();
     res.json({

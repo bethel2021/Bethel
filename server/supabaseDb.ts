@@ -58,6 +58,13 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
       client.from('church_app_state').select('state, sync_version').eq('id', 'bethel_church_data').maybeSingle()
     ]);
 
+    if (classesRes.status === 'rejected') {
+      throw new Error(`Supabase query 'classes' failed: ${classesRes.reason?.message || JSON.stringify(classesRes.reason)}`);
+    }
+    if (studentsRes.status === 'rejected') {
+      throw new Error(`Supabase query 'students' failed: ${studentsRes.reason?.message || JSON.stringify(studentsRes.reason)}`);
+    }
+
     const rawClasses = classesRes.status === 'fulfilled' && classesRes.value.data ? classesRes.value.data : [];
     const rawStudents = studentsRes.status === 'fulfilled' && studentsRes.value.data ? studentsRes.value.data : [];
     const rawTeachers = teachersRes.status === 'fulfilled' && teachersRes.value.data ? teachersRes.value.data : [];
@@ -196,6 +203,7 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
     }
   } catch (err) {
     console.warn('[Supabase DB] Failed to load data from Supabase relational tables:', err);
+    throw err;
   }
 
   return null;

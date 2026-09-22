@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { Request } from 'express';
+import bcrypt from 'bcryptjs';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types.js';
 import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccounts, ServerAdminAccount } from './initialData.js';
 import {
@@ -354,6 +355,42 @@ function sanitizeYageData() {
   });
 
   reconcileInitialStudents();
+  hashAllPasswordsIfNeeded();
+}
+
+export function hashPasswordIfNeeded(password: string): string {
+  if (!password) return '';
+  if (password.startsWith('$2a$') || password.startsWith('$2b$')) {
+    return password;
+  }
+  return bcrypt.hashSync(password, 10);
+}
+
+export function comparePassword(plain: string, hashed: string): boolean {
+  if (!plain || !hashed) return false;
+  if (hashed.startsWith('$2a$') || hashed.startsWith('$2b$')) {
+    try {
+      return bcrypt.compareSync(plain, hashed);
+    } catch {
+      return false;
+    }
+  }
+  return plain === hashed;
+}
+
+export function hashAllPasswordsIfNeeded(): boolean {
+  let changed = false;
+  adminAccounts.forEach(account => {
+    if (account.password && !account.password.startsWith('$2a$') && !account.password.startsWith('$2b$')) {
+      account.password = bcrypt.hashSync(account.password, 10);
+      changed = true;
+    }
+  });
+  if (systemConfig.adminPassword && !systemConfig.adminPassword.startsWith('$2a$') && !systemConfig.adminPassword.startsWith('$2b$')) {
+    systemConfig.adminPassword = bcrypt.hashSync(systemConfig.adminPassword, 10);
+    changed = true;
+  }
+  return changed;
 }
 
 export function loadFromDisk(): boolean {
@@ -872,6 +909,7 @@ export async function getClassById(id: string): Promise<ClassGroup | undefined> 
 }
 
 export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
+  await initOrLoadDataAsync(true);
   const existingIdx = classes.findIndex(c => c.id === cls.id || c.name === cls.name);
   if (existingIdx >= 0) {
     classes[existingIdx] = { ...classes[existingIdx], ...cls };
@@ -884,6 +922,7 @@ export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
 }
 
 export async function updateClass(id: string, updates: Partial<ClassGroup>): Promise<ClassGroup | null> {
+  await initOrLoadDataAsync(true);
   const existingIdx = classes.findIndex(c => c.id === id || c.name === id);
   if (existingIdx === -1) return null;
   classes[existingIdx] = { ...classes[existingIdx], ...updates };
@@ -964,6 +1003,7 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
 }
 
 export async function saveStudent(student: Student): Promise<Student> {
+  await initOrLoadDataAsync(true);
   const existingIdx = students.findIndex(s => s.id === student.id || (student.memberCode && s.memberCode === student.memberCode));
   if (existingIdx >= 0) {
     students[existingIdx] = { ...students[existingIdx], ...student };
@@ -976,6 +1016,7 @@ export async function saveStudent(student: Student): Promise<Student> {
 }
 
 export async function saveStudentsBatch(newStudents: Student[]): Promise<Student[]> {
+  await initOrLoadDataAsync(true);
   students.push(...newStudents);
   await supabaseUpsertStudentsBatch(newStudents);
   await saveDataToSupabase();
@@ -983,6 +1024,7 @@ export async function saveStudentsBatch(newStudents: Student[]): Promise<Student
 }
 
 export async function updateStudent(id: string, updates: Partial<Student>): Promise<Student | null> {
+  await initOrLoadDataAsync(true);
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
   students[existingIdx] = { ...students[existingIdx], ...updates };
@@ -999,6 +1041,7 @@ export async function updateStudent(id: string, updates: Partial<Student>): Prom
 }
 
 export async function deleteStudent(id: string): Promise<Student | null> {
+  await initOrLoadDataAsync(true);
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
   const removed = students[existingIdx];
@@ -1021,6 +1064,7 @@ export async function getTeacherById(id: string): Promise<any | undefined> {
 }
 
 export async function saveTeacher(teacher: any): Promise<any> {
+  await initOrLoadDataAsync(true);
   const existingIdx = teachers.findIndex(t => (teacher.id && t.id === teacher.id) || (teacher.name && t.name === teacher.name));
   let savedTeacher: any;
   if (existingIdx >= 0) {
@@ -1039,6 +1083,7 @@ export async function saveTeacher(teacher: any): Promise<any> {
 }
 
 export async function updateTeacher(id: string, updates: any): Promise<any | null> {
+  await initOrLoadDataAsync(true);
   const existingIdx = teachers.findIndex(t => t.id === id);
   if (existingIdx === -1) return null;
   teachers[existingIdx] = { ...teachers[existingIdx], ...updates };
@@ -1048,6 +1093,7 @@ export async function updateTeacher(id: string, updates: any): Promise<any | nul
 }
 
 export async function deleteTeacher(id: string): Promise<any | null> {
+  await initOrLoadDataAsync(true);
   const existingIdx = teachers.findIndex(t => t.id === id);
   if (existingIdx === -1) return null;
   const removed = teachers.splice(existingIdx, 1)[0];
@@ -1130,20 +1176,24 @@ export async function getAdminAccounts(): Promise<ServerAdminAccount[]> {
 }
 
 export async function saveAdminAccount(account: ServerAdminAccount): Promise<ServerAdminAccount> {
+  account.password = hashPasswordIfNeeded(account.password);
   const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === account.username.toLowerCase());
   if (existingIdx >= 0) {
     adminAccounts[existingIdx] = { ...adminAccounts[existingIdx], ...account };
   } else {
     adminAccounts.push(account);
   }
-  await supabaseUpsertAdminAccount(account);
+  await supabaseUpsertAdminAccount(adminAccounts[existingIdx >= 0 ? existingIdx : adminAccounts.length - 1]);
   await saveDataToSupabase();
-  return account;
+  return adminAccounts[existingIdx >= 0 ? existingIdx : adminAccounts.length - 1];
 }
 
 export async function updateAdminAccount(username: string, updates: Partial<ServerAdminAccount>): Promise<ServerAdminAccount | null> {
   const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === username.toLowerCase());
   if (existingIdx === -1) return null;
+  if (updates.password) {
+    updates.password = hashPasswordIfNeeded(updates.password);
+  }
   adminAccounts[existingIdx] = { ...adminAccounts[existingIdx], ...updates };
   await supabaseUpsertAdminAccount(adminAccounts[existingIdx]);
   await saveDataToSupabase();
@@ -1153,11 +1203,12 @@ export async function updateAdminAccount(username: string, updates: Partial<Serv
 export async function updateAccountPassword(username: string, newPassword: string): Promise<boolean> {
   const target = adminAccounts.find(a => a.username.toLowerCase() === username.toLowerCase());
   if (!target) return false;
-  target.password = newPassword;
+  const hashed = hashPasswordIfNeeded(newPassword);
+  target.password = hashed;
   if (username.toLowerCase() === 'admin') {
-    systemConfig.adminPassword = newPassword;
+    systemConfig.adminPassword = hashed;
   }
-  await supabaseUpdateAccountPassword(username, newPassword);
+  await supabaseUpdateAccountPassword(username, hashed);
   await saveDataToSupabase();
   return true;
 }
