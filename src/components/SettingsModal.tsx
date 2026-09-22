@@ -1278,7 +1278,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               ? 'bg-amber-50 text-amber-900 border-amber-200'
                               : 'bg-purple-50 text-purple-900 border-purple-200'
                           }`}>
-                            {isSundaySchool ? '主日学班级' : '团契契组'}
+                            {isSundaySchool ? '主日学班级' : '青年团契'}
                           </span>
                           {cls.isHiddenFromHome ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">

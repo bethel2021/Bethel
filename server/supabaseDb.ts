@@ -263,13 +263,14 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
     // Step 2: Upsert 'teachers' table (Relationship: classes -> teachers) & reconcile deleted
     // --------------------------------------------------------------------------
     if (Array.isArray(payload.teachers) && payload.teachers.length > 0) {
+      const validClassIds = new Set(Array.isArray(payload.classes) ? payload.classes.map(c => String(c.id)) : []);
       const teacherRows = payload.teachers.map(t => ({
         id: t.id,
         name: t.name,
         gender: t.gender || 'girl',
         phone: t.phone || null,
         wechat: t.wechat || null,
-        class_id: (t.classId && String(t.classId).trim() !== '') ? String(t.classId).trim() : null,
+        class_id: (t.classId && String(t.classId).trim() !== '' && validClassIds.has(String(t.classId).trim())) ? String(t.classId).trim() : null,
         role_title: t.roleTitle || '班主任',
         join_date: t.joinDate || '2026-01-01',
         notes: t.notes || null,
@@ -609,7 +610,14 @@ export async function supabaseUpsertTeacher(t: Teacher): Promise<boolean> {
   const client = getSupabase();
   if (!client) return false;
   try {
-    const classIdVal = (t.classId && String(t.classId).trim() !== '') ? String(t.classId).trim() : null;
+    let classIdVal = (t.classId && String(t.classId).trim() !== '') ? String(t.classId).trim() : null;
+    if (classIdVal) {
+      // Safely verify if class exists to prevent FK violation
+      const { data: clsExists } = await client.from('classes').select('id').eq('id', classIdVal).maybeSingle();
+      if (!clsExists) {
+        classIdVal = null;
+      }
+    }
     const { error } = await client.from('teachers').upsert({
       id: t.id,
       name: t.name,

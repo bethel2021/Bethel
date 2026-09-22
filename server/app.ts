@@ -572,7 +572,7 @@ apiRouter.get('/realtime-poll', async (req: Request, res: Response) => {
 // 2. Admin Authentication Login
 apiRouter.post('/login', async (req: Request, res: Response) => {
   try {
-    await initOrLoadDataAsync(true);
+    await initOrLoadDataAsync(false);
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: '请输入用户名和登录密码' });

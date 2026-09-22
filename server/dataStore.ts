@@ -761,8 +761,8 @@ export function mergeClientData(payload: SyncPayload): {
           ? existing.isHiddenFromHome 
           : (diskHiddenSet.has(c.id));
         const mergedClass: ClassGroup = {
-          ...existing,
           ...c,
+          ...existing,
           isHiddenFromHome: authoritativeHidden
         };
         if (JSON.stringify(existing) !== JSON.stringify(mergedClass)) {
@@ -978,6 +978,13 @@ export async function deleteClass(id: string): Promise<boolean> {
   setStudents(students.filter(s => s.classId !== clsId));
   setRecords(records.filter(r => r.classId !== clsId && !enrolledStudentIds.includes(r.studentId)));
   setClasses(classes.filter(c => c.id !== clsId && c.name !== clsName));
+
+  // Clear classId from any teachers associated with the deleted class
+  teachers.forEach(t => {
+    if (t && t.classId === clsId) {
+      t.classId = '';
+    }
+  });
 
   await supabaseDeleteClass(clsId);
   await saveDataToSupabase();
