@@ -435,6 +435,34 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
           }
         }
       }
+
+      // Reconcile deleted admin accounts in Supabase to prevent resurrection
+      try {
+        const { data: existingAccounts, error: selectError } = await client.from('admin_accounts').select('id, username');
+        if (!selectError && existingAccounts && existingAccounts.length > 0) {
+          const keepIds = new Set(payload.adminAccounts.map(a => a.id || `acc-${a.username.toLowerCase()}`));
+          const keepUsernames = new Set(payload.adminAccounts.map(a => a.username.toLowerCase()));
+          
+          const toDelete = existingAccounts.filter(a => {
+            const idMatch = keepIds.has(a.id);
+            const userMatch = keepUsernames.has(a.username?.toLowerCase());
+            return !idMatch && !userMatch;
+          });
+
+          // System protection: never delete the root 'admin' account
+          const safeToDelete = toDelete.filter(a => a.username?.toLowerCase() !== 'admin');
+          
+          if (safeToDelete.length > 0) {
+            const deleteIds = safeToDelete.map(a => a.id);
+            const { error: deleteError } = await client.from('admin_accounts').delete().in('id', deleteIds);
+            if (deleteError) {
+              console.warn('[Supabase DB Error] saveToSupabase admin_accounts reconciliation delete failed:', deleteError);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Supabase DB Error] saveToSupabase admin_accounts reconciliation failed:', e);
+      }
     }
 
     // --------------------------------------------------------------------------
@@ -898,10 +926,15 @@ export async function supabaseDeleteAdminAccount(username: string): Promise<bool
   const client = getSupabase();
   if (!client) return false;
   try {
-    await client.from('admin_accounts').delete().ilike('username', username);
+    const targetUsername = String(username).trim().toLowerCase();
+    const { error } = await client.from('admin_accounts').delete().eq('username', targetUsername);
+    if (error) {
+      console.warn('[Supabase DB Error] supabaseDeleteAdminAccount query error:', error);
+      return false;
+    }
     return true;
   } catch (err) {
-    console.warn('[Supabase DB] supabaseDeleteAdminAccount failed:', err);
+    console.warn('[Supabase DB] supabaseDeleteAdminAccount exception:', err);
     return false;
   }
 }

@@ -1392,7 +1392,7 @@ export async function deleteAdminAccount(username: string): Promise<ServerAdminA
   const deleted = adminAccounts.splice(existingIdx, 1)[0];
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
+  await saveDataToFile();
   await supabaseDeleteAdminAccount(username);
   scheduleSupabaseSnapshotSave();
   return deleted;
