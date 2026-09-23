@@ -216,21 +216,19 @@ export async function saveDataToSupabase(): Promise<boolean> {
     }
   }
 
-  // 2. Only write to local file if Supabase is not configured (offline / local dev fallback)
-  if (!isSupabaseConfigured()) {
-    try {
-      const filePath = getStoragePath();
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
-
-      const hiddenPath = getHiddenClassStoragePath();
-      fs.writeFileSync(hiddenPath, JSON.stringify(hiddenIds, null, 2), 'utf-8');
-    } catch (err) {
-      // Normal in serverless read-only environment
+  // 2. Persist local file cache (ensures zero-latency read-after-write and fast cold-start bootstrap)
+  try {
+    const filePath = getStoragePath();
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+
+    const hiddenPath = getHiddenClassStoragePath();
+    fs.writeFileSync(hiddenPath, JSON.stringify(hiddenIds, null, 2), 'utf-8');
+  } catch (err) {
+    // Normal in serverless read-only environment
   }
 
   // 3. Notify all real-time listeners (WebSocket, SSE, Long-polling)

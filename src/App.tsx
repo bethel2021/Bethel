@@ -347,6 +347,9 @@ export default function App() {
     setStudents(local.students);
     setActiveSunday(local.activeSunday);
     setRecords(local.records);
+    if (local.teachers && Array.isArray(local.teachers) && local.teachers.length > 0) {
+      setTeachers(local.teachers);
+    }
     const localAccounts = getLocalAccounts();
     setAccounts(localAccounts);
     setLastSyncTime('本地离线模式已就绪');

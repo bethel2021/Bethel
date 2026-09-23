@@ -190,6 +190,7 @@ export function getLocalData() {
       localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(initialSystemConfig));
       localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(records));
       localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, currentSunday);
+      localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(initialTeachers));
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
 
       return {
@@ -197,7 +198,8 @@ export function getLocalData() {
         students: initialStudents,
         config: initialSystemConfig,
         records,
-        activeSunday: currentSunday
+        activeSunday: currentSunday,
+        teachers: initialTeachers
       };
     }
 
@@ -323,7 +325,7 @@ export function resetLocalData() {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, currentSunday);
     localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(DEFAULT_ACCOUNTS));
     localStorage.removeItem(STORAGE_KEYS.HIDDEN_CLASS_IDS);
-    localStorage.removeItem(STORAGE_KEYS.TEACHERS);
+    localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(initialTeachers));
     localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     return {
       classes: initialClasses,
@@ -332,7 +334,7 @@ export function resetLocalData() {
       records,
       accounts: DEFAULT_ACCOUNTS,
       activeSunday: currentSunday,
-      teachers: []
+      teachers: initialTeachers
     };
   } catch (e) {
     console.warn('Failed resetting localStorage', e);

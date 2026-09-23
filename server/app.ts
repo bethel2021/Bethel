@@ -469,6 +469,7 @@ apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
     })),
     students,
     records,
+    teachers,
     deletedRecordKeys: Array.from(deletedRecordKeys),
     config: systemConfig,
     activeSunday,
