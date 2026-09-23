@@ -295,7 +295,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               <span>主日学与团契班级总览（共 {visibleClasses.length} 个班级）</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              各班级宗旨、适龄标准、上课教室与老师介绍
+              各班级宗旨、适龄标准、上课教室与介绍
             </p>
           </div>
         </div>
@@ -342,7 +342,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                     </div>
                     {cls.subjectTeacher && (
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">上课老师：</span>
+                        <span className="text-slate-400">上课：</span>
                         <span className="font-semibold text-slate-800">{cls.subjectTeacher}</span>
                       </div>
                     )}

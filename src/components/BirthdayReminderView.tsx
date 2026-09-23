@@ -184,7 +184,7 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
           className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs cursor-pointer"
         >
           <LogIn className="w-4 h-4" />
-          <span>主日学老师 / 同工登录</span>
+          <span>主日学 / 同工登录</span>
         </button>
       </div>
     );
@@ -964,7 +964,7 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
 
               {/* Signatures */}
               <div className="flex items-center justify-between text-xs text-slate-500 pt-4 border-t border-amber-200/60 max-w-md mx-auto">
-                <div>班级导师：{printCardStudent.classGroup?.teacher || '主日学老师'}</div>
+                <div>班级导师：{printCardStudent.classGroup?.teacher || '主日学'}</div>
                 <div>日期：{formatChineseDate(printCardStudent.nextBirthdayDateStr)}</div>
               </div>
 

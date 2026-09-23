@@ -3,8 +3,8 @@
     "churchName": "伯特利教会",
     "schoolTitle": "主日学与团契IMS",
     "allowedDayOfWeek": 0,
-    "checkinStartTime": "08:30",
-    "checkinEndTime": "12:30",
+    "checkinStartTime": "11:30",
+    "checkinEndTime": "16:30",
     "testMode": false,
     "currentYear": 2026,
     "currentSemester": "2026年秋季学期",
@@ -16,7 +16,7 @@
     "enableOfferingOption": false,
     "defaultOfferingChecked": false,
     "enableLateRule": true,
-    "lateThresholdTime": "09:30",
+    "lateThresholdTime": "15:00",
     "enableExcusedNote": true,
     "enableCheckinPopup": true,
     "adminPassword": "$2b$10$D1YdbjVxQwxuIUDylyOSqu5fMGi0QySpIIckxqGFdtX/49MgaAX46",
@@ -27,7 +27,14 @@
       "class-4",
       "class-5",
       "class-7"
-    ]
+    ],
+    "config": {
+      "accountClassIsolation": {
+        "btlgzbls": "class-6",
+        "btlczbls": "class-5",
+        "fellowship": "class-7"
+      }
+    }
   },
   "classes": [
     {
@@ -443,7 +450,6 @@
   ],
   "records": [],
   "deletedRecordKeys": [
-    "rec-2026-09-27-s-601-1790013650975",
     "rec-2026-09-27-s-625-1790013853908",
     "rec-2026-09-27-s-601-1790013654726",
     "rec-2026-09-27-s-601-1790013659004",
@@ -465,32 +471,18 @@
     "s-625_2026-09-27",
     "rec-2026-09-27-s-625-1790013858261",
     "rec-2026-09-27-s-601-1790013789289",
-    "rec-2026-09-27-s-625-1790013849600"
+    "rec-2026-09-27-s-625-1790013849600",
+    "rec-2026-09-27-s-601-1790013650975"
   ],
   "adminAccounts": [
     {
       "id": "acc-1790178050181-uh03",
       "username": "btlgzbls",
-      "displayName": "高中班",
+      "displayName": "高中班老师",
       "role": "teacher",
       "password": "$2b$10$kXrZrCI9sPs.rlpsZYTkgOmMVeyuRqvutumqQBYnVELu2Xs.Z1HoS",
-      "createdAt": "2026-09-23T00:00:00+00:00"
-    },
-    {
-      "id": "acc-fellowship",
-      "username": "fellowship",
-      "displayName": "团契带领同工",
-      "role": "fellowship_leader",
-      "password": "$2b$10$vYYdUoaK80zhv9NVx7Utte4GT7rxHxbYMR6ejg.0fKL7H4OsbCav6",
-      "createdAt": "2026-01-01T00:00:00+00:00"
-    },
-    {
-      "id": "acc-1790181054811-04sp",
-      "username": "btlczbls",
-      "displayName": "初中班老师",
-      "role": "teacher",
-      "password": "$2b$10$6B5SaZY4OO5tOYlBdDnkQeOl/ocvfxoFSwejI.wAsvYt4YKAXh6B.",
-      "createdAt": "2026-09-23T00:00:00+00:00"
+      "createdAt": "2026-09-23T00:00:00+00:00",
+      "assignedClassId": "class-6"
     },
     {
       "id": "acc-admin",
@@ -499,10 +491,28 @@
       "role": "superadmin",
       "password": "$2b$10$bRWcPwYhjHDNZfxZV5Tp2.jraaUWpSz8Qh5X/3PZlavpAhAqPS1mq",
       "createdAt": "2026-01-01T00:00:00+00:00"
+    },
+    {
+      "id": "acc-1790181054811-04sp",
+      "username": "btlczbls",
+      "displayName": "初中班老师",
+      "role": "teacher",
+      "password": "$2b$10$6B5SaZY4OO5tOYlBdDnkQeOl/ocvfxoFSwejI.wAsvYt4YKAXh6B.",
+      "createdAt": "2026-09-23T00:00:00+00:00",
+      "assignedClassId": "class-5"
+    },
+    {
+      "id": "acc-fellowship",
+      "username": "fellowship",
+      "displayName": "团契带领同工",
+      "role": "fellowship_leader",
+      "password": "$2b$10$vYYdUoaK80zhv9NVx7Utte4GT7rxHxbYMR6ejg.0fKL7H4OsbCav6",
+      "createdAt": "2026-01-01T00:00:00+00:00",
+      "assignedClassId": "class-7"
     }
   ],
   "activeSunday": "2026-09-27",
-  "syncVersion": 104,
+  "syncVersion": 124,
   "hiddenClassIds": [
     "class-1",
     "class-2",
@@ -514,7 +524,7 @@
   "teachers": [
     {
       "id": "t-1",
-      "name": "春来",
+      "name": "胡春来",
       "gender": "girl",
       "phone": "13888889999",
       "wechat": "",
@@ -525,7 +535,7 @@
     },
     {
       "id": "t-2",
-      "name": "秋娟",
+      "name": "戴秋娟",
       "gender": "girl",
       "phone": "13812345672",
       "wechat": "",
@@ -535,7 +545,7 @@
     },
     {
       "id": "t-3",
-      "name": "若雪",
+      "name": "翁若雪",
       "gender": "girl",
       "phone": "13812345673",
       "wechat": "",
@@ -545,7 +555,7 @@
     },
     {
       "id": "t-4",
-      "name": "上好",
+      "name": "陈上好",
       "gender": "girl",
       "phone": "13812345674",
       "wechat": "",
@@ -555,7 +565,7 @@
     },
     {
       "id": "t-5",
-      "name": "雪成",
+      "name": "林雪成",
       "gender": "girl",
       "phone": "13812345675",
       "wechat": "",
@@ -582,18 +592,7 @@
       "classId": "class-7",
       "roleTitle": "班主任",
       "joinDate": "2026-01-01"
-    },
-    {
-      "id": "t-905578",
-      "name": "周雅各",
-      "gender": "boy",
-      "phone": "13988889999",
-      "wechat": "jacob_updated",
-      "classId": "class-2",
-      "roleTitle": "班主任",
-      "joinDate": "2026-03-15",
-      "notes": "更新后的特长备注"
     }
   ],
-  "updatedAt": "2026-09-23T18:00:29.169+00:00"
+  "updatedAt": "2026-09-23T19:12:47.615Z"
 }

@@ -101,8 +101,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const isSuperAdmin = currentUser?.role === 'superadmin';
   const dbTeacherNames = useMemo(() => {
     const list = [
-      ...teachers.map(t => (t.name || '').trim().replace(/\s*老师$/, '')),
-      ...classes.map(c => (c.teacher || '').trim().replace(/\s*老师$/, '')),
+      ...teachers.map(t => (t.name || '').trim().replace(/\s*$/, '')),
+      ...classes.map(c => (c.teacher || '').trim().replace(/\s*$/, '')),
       '春来', '秋娟', '若雪', '上好', '雪成', '志安', '东丽'
     ].filter(Boolean);
     return Array.from(new Set(list));
@@ -220,8 +220,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!rt) return '班级负责';
     const trimmed = rt.trim();
     if (trimmed === '班主任' || trimmed === '主日学班主任' || trimmed === '负责人' || trimmed === '团契负责人' || trimmed === '班级负责') return '班级负责';
-    if (trimmed === '主日学同工' || trimmed === '讲员' || trimmed === '主讲老师' || trimmed === '主讲' || trimmed === '上课老师') return '上课老师';
-    if (trimmed === '助教老师' || trimmed === '助教' || trimmed === '辅助老师' || trimmed === '副班主任' || trimmed === '协工') return '辅助老师';
+    if (trimmed === '主日学同工' || trimmed === '讲员' || trimmed === '主讲' || trimmed === '主讲' || trimmed === '上课') return '上课';
+    if (trimmed === '助教' || trimmed === '助教' || trimmed === '辅助' || trimmed === '副班主任' || trimmed === '协工') return '辅助';
     if (trimmed === '主日学校长' || trimmed === '主日学讲员') return '班级负责';
     return trimmed;
   };
@@ -232,10 +232,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (rt === '班级负责' || rt === '班主任' || rt === '主日学班主任' || rt.includes('负责人') || rt.includes('班主任')) {
       return 1;
     }
-    if (rt === '上课老师' || rt === '讲员' || rt === '主讲老师' || rt === '主讲' || rt === '主日学同工') {
+    if (rt === '上课' || rt === '讲员' || rt === '主讲' || rt === '主讲' || rt === '主日学同工') {
       return 2;
     }
-    if (rt === '辅助老师' || rt === '助教老师' || rt === '助教' || rt === '协工' || rt === '辅助' || rt === '副班主任') {
+    if (rt === '辅助' || rt === '助教' || rt === '助教' || rt === '协工' || rt === '辅助' || rt === '副班主任') {
       return 3;
     }
     return 4;
@@ -260,7 +260,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         return classIdxA - classIdxB;
       }
 
-      // 2. Sort by Role Order (按 “班级负责”、“上课老师”、“辅助老师” 顺序)
+      // 2. Sort by Role Order (按 “班级负责”、“上课”、“辅助” 顺序)
       const prioA = getTeacherRolePriority(a.roleTitle);
       const prioB = getTeacherRolePriority(b.roleTitle);
 
@@ -275,7 +275,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleEditTeacher = (t: any) => {
     setEditingTeacher(t);
-    const cleanName = (t.name || '').replace(/\s*老师$/, '');
+    const cleanName = (t.name || '').replace(/\s*$/, '');
     setTeacherName(cleanName);
     setTeacherGender(t.gender || 'boy');
     setTeacherPhone(t.phone || '');
@@ -304,7 +304,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       showNotice('error', '权限不足：只有总管理员才能管理教师资料！');
       return;
     }
-    const cleanedName = teacherName.trim().replace(/\s*老师$/, '');
+    const cleanedName = teacherName.trim().replace(/\s*$/, '');
     if (!cleanedName) {
       showNotice('error', '教师姓名不能为空！');
       return;
@@ -430,7 +430,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       showNotice('error', '权限受限：除了总管理员之外，其他账号只有管理签到权限，没有编辑班级的权限！');
       return;
     }
-    const cleanTeacher = (cls.teacher || '').trim().replace(/\s*老师$/, '');
+    const cleanTeacher = (cls.teacher || '').trim().replace(/\s*$/, '');
     const hasCustomTeacher = Boolean(cleanTeacher && !dbTeacherNames.includes(cleanTeacher));
 
     setEditingClass({ ...cls, isHiddenFromHome: cls.isHiddenFromHome || false });
@@ -514,6 +514,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Open in-app deletion confirm for Account
   const handleRequestDeleteAccount = (acc: AdminAccount) => {
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：仅总管理员有权限删除账号！');
+      return;
+    }
     if (acc.username.toLowerCase() === 'admin') {
       showNotice('error', '系统安全限制：根总管理员账号（admin）受系统核心保护，禁止删除！');
       return;
@@ -529,8 +533,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Execute in-app confirmed deletion
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
-    if (!isSuperAdmin && deleteTarget.type !== 'account') {
-      showNotice('error', '权限受限：除了总管理员之外，其他账号没有删除班级、学生与教师的权限！');
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：除了总管理员之外，其他账号没有删除班级、学生与账号的权限！');
       return;
     }
     setIsDeleting(true);
@@ -562,6 +566,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Open create account modal
   const handleOpenNewAccount = () => {
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：仅总管理员可新建管理账号！');
+      return;
+    }
     setEditingAccount(null);
     setAccountUsername('');
     setAccountDisplayName('');
@@ -574,6 +582,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Open edit account modal
   const handleOpenEditAccount = (acc: AdminAccount) => {
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：仅总管理员可修改管理账号资料！');
+      return;
+    }
     setEditingAccount(acc);
     setAccountUsername(acc.username);
     setAccountDisplayName(acc.displayName);
@@ -586,6 +598,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Open change password modal
   const handleOpenChangePassword = (acc: AdminAccount) => {
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：仅总管理员可重置账号密码！');
+      return;
+    }
     setPasswordTargetAccount(acc);
     setNewAccountPassword('');
     setIsPasswordModalOpen(true);
@@ -594,6 +610,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Submit create or edit account
   const handleSaveAccountSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：仅总管理员可操作账号！');
+      return;
+    }
     const cleanUsername = accountUsername.trim().toLowerCase();
     const cleanDisplayName = accountDisplayName.trim();
     if (!cleanUsername) {
@@ -601,7 +621,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
     if (!cleanDisplayName) {
-      showNotice('error', '请输入账号显示名称（例如：张老师、初中班主日学教师）');
+      showNotice('error', '请输入账号显示名称（例如：张、初中班主日学教师）');
       return;
     }
     if (!editingAccount && (!accountPassword || accountPassword.trim().length < 4)) {
@@ -903,7 +923,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <p className="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
                 按照系统权限配置：<strong>除了总管理员之外，其他账号只有管理签到权限，没有添加/删除班级与学生的权限。</strong>
-                如需新增班级、编辑班级与上课老师信息、批量录入学员或移出学员，请切换使用总管理员账号登录。
+                如需新增班级、编辑班级与上课信息、批量录入学员或移出学员，请切换使用总管理员账号登录。
               </p>
             </div>
           </div>
@@ -1040,7 +1060,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <div className="text-xs text-slate-500 font-medium">
-                当前排序：按班级 (从小小班到团契) 及角色 (班级负责 ➔ 上课老师 ➔ 辅助老师) | 共 <span className="font-bold text-amber-900">
+                当前排序：按班级 (从小小班到团契) 及角色 (班级负责 ➔ 上课 ➔ 辅助) | 共 <span className="font-bold text-amber-900">
                   {sortedTeachers.length}
                 </span> 位教师
               </div>
@@ -1070,15 +1090,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     ) : (
                       sortedTeachers.map(t => {
                         const cls = classes.find(c => c.id === t.classId);
-                        const cleanTeacherName = (t.name || '').replace(/\s*老师$/, '');
+                        const cleanTeacherName = (t.name || '').replace(/\s*$/, '');
                         const isSister = t.gender === 'girl';
                         const normalizedRole = normalizeRoleTitle(t.roleTitle);
                         let roleBadgeStyle = 'bg-slate-100 text-slate-700 border-slate-200';
                         if (normalizedRole === '班级负责') {
                           roleBadgeStyle = 'bg-amber-700 text-white border-amber-800 font-bold shadow-xs';
-                        } else if (normalizedRole === '上课老师') {
+                        } else if (normalizedRole === '上课') {
                           roleBadgeStyle = 'bg-sky-50 text-sky-800 border-sky-200/90 font-bold';
-                        } else if (normalizedRole === '辅助老师') {
+                        } else if (normalizedRole === '辅助') {
                           roleBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200/90 font-medium';
                         }
 
@@ -1180,8 +1200,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="w-full text-xs px-2.5 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                     >
                       <option value="班级负责">班级负责</option>
-                      <option value="上课老师">上课老师</option>
-                      <option value="辅助老师">辅助老师</option>
+                      <option value="上课">上课</option>
+                      <option value="辅助">辅助</option>
                     </select>
                   </div>
 
@@ -1273,13 +1293,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* SUB-TAB 1: CLASSES MANAGEMENT (自定义班级名称与班级负责、上课老师) */}
+      {/* SUB-TAB 1: CLASSES MANAGEMENT (自定义班级名称与班级负责、上课) */}
       {/* ========================================================================= */}
       {activeSubTab === 'classes' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-xs text-slate-500">
-              共配置 <span className="font-bold text-slate-900">{classes.length}</span> 个班级/团契。可随时查看班名、班级负责、上课老师与活动课室。
+              共配置 <span className="font-bold text-slate-900">{classes.length}</span> 个班级/团契。可随时查看班名、班级负责、上课与活动课室。
             </div>
             {isSuperAdmin ? (
               <button
@@ -1381,7 +1401,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <span className="font-semibold text-slate-800">{cls.teacher}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">上课老师:</span>
+                        <span className="text-slate-400">上课:</span>
                         <span className="font-semibold text-slate-800">{cls.subjectTeacher || '未设定'}</span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -1846,7 +1866,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                支持总管理员、主日学上课老师、团契负责人账号的新建、修改资料、重置密码与删除。修改即刻多端同步生效。
+                支持总管理员、主日学上课、团契负责人账号的新建、修改资料、重置密码与删除。修改即刻多端同步生效。
               </p>
             </div>
 
@@ -1865,14 +1885,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={handleOpenNewAccount}
-                className="px-3.5 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>新建管理账号</span>
-              </button>
+              {isSuperAdmin ? (
+                <button
+                  type="button"
+                  onClick={handleOpenNewAccount}
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>新建管理账号</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onOpenLogin}
+                  className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 transition-colors"
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-700" />
+                  <span>切换总管理员以管理账号</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1899,7 +1930,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="bg-sky-50/60 p-3.5 rounded-xl border border-sky-200/80 shadow-2xs">
               <div className="text-[11px] text-sky-900 font-medium flex items-center gap-1">
                 <BookOpen className="w-3 h-3 text-sky-700" />
-                <span>主日学老师 (考勤权限)</span>
+                <span>主日学 (考勤权限)</span>
               </div>
               <div className="text-xl font-bold text-sky-950 mt-1 font-serif">
                 {accounts.filter(a => a.role === 'teacher').length}
@@ -1928,10 +1959,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </span>
                 </h4>
               </div>
-              <span className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                <span>全同工账号自主管理授权：支持任何同工新建、修改及删除管理账号</span>
-              </span>
+              {!isSuperAdmin && (
+                <span className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  <span>当前账号权限受限：仅总管理员可新建、修改或删除账号</span>
+                </span>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -1947,7 +1980,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {accounts.map(acc => {
+                  {[...accounts].sort((a, b) => (a.role === 'superadmin' ? -1 : 1)).map(acc => {
                     const isRootAdmin = acc.username.toLowerCase() === 'admin';
                     const isCurrentUserAccount = currentUser?.username === acc.username;
 
@@ -2044,8 +2077,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenEditAccount(acc)}
-                              className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border-slate-200 hover:bg-slate-100 text-slate-700"
-                              title="修改账号显示名称与角色"
+                              disabled={!isSuperAdmin}
+                              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                                isSuperAdmin 
+                                  ? 'border-slate-200 hover:bg-slate-100 text-slate-700' 
+                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
+                              }`}
+                              title={isSuperAdmin ? '修改账号姓名与角色' : '仅总管理员可修改资料'}
                             >
                               <Edit2 className="w-3.5 h-3.5 text-slate-600" />
                               <span className="hidden sm:inline">编辑</span>
@@ -2054,8 +2092,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenChangePassword(acc)}
-                              className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border-amber-200 hover:bg-amber-50 text-amber-900"
-                              title="重置此账号登录密码"
+                              disabled={!isSuperAdmin}
+                              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                                isSuperAdmin 
+                                  ? 'border-amber-200 hover:bg-amber-50 text-amber-900' 
+                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
+                              }`}
+                              title={isSuperAdmin ? '重置此账号登录密码' : '仅总管理员可重置密码'}
                             >
                               <KeyRound className="w-3.5 h-3.5 text-amber-700" />
                               <span className="hidden sm:inline">改密</span>
@@ -2064,16 +2107,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleRequestDeleteAccount(acc)}
-                              disabled={isRootAdmin}
+                              disabled={!isSuperAdmin || isRootAdmin}
                               className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
                                 isRootAdmin
                                   ? 'opacity-30 border-slate-200 text-slate-300 cursor-not-allowed'
-                                  : 'border-red-200 hover:bg-red-50 text-red-600'
+                                  : isSuperAdmin
+                                  ? 'border-red-200 hover:bg-red-50 text-red-600'
+                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
                               }`}
                               title={
                                 isRootAdmin 
                                   ? '系统根总管受系统保护，不可删除' 
-                                  : '删除此账号'
+                                  : isSuperAdmin 
+                                  ? '删除此账号' 
+                                  : '仅总管理员可删除账号'
                               }
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -2109,7 +2156,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <div className="bg-white/70 p-3 rounded-xl border border-amber-200/60">
                 <div className="font-bold text-slate-900 flex items-center gap-1 mb-1">
-                  <span>📖 主日学上课老师 (teacher)</span>
+                  <span>📖 主日学上课 (teacher)</span>
                 </div>
                 <p>
                   专职负责主日学生点名考勤、金句背诵打卡与出勤统计。受安全保护，无权擅自删除班级或移除在册学员，确保教会资产档案安全无虞。
@@ -2631,7 +2678,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* EDIT / NEW CLASS MODAL (自定义班级名称、班级负责与上课老师弹窗) */}
+      {/* EDIT / NEW CLASS MODAL (自定义班级名称、班级负责与上课弹窗) */}
       {/* ========================================================================= */}
       {isClassModalOpen && editingClass && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -2643,7 +2690,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {editingClass.id ? '编辑班级/团契信息' : '创建新班级 / 团契'}
                 </h3>
                 <p className="text-xs text-amber-200 mt-0.5">
-                  自定义班级名称、班级性质、班级负责、上课老师与活动课室
+                  自定义班级名称、班级性质、班级负责、上课与活动课室
                 </p>
               </div>
               <button
@@ -2705,15 +2752,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    班级负责 *
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>班级负责 *</span>
+                    <button type="button" onClick={() => setEditingClass({ ...editingClass, teacher: '' })} className="text-[10px] text-red-500 hover:text-red-700 underline">清除</button>
                   </label>
                   {!showCustomTeacherInput ? (
                     <div className="space-y-1">
                       <select
                         value={(() => {
                           const raw = (editingClass.teacher || '').trim();
-                          const clean = raw.replace(/\s*老师$/, '');
+                          const clean = raw.replace(/\s*$/, '');
                           if (dbTeacherNames.includes(clean)) return clean;
                           if (dbTeacherNames.includes(raw)) return raw;
                           return raw;
@@ -2724,23 +2772,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             setShowCustomTeacherInput(true);
                             setEditingClass({ ...editingClass, teacher: '' });
                           } else {
-                            const formatted = val ? (val.endsWith('老师') ? val : `${val} 老师`) : '';
+                            const formatted = val ? (val.endsWith('') ? val : `${val} `) : '';
                             setEditingClass({ ...editingClass, teacher: formatted });
                           }
                         }}
                         className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                       >
-                        <option value="">— 选择核心负责老师 —</option>
+                        <option value="">— 选择核心负责 —</option>
                         {(() => {
                           const raw = (editingClass.teacher || '').trim();
-                          const clean = raw.replace(/\s*老师$/, '');
+                          const clean = raw.replace(/\s*$/, '');
                           const isCustom = raw && !dbTeacherNames.includes(clean) && !dbTeacherNames.includes(raw);
                           return (
                             <>
                               {isCustom && <option value={raw}>{raw}</option>}
                               {dbTeacherNames.map(name => (
                                 <option key={name} value={name}>
-                                  {name} 老师
+                                  {name} 
                                 </option>
                               ))}
                             </>
@@ -2758,7 +2806,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         required
                         value={editingClass.teacher || ''}
                         onChange={e => setEditingClass({ ...editingClass, teacher: e.target.value })}
-                        placeholder="例如: 李路得 老师"
+                        placeholder="例如: 李路得 "
                         className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                       />
                       {dbTeacherNames.length > 0 && (
@@ -2778,8 +2826,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    上课老师 (可多选)
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>上课 (可多选)</span>
+                    <button type="button" onClick={() => setEditingClass({ ...editingClass, subjectTeacher: '' })} className="text-[10px] text-red-500 hover:text-red-700 underline">全部清除</button>
                   </label>
                   
                   {/* Selected badges list */}
@@ -2790,7 +2839,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         : [];
                       
                       if (selectedSubjectTeachers.length === 0) {
-                        return <span className="text-[11px] text-slate-400 italic px-1">暂无设定上课老师 (点击下方添加)</span>;
+                        return <span className="text-[11px] text-slate-400 italic px-1">暂无设定上课 (点击下方添加)</span>;
                       }
 
                       return selectedSubjectTeachers.map((name, idx) => (
@@ -2823,7 +2872,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <span className="text-[10px] text-slate-400 mr-0.5">快捷点选:</span>
                         {dbTeacherNames.slice(0, 10).map(name => {
                           const currentTeachers = editingClass.subjectTeacher
-                            ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim().replace(/\s*老师$/, '')).filter(Boolean)
+                            ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim().replace(/\s*$/, '')).filter(Boolean)
                             : [];
                           const isAlreadySelected = currentTeachers.includes(name);
                           return (
@@ -2835,10 +2884,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim()).filter(Boolean)
                                   : [];
                                 if (isAlreadySelected) {
-                                  const filtered = rawTeachers.filter(s => s.replace(/\s*老师$/, '') !== name);
+                                  const filtered = rawTeachers.filter(s => s.replace(/\s*$/, '') !== name);
                                   setEditingClass({ ...editingClass, subjectTeacher: filtered.join('、') });
                                 } else {
-                                  const added = [...rawTeachers, `${name} 老师`];
+                                  const added = [...rawTeachers, `${name} `];
                                   setEditingClass({ ...editingClass, subjectTeacher: added.join('、') });
                                 }
                               }}
@@ -2868,7 +2917,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             if (val === '__custom__') {
                               setShowCustomSubjectTeacherInput(true);
                             } else if (val) {
-                              const formatted = val.endsWith('老师') ? val : `${val} 老师`;
+                              const formatted = val.endsWith('') ? val : `${val} `;
                               if (!currentTeachers.includes(formatted) && !currentTeachers.includes(val)) {
                                 const updated = [...currentTeachers, formatted];
                                 setEditingClass({ ...editingClass, subjectTeacher: updated.join('、') });
@@ -2880,18 +2929,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           <option value="">— 从教师库下拉选取添加 —</option>
                           {(() => {
                             const currentTeachers = editingClass.subjectTeacher
-                              ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim().replace(/\s*老师$/, '')).filter(Boolean)
+                              ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim().replace(/\s*$/, '')).filter(Boolean)
                               : [];
                             return dbTeacherNames
                               .filter(name => !currentTeachers.includes(name))
                               .map(name => (
                                 <option key={name} value={name}>
-                                  {name} 老师
+                                  {name} 
                                 </option>
                               ));
                           })()}
                           <option value="__custom__" className="text-amber-600 font-medium">
-                            ✍️ 手动添加自定义老师...
+                            ✍️ 手动添加自定义...
                           </option>
                         </select>
                       </div>
@@ -2902,7 +2951,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {showCustomSubjectTeacherInput && (
                     <div className="mt-2 p-2.5 rounded-xl border border-amber-100 bg-amber-50/20 space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-medium text-amber-800">添加自定义上课老师：</span>
+                        <span className="text-[10px] font-medium text-amber-800">添加自定义上课：</span>
                         <button
                           type="button"
                           onClick={() => setShowCustomSubjectTeacherInput(false)}
@@ -3395,7 +3444,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   required
                   value={accountDisplayName}
                   onChange={e => setAccountDisplayName(e.target.value)}
-                  placeholder="例如: 李老师 (高小班上课) 或 王执事"
+                  placeholder="例如: 李 (高小班上课) 或 王执事"
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
@@ -3409,7 +3458,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={e => setAccountRole(e.target.value as any)}
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white"
                 >
-                  <option value="teacher">主日学上课老师 (仅限日常签到点名，无增删班级/学员权限)</option>
+                  <option value="teacher">主日学上课 (仅限日常签到点名，无增删班级/学员权限)</option>
                   <option value="fellowship_leader">团契负责人/同工 (仅限日常团契点名，无增删班级/学员权限)</option>
                   <option value="superadmin">总管理员 (拥有最高权限：增删班级、增删学员、管理所有账号)</option>
                 </select>
