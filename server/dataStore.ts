@@ -4,7 +4,7 @@ import os from 'os';
 import type { Request } from 'express';
 import bcrypt from 'bcryptjs';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types.js';
-import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccounts, ServerAdminAccount } from './initialData.js';
+import { initialClasses, initialStudents, initialSystemConfig, initialAdminAccounts, initialTeachers, ServerAdminAccount } from './initialData.js';
 import {
   saveToSupabase,
   loadFromSupabase,
@@ -46,7 +46,7 @@ export function removeDeletedRecordKey(key: string) {
 }
 export const adminAccounts: ServerAdminAccount[] = [...initialAdminAccounts];
 export const activeSessions = new Map<string, AdminUser>();
-export const teachers: any[] = [];
+export const teachers: any[] = [...initialTeachers];
 export let syncVersion = 1;
 export let lastModifiedTimestamp = new Date().toISOString();
 
@@ -1134,9 +1134,53 @@ export async function deleteStudent(id: string): Promise<Student | null> {
 }
 
 // --- Teachers ---
+export function getRolePriority(roleTitle?: string): number {
+  if (!roleTitle) return 1;
+  const rt = roleTitle.trim();
+  if (rt === '班级负责' || rt === '班主任' || rt === '主日学班主任' || rt.includes('负责人') || rt.includes('班主任')) {
+    return 1;
+  }
+  if (rt === '上课老师' || rt === '讲员' || rt === '主讲老师' || rt === '主讲' || rt === '主日学同工') {
+    return 2;
+  }
+  if (rt === '辅助老师' || rt === '助教老师' || rt === '助教' || rt === '协工' || rt === '辅助' || rt === '副班主任') {
+    return 3;
+  }
+  return 4;
+}
+
+export function sortTeachersList(teachersList: any[]): any[] {
+  const classOrderMap = new Map<string, number>();
+  classes.forEach((c, index) => {
+    classOrderMap.set(c.id, index);
+  });
+
+  return [...teachersList].sort((a, b) => {
+    // 1. Class Order (从小小班到团契)
+    const classIdxA = a.classId && classOrderMap.has(a.classId) ? classOrderMap.get(a.classId)! : 999;
+    const classIdxB = b.classId && classOrderMap.has(b.classId) ? classOrderMap.get(b.classId)! : 999;
+
+    if (classIdxA !== classIdxB) {
+      return classIdxA - classIdxB;
+    }
+
+    // 2. Role Priority (班级负责 -> 上课老师 -> 辅助老师)
+    const rolePrioA = getRolePriority(a.roleTitle);
+    const rolePrioB = getRolePriority(b.roleTitle);
+
+    if (rolePrioA !== rolePrioB) {
+      return rolePrioA - rolePrioB;
+    }
+
+    // 3. Name order
+    return (a.name || '').localeCompare(b.name || '', 'zh-CN');
+  });
+}
+
 export async function getTeachers(classId?: string): Promise<any[]> {
   await initOrLoadDataAsync(true);
-  return classId ? teachers.filter(t => t.classId === classId) : [...teachers];
+  const list = classId ? teachers.filter(t => t.classId === classId) : [...teachers];
+  return sortTeachersList(list);
 }
 
 export async function getTeacherById(id: string): Promise<any | undefined> {
@@ -1388,6 +1432,7 @@ export const dataStore = {
   saveTeacher,
   updateTeacher,
   deleteTeacher,
+  sortTeachersList,
 
   // Attendance Records
   getAttendanceRecords,

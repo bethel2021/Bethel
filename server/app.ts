@@ -338,7 +338,7 @@ apiRouter.get('/state', async (req: Request, res: Response) => {
     students: stateStudents,
     records: stateRecords,
     deletedRecordKeys: Array.from(deletedRecordKeys),
-    teachers,
+    teachers: dataStore.sortTeachersList(teachers),
     accounts: adminAccounts.map(a => ({
       id: a.id,
       username: a.username,

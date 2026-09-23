@@ -212,18 +212,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [teacherPhone, setTeacherPhone] = useState('');
   const [teacherWechat, setTeacherWechat] = useState('');
   const [teacherClassId, setTeacherClassId] = useState('');
-  const [teacherRoleTitle, setTeacherRoleTitle] = useState('班主任');
+  const [teacherRoleTitle, setTeacherRoleTitle] = useState('班级负责');
   const [teacherJoinDate, setTeacherJoinDate] = useState(new Date().toISOString().split('T')[0]);
   const [teacherNotes, setTeacherNotes] = useState('');
 
   const normalizeRoleTitle = (rt?: string) => {
-    if (!rt) return '班主任';
-    if (rt === '主日学班主任') return '班主任';
-    if (rt === '主日学同工') return '上课老师';
-    if (rt === '助教老师' || rt === '助教' || rt === '辅助老师') return '辅助老师';
-    if (rt === '主日学校长' || rt === '主日学讲员') return '班主任';
-    return rt;
+    if (!rt) return '班级负责';
+    const trimmed = rt.trim();
+    if (trimmed === '班主任' || trimmed === '主日学班主任' || trimmed === '负责人' || trimmed === '团契负责人' || trimmed === '班级负责') return '班级负责';
+    if (trimmed === '主日学同工' || trimmed === '讲员' || trimmed === '主讲老师' || trimmed === '主讲' || trimmed === '上课老师') return '上课老师';
+    if (trimmed === '助教老师' || trimmed === '助教' || trimmed === '辅助老师' || trimmed === '副班主任' || trimmed === '协工') return '辅助老师';
+    if (trimmed === '主日学校长' || trimmed === '主日学讲员') return '班级负责';
+    return trimmed;
   };
+
+  const getTeacherRolePriority = (roleTitle?: string) => {
+    if (!roleTitle) return 1;
+    const rt = roleTitle.trim();
+    if (rt === '班级负责' || rt === '班主任' || rt === '主日学班主任' || rt.includes('负责人') || rt.includes('班主任')) {
+      return 1;
+    }
+    if (rt === '上课老师' || rt === '讲员' || rt === '主讲老师' || rt === '主讲' || rt === '主日学同工') {
+      return 2;
+    }
+    if (rt === '辅助老师' || rt === '助教老师' || rt === '助教' || rt === '协工' || rt === '辅助' || rt === '副班主任') {
+      return 3;
+    }
+    return 4;
+  };
+
+  const sortedTeachers = useMemo(() => {
+    const classOrderMap = new Map<string, number>();
+    classes.forEach((c, idx) => {
+      classOrderMap.set(c.id, idx);
+    });
+
+    const filtered = selectedTeacherClassFilter === 'all'
+      ? teachers
+      : teachers.filter(t => t.classId === selectedTeacherClassFilter);
+
+    return [...filtered].sort((a, b) => {
+      // 1. Sort by Class Order (从小小班到团契)
+      const classIdxA = a.classId && classOrderMap.has(a.classId) ? classOrderMap.get(a.classId)! : 999;
+      const classIdxB = b.classId && classOrderMap.has(b.classId) ? classOrderMap.get(b.classId)! : 999;
+
+      if (classIdxA !== classIdxB) {
+        return classIdxA - classIdxB;
+      }
+
+      // 2. Sort by Role Order (按 “班级负责”、“上课老师”、“辅助老师” 顺序)
+      const prioA = getTeacherRolePriority(a.roleTitle);
+      const prioB = getTeacherRolePriority(b.roleTitle);
+
+      if (prioA !== prioB) {
+        return prioA - prioB;
+      }
+
+      // 3. Name order
+      return (a.name || '').localeCompare(b.name || '', 'zh-CN');
+    });
+  }, [teachers, classes, selectedTeacherClassFilter]);
 
   const handleEditTeacher = (t: any) => {
     setEditingTeacher(t);
@@ -245,7 +293,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setTeacherPhone('');
     setTeacherWechat('');
     setTeacherClassId(classes[0]?.id || '');
-    setTeacherRoleTitle('班主任');
+    setTeacherRoleTitle('班级负责');
     setTeacherJoinDate(new Date().toISOString().split('T')[0]);
     setTeacherNotes('');
   };
@@ -1012,8 +1060,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <div className="text-xs text-slate-500 font-medium">
-                当前筛选下：<span className="font-bold text-amber-900">
-                  {selectedTeacherClassFilter === 'all' ? teachers.length : teachers.filter(t => t.classId === selectedTeacherClassFilter).length}
+                当前排序：按班级 (从小小班到团契) 及角色 (班级负责 ➔ 上课老师 ➔ 辅助老师) | 共 <span className="font-bold text-amber-900">
+                  {sortedTeachers.length}
                 </span> 位教师
               </div>
             </div>
@@ -1026,30 +1074,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <tr>
                       <th className="px-3.5 py-3">姓名</th>
                       <th className="px-3.5 py-3">性别</th>
-                      <th className="px-3.5 py-3">角色</th>
+                      <th className="px-3.5 py-3">角色分工</th>
                       <th className="px-3.5 py-3">负责班级</th>
                       <th className="px-3.5 py-3">联系电话</th>
                       <th className="px-3.5 py-3 text-right">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(selectedTeacherClassFilter === 'all' 
-                      ? teachers 
-                      : teachers.filter(t => t.classId === selectedTeacherClassFilter)
-                    ).length === 0 ? (
+                    {sortedTeachers.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                           暂无负责该班级的教师，请在右侧新增教师资料
                         </td>
                       </tr>
                     ) : (
-                      (selectedTeacherClassFilter === 'all' 
-                        ? teachers 
-                        : teachers.filter(t => t.classId === selectedTeacherClassFilter)
-                      ).map(t => {
+                      sortedTeachers.map(t => {
                         const cls = classes.find(c => c.id === t.classId);
                         const cleanTeacherName = (t.name || '').replace(/\s*老师$/, '');
                         const isSister = t.gender === 'girl';
+                        const normalizedRole = normalizeRoleTitle(t.roleTitle);
+                        let roleBadgeStyle = 'bg-slate-100 text-slate-700 border-slate-200';
+                        if (normalizedRole === '班级负责') {
+                          roleBadgeStyle = 'bg-amber-700 text-white border-amber-800 font-bold shadow-xs';
+                        } else if (normalizedRole === '上课老师') {
+                          roleBadgeStyle = 'bg-sky-50 text-sky-800 border-sky-200/90 font-bold';
+                        } else if (normalizedRole === '辅助老师') {
+                          roleBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200/90 font-medium';
+                        }
+
                         return (
                           <tr key={t.id} className="hover:bg-amber-50/40 transition-colors">
                             <td className="px-3.5 py-2.5">
@@ -1067,8 +1119,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 {isSister ? '姊妹' : '弟兄'}
                               </span>
                             </td>
-                            <td className="px-3.5 py-2.5 font-medium text-slate-600">
-                              {normalizeRoleTitle(t.roleTitle)}
+                            <td className="px-3.5 py-2.5 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-md text-[11px] border shadow-2xs ${roleBadgeStyle}`}>
+                                {normalizedRole}
+                              </span>
                             </td>
                             <td className="px-3.5 py-2.5">
                               <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-[11px] font-medium">
@@ -1145,7 +1199,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onChange={e => setTeacherRoleTitle(e.target.value)}
                       className="w-full text-xs px-2.5 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                     >
-                      <option value="班主任">班主任</option>
+                      <option value="班级负责">班级负责</option>
                       <option value="上课老师">上课老师</option>
                       <option value="辅助老师">辅助老师</option>
                     </select>
