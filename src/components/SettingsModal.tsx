@@ -1195,8 +1195,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="w-full text-xs px-2.5 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                     >
                       <option value="班级负责">班级负责</option>
-                      <option value="上课">上课</option>
-                      <option value="辅助">辅助</option>
+                      <option value="上课老师">上课老师</option>
+                      <option value="辅助老师">辅助老师</option>
                     </select>
                   </div>
 
@@ -1396,7 +1396,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <span className="font-semibold text-slate-800">{cls.teacher}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">上课:</span>
+                        <span className="text-slate-400">上课老师:</span>
                         <span className="font-semibold text-slate-800">{cls.subjectTeacher || '未设定'}</span>
                       </div>
                       <div className="flex items-center justify-between">
