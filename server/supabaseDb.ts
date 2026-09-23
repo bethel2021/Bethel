@@ -747,19 +747,44 @@ export async function supabaseUpsertAdminAccount(a: ServerAdminAccount): Promise
   const client = getSupabase();
   if (!client) return false;
   try {
+    let validClassId: string | null = null;
+    if (a.assignedClassId && String(a.assignedClassId).trim() !== '') {
+      const candidate = String(a.assignedClassId).trim();
+      const { data: clsExists } = await client.from('classes').select('id').eq('id', candidate).maybeSingle();
+      if (clsExists) {
+        validClassId = candidate;
+      }
+    }
+
     const row = {
       id: a.id,
       username: a.username.toLowerCase(),
       display_name: a.displayName,
       role: a.role,
       password: a.password,
-      created_at: a.createdAt,
-      assigned_class_id: a.assignedClassId || null
+      created_at: a.createdAt || new Date().toISOString().split('T')[0],
+      assigned_class_id: validClassId
     };
-    const { error } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
+
+    // 1. Try upsert with onConflict: 'id'
+    let { error } = await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
     if (error) {
-      console.warn('[Supabase DB Error] supabaseUpsertAdminAccount onConflict username failed, trying id:', error);
-      await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
+      // 2. Try upsert with onConflict: 'username'
+      const { error: err2 } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
+      if (err2) {
+        // 3. Fallback: try update if existing row matches username, else insert
+        const { data: existing } = await client.from('admin_accounts').select('id').ilike('username', a.username).maybeSingle();
+        if (existing) {
+          await client.from('admin_accounts').update({
+            display_name: a.displayName,
+            role: a.role,
+            password: a.password,
+            assigned_class_id: validClassId
+          }).eq('id', existing.id);
+        } else {
+          await client.from('admin_accounts').insert(row);
+        }
+      }
     }
     return true;
   } catch (err) {

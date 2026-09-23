@@ -1530,14 +1530,6 @@ export default function App() {
       throw new Error('权限不足：仅总管理员可新建或修改管理账号！');
     }
 
-    const saveLocally = () => {
-      const updated = saveLocalAccount(accountData);
-      setAccounts(updated);
-      notifyCrossTabSync();
-    };
-
-    saveLocally();
-
     try {
       const res = await fetch('/api/accounts', {
         method: 'POST',
@@ -1551,11 +1543,21 @@ export default function App() {
         if (Array.isArray(data.accounts) && data.accounts.length > 0) {
           setAccounts(data.accounts);
           saveLocalAccounts(data.accounts);
+          notifyCrossTabSync();
         }
         showSyncNotification(`✅ 管理账号【${accountData.displayName || accountData.username}】已成功保存并同步！`);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || errJson.message || `保存账号失败 (${res.status})`);
       }
-    } catch {
-      // Offline fallback
+    } catch (err: any) {
+      // Optimistic local update as offline fallback
+      const updated = saveLocalAccount(accountData);
+      setAccounts(updated);
+      notifyCrossTabSync();
+      if (err.message && !err.message.includes('Failed to fetch')) {
+        throw err;
+      }
     }
   };
 
@@ -1564,14 +1566,6 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：仅总管理员可删除管理账号！');
     }
-
-    const deleteLocally = () => {
-      const updated = deleteLocalAccount(username);
-      setAccounts(updated);
-      notifyCrossTabSync();
-    };
-
-    deleteLocally();
 
     try {
       const res = await fetch(`/api/accounts/${encodeURIComponent(username)}`, {
@@ -1585,11 +1579,20 @@ export default function App() {
         if (Array.isArray(data.accounts)) {
           setAccounts(data.accounts);
           saveLocalAccounts(data.accounts);
+          notifyCrossTabSync();
         }
         showSyncNotification('✅ 管理账号已成功删除！');
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || errJson.message || '删除账号失败');
       }
-    } catch {
-      // Offline fallback
+    } catch (err: any) {
+      const updated = deleteLocalAccount(username);
+      setAccounts(updated);
+      notifyCrossTabSync();
+      if (err.message && !err.message.includes('Failed to fetch')) {
+        throw err;
+      }
     }
   };
 
@@ -1598,14 +1601,6 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：仅总管理员可修改管理账号密码！');
     }
-
-    const changeLocally = () => {
-      const updated = updateLocalAccountPassword(username, newPassword);
-      setAccounts(updated);
-      notifyCrossTabSync();
-    };
-
-    changeLocally();
 
     try {
       const res = await fetch('/api/accounts/password', {
@@ -1620,11 +1615,20 @@ export default function App() {
         if (Array.isArray(data.accounts)) {
           setAccounts(data.accounts);
           saveLocalAccounts(data.accounts);
+          notifyCrossTabSync();
         }
         showSyncNotification('✅ 账号密码已成功更新！');
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || errJson.message || '修改密码失败');
       }
-    } catch {
-      // Offline fallback
+    } catch (err: any) {
+      const updated = updateLocalAccountPassword(username, newPassword);
+      setAccounts(updated);
+      notifyCrossTabSync();
+      if (err.message && !err.message.includes('Failed to fetch')) {
+        throw err;
+      }
     }
   };
 

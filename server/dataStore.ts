@@ -580,9 +580,19 @@ export async function initOrLoadDataAsync(force = false) {
             if (typeof k === 'string' && k) deletedRecordKeys.add(k);
           });
         }
-        if (Array.isArray(cloudData.adminAccounts) && cloudData.adminAccounts.length > 0) {
+        if (Array.isArray(cloudData.adminAccounts)) {
+          const accountMap = new Map<string, ServerAdminAccount>();
+          cloudData.adminAccounts.forEach(acc => {
+            if (acc && acc.username) accountMap.set(acc.username.toLowerCase(), acc);
+          });
+          adminAccounts.forEach(acc => {
+            if (acc && acc.username && !accountMap.has(acc.username.toLowerCase())) {
+              accountMap.set(acc.username.toLowerCase(), acc);
+            }
+          });
+          const mergedAdmins = Array.from(accountMap.values());
           adminAccounts.length = 0;
-          adminAccounts.push(...cloudData.adminAccounts);
+          adminAccounts.push(...mergedAdmins);
         }
         if (Array.isArray(cloudData.teachers) && cloudData.teachers.length > 0) {
           teachers.length = 0;
