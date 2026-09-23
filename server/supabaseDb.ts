@@ -370,7 +370,7 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
         if (!a || !a.username) continue;
         const validClassId = (a.assignedClassId && validClassIds.has(a.assignedClassId)) ? a.assignedClassId : null;
         const row = {
-          id: a.id,
+          id: a.id || `acc-${a.username.toLowerCase()}`,
           username: a.username.toLowerCase(),
           display_name: a.displayName,
           role: a.role,

@@ -1280,20 +1280,23 @@ export async function getAdminAccounts(): Promise<ServerAdminAccount[]> {
 }
 
 export async function saveAdminAccount(account: ServerAdminAccount): Promise<ServerAdminAccount> {
-  account.password = hashPasswordIfNeeded(account.password);
   const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === account.username.toLowerCase());
   let targetAccount: ServerAdminAccount;
   if (existingIdx >= 0) {
+    const existing = adminAccounts[existingIdx];
+    const newPassword = account.password ? hashPasswordIfNeeded(account.password) : existing.password;
     adminAccounts[existingIdx] = { 
-      ...adminAccounts[existingIdx], 
+      ...existing, 
       ...account,
-      id: adminAccounts[existingIdx].id // preserve ID
+      id: existing.id, // preserve ID
+      password: newPassword
     };
     targetAccount = adminAccounts[existingIdx];
   } else {
     targetAccount = {
       ...account,
-      id: account.id || `acc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+      id: account.id || `acc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      password: hashPasswordIfNeeded(account.password)
     };
     adminAccounts.push(targetAccount);
   }
