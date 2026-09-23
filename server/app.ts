@@ -1330,6 +1330,7 @@ apiRouter.get('/accounts', async (req: Request, res: Response) => {
 
 apiRouter.post('/accounts', async (req: Request, res: Response) => {
   try {
+    await initOrLoadDataAsync(true);
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
       return res.status(403).json({ error: auth.message || '仅总管理员有权限添加或修改账号' });
@@ -1418,6 +1419,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
 
 apiRouter.post('/accounts/password', async (req: Request, res: Response) => {
   try {
+    await initOrLoadDataAsync(true);
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
       return res.status(403).json({ error: auth.message || '仅总管理员有权限修改账号密码' });
@@ -1461,6 +1463,7 @@ apiRouter.post('/accounts/password', async (req: Request, res: Response) => {
 
 apiRouter.delete('/accounts/:username', async (req: Request, res: Response) => {
   try {
+    await initOrLoadDataAsync(true);
     const auth = verifySuperAdminPermission(req);
     if (!auth.allowed) {
       return res.status(403).json({ error: auth.message || '仅总管理员有权限删除账号' });
