@@ -907,7 +907,8 @@ export function mergeClientData(payload: SyncPayload): {
     activeSunday,
     syncVersion,
     lastModifiedTimestamp,
-    teachers
+    teachers,
+    adminAccounts
   } as any;
 }
 

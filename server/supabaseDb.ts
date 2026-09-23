@@ -397,18 +397,6 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
           }
         }
       }
-
-      // Reconcile deleted admin accounts in Supabase
-      try {
-        const { data: existingAdmins } = await client.from('admin_accounts').select('id, username');
-        if (existingAdmins && existingAdmins.length > 0) {
-          const keepSet = new Set(payload.adminAccounts.map(a => a.username.toLowerCase()));
-          const toDelete = existingAdmins.filter(a => !keepSet.has(a.username.toLowerCase())).map(a => a.id);
-          if (toDelete.length > 0) {
-            await client.from('admin_accounts').delete().in('id', toDelete);
-          }
-        }
-      } catch (e) {}
     }
 
     // --------------------------------------------------------------------------
