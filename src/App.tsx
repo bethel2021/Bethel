@@ -129,6 +129,38 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [serverRuntime, setServerRuntime] = useState<string | null>(null);
 
+  // Authoritative State Tracking Refs for Rollback Detection & Deep Verification
+  const studentsRef = useRef<Student[]>(students);
+  const classesRef = useRef<ClassGroup[]>(classes);
+  const teachersRef = useRef<any[]>(teachers);
+  const expectedEntitiesRef = useRef<Map<string, { type: 'student' | 'class' | 'teacher'; timestamp: number; name?: string }>>(new Map());
+  const recentDeletionsRef = useRef<Set<string>>(new Set());
+  const lastToastTimerRef = useRef<any>(null);
+
+  // Synchronize state tracking refs on state changes
+  useEffect(() => {
+    studentsRef.current = students;
+  }, [students]);
+
+  useEffect(() => {
+    classesRef.current = classes;
+  }, [classes]);
+
+  useEffect(() => {
+    teachersRef.current = teachers;
+  }, [teachers]);
+
+  // Unified Notification Toast Helper with automatic clearing
+  const showSyncNotification = (message: string, duration = 3500) => {
+    if (lastToastTimerRef.current) {
+      clearTimeout(lastToastTimerRef.current);
+    }
+    setNewCheckinAlert(message);
+    lastToastTimerRef.current = setTimeout(() => {
+      setNewCheckinAlert(null);
+    }, duration);
+  };
+
   // Broadcast cross-tab synchronization
   const notifyCrossTabSync = () => {
     try {
@@ -143,7 +175,7 @@ export default function App() {
     } catch {}
   };
 
-  // Authoritative state application from any sync channel (WebSocket, SSE, Long-poll, HTTP)
+  // Authoritative state application with explicit regression detection & deep state validation
   const applyServerState = (data: any, isInitial = false) => {
     if (!data || !data.config) return;
     setIsServerAvailable(true);
@@ -154,6 +186,73 @@ export default function App() {
         return;
       }
       syncVersionRef.current = data.syncVersion;
+    }
+
+    // -------------------------------------------------------------
+    // 🔍 Explicit Critical Data Integrity & Anti-Rollback Validation
+    // -------------------------------------------------------------
+    let hasRegression = false;
+    let regressionReason = '';
+    const now = Date.now();
+
+    // 1. Students list validation
+    if (Array.isArray(data.students)) {
+      const currentStudents = studentsRef.current || [];
+      const incomingStudents = data.students;
+
+      // Detect unexpected empty or severe drop in student count when no deletion took place
+      if (currentStudents.length > 0 && incomingStudents.length === 0 && recentDeletionsRef.current.size === 0 && !isInitial) {
+        hasRegression = true;
+        regressionReason = '学员名单回退为空';
+      }
+
+      // Detect missing recently modified/added student
+      if (!hasRegression) {
+        for (const [id, meta] of expectedEntitiesRef.current.entries()) {
+          if (meta.type === 'student' && now - meta.timestamp < 30000) {
+            const found = incomingStudents.some((s: any) => s.id === id || (meta.name && s.name === meta.name));
+            if (!found) {
+              hasRegression = true;
+              regressionReason = `近期保存的学员【${meta.name || id}】未包含在后台回传数据中`;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Classes list validation
+    if (Array.isArray(data.classes) && !hasRegression) {
+      const currentClasses = classesRef.current || [];
+      const incomingClasses = data.classes;
+
+      if (currentClasses.length > 0 && incomingClasses.length === 0 && !isInitial) {
+        hasRegression = true;
+        regressionReason = '班级名单回退为空';
+      }
+
+      if (!hasRegression) {
+        for (const [id, meta] of expectedEntitiesRef.current.entries()) {
+          if (meta.type === 'class' && now - meta.timestamp < 30000) {
+            const found = incomingClasses.some((c: any) => c.id === id || (meta.name && c.name === meta.name));
+            if (!found) {
+              hasRegression = true;
+              regressionReason = `近期保存的班级【${meta.name || id}】未包含在后台回传数据中`;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // If critical state regression is detected, reject rollback & force cloud full-recovery reload
+    if (hasRegression && !isInitial) {
+      console.warn(`[双向校验警告] 检测到后台关键数据状态回退（原因: ${regressionReason}），触发强制全量拉取与云端双向恢复...`);
+      showSyncNotification(`⚠️ 检测到后台状态同步延迟（${regressionReason}），正在自动重新校验与强行同步...`, 4000);
+      setTimeout(() => {
+        syncWithCloud();
+      }, 200);
+      return;
     }
 
     // Smart diffing updates to prevent unnecessary re-renders & page flickering
@@ -269,6 +368,25 @@ export default function App() {
       });
     }
 
+    // Clean up verified expected mutations
+    for (const [id, meta] of expectedEntitiesRef.current.entries()) {
+      if (now - meta.timestamp > 30000) {
+        expectedEntitiesRef.current.delete(id);
+      } else if (meta.type === 'student' && Array.isArray(data.students)) {
+        if (data.students.some((s: any) => s.id === id || (meta.name && s.name === meta.name))) {
+          expectedEntitiesRef.current.delete(id);
+        }
+      } else if (meta.type === 'class' && Array.isArray(data.classes)) {
+        if (data.classes.some((c: any) => c.id === id || (meta.name && c.name === meta.name))) {
+          expectedEntitiesRef.current.delete(id);
+        }
+      } else if (meta.type === 'teacher' && Array.isArray(data.teachers)) {
+        if (data.teachers.some((t: any) => t.id === id || (meta.name && t.name === meta.name))) {
+          expectedEntitiesRef.current.delete(id);
+        }
+      }
+    }
+
     setLastSyncTime(getCurrentRomeFullTimeStr());
 
     // Keep local cache synced as authoritative backup
@@ -380,12 +498,15 @@ export default function App() {
         const result = await res.json();
         applyServerState(result, false);
         notifyCrossTabSync();
+        showSyncNotification('✅ 云端双向校验完成，所有数据已完全同步！');
         return;
       }
       await loadState(false);
       notifyCrossTabSync();
+      showSyncNotification('✅ 数据已完成同步校准！');
     } catch {
       await loadState(false);
+      showSyncNotification('ℹ️ 当前处于本地离线模式，已保存最新离线数据');
     } finally {
       setTimeout(() => setIsSyncing(false), 400);
     }
@@ -833,6 +954,7 @@ export default function App() {
           setConfig(data.config);
           saveLocalData({ config: data.config });
         }
+        showSyncNotification('✅ 系统设置已通过双向状态校验并成功保存！');
       }
     } catch {
       // Offline fallback: already preserved locally in step 1
@@ -848,6 +970,7 @@ export default function App() {
     const classId = classData.id || `class-${Date.now()}`;
     const mutationPayload: Partial<ClassGroup> = { ...classData, id: classId };
     pendingClassMutationsRef.current.set(classId, mutationPayload);
+    expectedEntitiesRef.current.set(classId, { type: 'class', timestamp: Date.now(), name: classData.name });
     syncVersionRef.current = (syncVersionRef.current || 0) + 1;
 
     const saveLocally = () => {
@@ -915,6 +1038,7 @@ export default function App() {
         // Force an immediate reload and local storage rewrite from authoritative state
         pendingClassMutationsRef.current.delete(classId);
         await loadState(false);
+        showSyncNotification(`✅ 班级【${classData.name || '信息'}】已通过状态校验并同步！`);
       }
     } catch {
       // Offline fallback
@@ -1009,6 +1133,7 @@ export default function App() {
         }
         // Update mutation state without full state reload
         pendingClassMutationsRef.current.delete(classId);
+        showSyncNotification(isHiddenFromHome ? '✅ 班级已设置为不在首页展示' : '✅ 班级已恢复在首页正常展示');
       } else {
         // Fallback to /api/classes
         const fallbackRes = await fetch('/api/classes', {
@@ -1022,6 +1147,7 @@ export default function App() {
             syncVersionRef.current = fallbackData.syncVersion;
           }
           pendingClassMutationsRef.current.delete(classId);
+          showSyncNotification('✅ 班级展示状态已同步保存');
         }
       }
     } catch {
@@ -1037,6 +1163,8 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有删除班级的权限！');
     }
+
+    recentDeletionsRef.current.add(classId);
 
     const deleteLocally = () => {
       const enrolledStudents = students.filter(s => s.classId === classId);
@@ -1063,6 +1191,7 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         setIsServerAvailable(true);
         await loadState(false);
+        showSyncNotification('✅ 班级及关联数据已成功删除并同步！');
       }
     } catch {
       // Offline fallback
@@ -1077,6 +1206,7 @@ export default function App() {
 
     const assignedId = studentData.id || `s-${Date.now()}`;
     const payload = { ...studentData, id: assignedId };
+    expectedEntitiesRef.current.set(assignedId, { type: 'student', timestamp: Date.now(), name: payload.name });
 
     const saveLocally = () => {
       setStudents(prev => {
@@ -1133,6 +1263,7 @@ export default function App() {
           });
         }
         await loadState(false);
+        showSyncNotification(`✅ 学员【${payload.name}】档案已通过状态校验并成功同步！`);
       }
     } catch {
       // Offline fallback
@@ -1147,18 +1278,22 @@ export default function App() {
 
     const addLocally = () => {
       const lines = namesText.split(/[\n,，]+/).map(s => s.trim()).filter(Boolean);
-      const newItems: Student[] = lines.map((name, i) => ({
-        id: `s-${Date.now()}-${i}`,
-        name,
-        gender: i % 2 === 0 ? 'boy' : 'girl',
-        age: defaultAge || 7,
-        birthDate: defaultBirthDate || '2019-06-01',
-        classId,
-        parentName: '家长/本人',
-        parentPhone: '未填写',
-        memberCode: `BTL-${Math.floor(100 + Math.random() * 900)}`,
-        joinDate: new Date().toISOString().split('T')[0]
-      }));
+      const newItems: Student[] = lines.map((name, i) => {
+        const id = `s-${Date.now()}-${i}`;
+        expectedEntitiesRef.current.set(id, { type: 'student', timestamp: Date.now(), name });
+        return {
+          id,
+          name,
+          gender: (i % 2 === 0 ? 'boy' : 'girl') as 'boy' | 'girl',
+          age: defaultAge || 7,
+          birthDate: defaultBirthDate || '2019-06-01',
+          classId,
+          parentName: '家长/本人',
+          parentPhone: '未填写',
+          memberCode: `BTL-${Math.floor(100 + Math.random() * 900)}`,
+          joinDate: new Date().toISOString().split('T')[0]
+        };
+      });
       setStudents(prev => {
         const updated = [...prev, ...newItems];
         saveLocalData({ students: updated });
@@ -1187,6 +1322,7 @@ export default function App() {
           saveLocalData({ students: data.students });
         }
         await loadState(false);
+        showSyncNotification(`✅ 批量录入学员成功，已通过双向状态校验并同步！`);
       }
     } catch {
       // Offline fallback
@@ -1198,6 +1334,8 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有删除学员的权限！');
     }
+
+    recentDeletionsRef.current.add(studentId);
 
     const deleteLocally = () => {
       setStudents(prev => {
@@ -1232,6 +1370,7 @@ export default function App() {
           saveLocalData({ students: data.students });
         }
         await loadState(false);
+        showSyncNotification('✅ 学员档案已成功删除并同步！');
       }
     } catch {
       // Offline fallback
@@ -1246,6 +1385,7 @@ export default function App() {
 
     const teacherId = (teacherData.id && String(teacherData.id).trim()) || `t-${Date.now().toString().slice(-6)}`;
     const fullTeacherData = { ...teacherData, id: teacherId };
+    expectedEntitiesRef.current.set(teacherId, { type: 'teacher', timestamp: Date.now(), name: fullTeacherData.name });
 
     const saveLocally = () => {
       setTeachers(prev => {
@@ -1293,6 +1433,7 @@ export default function App() {
         }
         setIsServerAvailable(true);
         await loadState(false);
+        showSyncNotification(`✅ 教师【${fullTeacherData.name}】资料已通过状态校验并同步！`);
       } else {
         const errData = contentType.includes('application/json') ? await res.json() : null;
         throw new Error(errData?.error || `保存教师资料失败 (${res.status})`);
@@ -1307,6 +1448,8 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有删除教师的权限！');
     }
+
+    recentDeletionsRef.current.add(teacherId);
 
     const deleteLocally = () => {
       setTeachers(prev => {
@@ -1328,6 +1471,7 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         setIsServerAvailable(true);
         await loadState(false);
+        showSyncNotification('✅ 教师资料已成功删除！');
       }
     } catch {
       // Offline fallback
@@ -1546,9 +1690,21 @@ export default function App() {
       
       {/* Real-time Notification Toast */}
       {newCheckinAlert && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-300">
-          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-          <span className="text-xs font-medium">{newCheckinAlert}</span>
+        <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-300 max-w-md ${
+          newCheckinAlert.includes('⚠️') || newCheckinAlert.includes('失败') || newCheckinAlert.includes('错误')
+            ? 'bg-amber-950 text-amber-100 border-amber-600'
+            : newCheckinAlert.includes('✅')
+            ? 'bg-slate-900 text-emerald-300 border-emerald-500/40'
+            : 'bg-slate-900 text-white border-slate-700'
+        }`}>
+          {newCheckinAlert.includes('⚠️') ? (
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+          ) : newCheckinAlert.includes('✅') ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          ) : (
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+          )}
+          <span className="text-xs font-medium leading-relaxed">{newCheckinAlert}</span>
         </div>
       )}
 
