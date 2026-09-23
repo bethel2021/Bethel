@@ -95,16 +95,16 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="w-11 h-11 rounded-xl bg-linear-to-br from-amber-600 to-amber-800 flex items-center justify-center text-amber-50 shadow-md shadow-amber-900/10 shrink-0">
               <Church className="w-6 h-6" />
             </div>
-            <div>
+            <div className="whitespace-nowrap">
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 font-serif">
+                <h1 className="text-xl font-bold tracking-tight text-slate-900 font-serif truncate">
                   {config.churchName}
                 </h1>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-medium border border-amber-200">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-medium border border-amber-200 shrink-0">
                   {config.currentSemester}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+              <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5 truncate">
                 <span className="text-amber-900 font-semibold">{config.schoolTitle}</span>
                 <span className="text-slate-300">•</span>
                 <span className="text-amber-800">学生考勤与资料管理</span>

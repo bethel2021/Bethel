@@ -137,15 +137,20 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
         notes: r.notes || undefined
       }));
 
-      const mappedAdmins: ServerAdminAccount[] = rawAdmins.map(a => ({
-        id: a.id || `acc-${a.username}`,
-        username: a.username,
-        displayName: a.display_name || a.displayName || a.username,
-        role: a.role || 'teacher',
-        password: a.password,
-        createdAt: a.created_at || a.createdAt || '2026-01-01',
-        assignedClassId: a.assigned_class_id || a.assignedClassId || undefined
-      }));
+      const isolationMap = rawConfig?.config?.accountClassIsolation || rawConfig?.config?.config?.accountClassIsolation || {};
+      const mappedAdmins: ServerAdminAccount[] = rawAdmins.map(a => {
+        const usernameLower = a.username ? String(a.username).toLowerCase() : '';
+        const fallbackClassId = isolationMap[usernameLower] || undefined;
+        return {
+          id: a.id || `acc-${a.username}`,
+          username: a.username,
+          displayName: a.display_name || a.displayName || a.username,
+          role: a.role || 'teacher',
+          password: a.password,
+          createdAt: a.created_at || a.createdAt || '2026-01-01',
+          assignedClassId: a.assigned_class_id || a.assignedClassId || fallbackClassId
+        };
+      });
 
       // Deleted record keys from deleted_attendance_records table
       const deletedKeysFromTable: string[] = rawDeleted.map(d => d.id || `${d.student_id}_${d.date}`).filter(Boolean);

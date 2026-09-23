@@ -196,6 +196,18 @@ export async function saveDataToSupabase(): Promise<boolean> {
     c.isHiddenFromHome = hiddenIds.includes(c.id);
   });
 
+  // 动态自愈设计：备份班级数据隔离映射至系统配置 JSONB，防数据库字段缺失导致重置
+  const isolationMap: Record<string, string> = {};
+  adminAccounts.forEach(a => {
+    if (a.assignedClassId) {
+      isolationMap[a.username.toLowerCase()] = a.assignedClassId;
+    }
+  });
+  systemConfig.config = {
+    ...(systemConfig.config || {}),
+    accountClassIsolation: isolationMap
+  };
+
   const updatedConfig = {
     ...systemConfig,
     hiddenClassIds: hiddenIds

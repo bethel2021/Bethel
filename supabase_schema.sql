@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS admin_accounts (
   display_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'teacher',
   password TEXT NOT NULL,
+  assigned_class_id TEXT REFERENCES classes(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

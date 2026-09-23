@@ -73,6 +73,7 @@ export interface SystemConfig {
   enableCheckinPopup: boolean; // 是否在大屏模式显示实时打卡悬浮喜报
   hiddenClassIds?: string[]; // 在首页隐藏的班级ID列表
   adminPassword?: string; // 后台管理员密码 (默认 bethel2026)
+  config?: any; // 动态元数据配置存储，作为数据库表缺少特定列时的自愈型备用存储
 }
 
 export interface AdminUser {
