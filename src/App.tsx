@@ -1577,6 +1577,7 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setIsServerAvailable(true);
+        deleteLocalAccount(username);
         if (Array.isArray(data.accounts)) {
           setAccounts(data.accounts);
           saveLocalAccounts(data.accounts);

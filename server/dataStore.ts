@@ -581,28 +581,27 @@ export async function initOrLoadDataAsync(force = false) {
           });
         }
         if (Array.isArray(cloudData.adminAccounts)) {
-          const accountMap = new Map<string, ServerAdminAccount>();
-          cloudData.adminAccounts.forEach(acc => {
-            if (acc && acc.username) accountMap.set(acc.username.toLowerCase(), acc);
-          });
-          const unsyncedLocals: ServerAdminAccount[] = [];
-          adminAccounts.forEach(acc => {
-            if (acc && acc.username) {
-              const uKey = acc.username.toLowerCase();
-              if (!accountMap.has(uKey)) {
-                accountMap.set(uKey, acc);
-                unsyncedLocals.push(acc);
+          if (cloudData.adminAccounts.length > 0) {
+            // Cloud Supabase DB is authoritative for admin_accounts
+            const memoryPassMap = new Map<string, string>();
+            adminAccounts.forEach(a => {
+              if (a.username && a.password) {
+                memoryPassMap.set(a.username.toLowerCase(), a.password);
               }
-            }
-          });
-          const mergedAdmins = Array.from(accountMap.values());
-          adminAccounts.length = 0;
-          adminAccounts.push(...mergedAdmins);
+            });
 
-          if (unsyncedLocals.length > 0) {
-            for (const localAcc of unsyncedLocals) {
+            const authoritativeAdmins = cloudData.adminAccounts.map(a => ({
+              ...a,
+              password: a.password || memoryPassMap.get(a.username.toLowerCase()) || ''
+            }));
+
+            adminAccounts.length = 0;
+            adminAccounts.push(...authoritativeAdmins);
+          } else if (adminAccounts.length > 0) {
+            // Supabase admin_accounts table is empty, seed local accounts to Supabase
+            for (const localAcc of adminAccounts) {
               supabaseUpsertAdminAccount(localAcc).catch(err => {
-                console.warn('[Sync Admin Account Error] Failed to background sync local account:', localAcc.username, err);
+                console.warn('[Sync Admin Account Error] Failed to seed initial account:', localAcc.username, err);
               });
             }
           }
@@ -1292,7 +1291,10 @@ export async function saveAdminAccount(account: ServerAdminAccount): Promise<Ser
     };
     targetAccount = adminAccounts[existingIdx];
   } else {
-    targetAccount = { ...account };
+    targetAccount = {
+      ...account,
+      id: account.id || `acc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+    };
     adminAccounts.push(targetAccount);
   }
   syncVersion++;

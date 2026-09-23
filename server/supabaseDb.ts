@@ -763,8 +763,9 @@ export async function supabaseUpsertAdminAccount(a: ServerAdminAccount): Promise
       }
     }
 
+    const rowId = a.id || `acc-${a.username.toLowerCase()}`;
     const row = {
-      id: a.id,
+      id: rowId,
       username: a.username.toLowerCase(),
       display_name: a.displayName,
       role: a.role,
