@@ -514,7 +514,7 @@ export function loadFromDisk(): boolean {
   return false;
 }
 
-export function initOrLoadData() {
+export async function initOrLoadData() {
   if (isInitialized) {
     return;
   }
@@ -523,16 +523,21 @@ export function initOrLoadData() {
   const loaded = loadFromDisk();
   if (loaded) {
     sanitizeYageData();
-    initOrLoadDataAsync().catch(() => {});
+    await initOrLoadDataAsync().catch(() => {});
     return;
   }
 
-  // If no file exists, initialize default records in memory
-  sanitizeYageData();
-  generateHistoricalRecords();
-
-  // Load from Supabase PostgreSQL in background
-  initOrLoadDataAsync().catch(() => {});
+  // If Supabase is configured, fetch authoritative cloud data BEFORE generating fallback mock data
+  if (isSupabaseConfigured()) {
+    console.log('[Supabase DB] Supabase is configured. Pre-loading cloud database before accepting requests...');
+    sanitizeYageData();
+    await initOrLoadDataAsync().catch(() => {});
+  } else {
+    // If no file exists and no Supabase is configured, initialize default records in memory
+    console.log('[Storage DB] Supabase not configured. Initializing local in-memory records...');
+    sanitizeYageData();
+    generateHistoricalRecords();
+  }
 }
 
 export async function initOrLoadDataAsync(force = false) {
@@ -636,6 +641,8 @@ export async function initOrLoadDataAsync(force = false) {
       } else {
         // Supabase is configured but database is freshly created / empty -> seed initial data!
         console.log('[Supabase DB] Fresh Supabase database detected. Seeding initial church roster to PostgreSQL...');
+        sanitizeYageData();
+        generateHistoricalRecords();
         await saveDataToDb();
       }
     } catch (err) {

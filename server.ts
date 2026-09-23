@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import path from 'path';
@@ -10,7 +11,9 @@ import { initOrLoadData } from './server/dataStore';
 const PORT = 3000;
 
 async function startServer() {
-  initOrLoadData();
+  console.log('[Server Startup] Initializing data store...');
+  await initOrLoadData();
+  console.log('[Server Startup] Data store initialized.');
 
   const server = http.createServer(app);
 

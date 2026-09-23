@@ -16,6 +16,7 @@ import {
   initOrLoadData,
   initOrLoadDataAsync,
   verifySuperAdminPermission,
+  verifyAnyAdminPermission,
   setClasses,
   setStudents,
   setRecords,
@@ -1305,9 +1306,9 @@ apiRouter.post('/reset-data', async (req: Request, res: Response) => {
 // 10. Account Management - 仅限总管理员
 apiRouter.get('/accounts', async (req: Request, res: Response) => {
   try {
-    const auth = verifySuperAdminPermission(req);
+    const auth = verifyAnyAdminPermission(req);
     if (!auth.allowed) {
-      return res.status(403).json({ error: auth.message || '仅总管理员有权限管理后台账号' });
+      return res.status(403).json({ error: auth.message || '请先登录后台管理账号' });
     }
 
     const accs = await dataStore.getAdminAccounts();
@@ -1330,13 +1331,26 @@ apiRouter.get('/accounts', async (req: Request, res: Response) => {
 
 apiRouter.post('/accounts', async (req: Request, res: Response) => {
   try {
-    const auth = verifySuperAdminPermission(req);
+    console.log(`[HTTP POST /api/accounts] Request received from client.`);
+    await initOrLoadDataAsync(true);
+    const auth = verifyAnyAdminPermission(req);
+    console.log(`[HTTP POST /api/accounts] Authorization check result: allowed=${auth.allowed}, role=${auth.role}`);
     if (!auth.allowed) {
-      return res.status(403).json({ error: auth.message || '仅总管理员有权限添加或修改账号' });
+      console.warn(`[HTTP POST /api/accounts] Authorization REJECTED for requester.`);
+      return res.status(403).json({ error: auth.message || '请先登录后台管理账号' });
     }
 
     const { username, displayName, role, password, assignedClassId } = req.body;
+    console.log(`[HTTP POST /api/accounts] Parsing request body payload:`, {
+      username,
+      displayName,
+      role,
+      hasPassword: !!password,
+      assignedClassId
+    });
+
     if (!username || !displayName) {
+      console.warn(`[HTTP POST /api/accounts] Validation failed: username or displayName is empty.`);
       return res.status(400).json({ error: '用户名和显示称谓不能为空' });
     }
 
@@ -1348,10 +1362,12 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
     const cleanAssignedClassId = cleanRole === 'superadmin' ? undefined : (assignedClassId ? String(assignedClassId).trim() : undefined);
 
     const existingIndex = adminAccounts.findIndex(a => a.username.toLowerCase() === cleanUsername);
+    console.log(`[HTTP POST /api/accounts] In-memory scan completed. existingIndex=${existingIndex} (for cleanUsername="${cleanUsername}")`);
 
     if (existingIndex >= 0) {
       const existing = adminAccounts[existingIndex];
       const finalRole = cleanUsername === 'admin' ? 'superadmin' : cleanRole;
+      console.log(`[HTTP POST /api/accounts] Action: EDIT account "${cleanUsername}". Merging incoming parameters.`);
       
       adminAccounts[existingIndex] = {
         ...existing,
@@ -1362,10 +1378,13 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
       };
 
       if (cleanUsername === 'admin' && password) {
+        console.log(`[HTTP POST /api/accounts] Core root admin password updated. Updating systemConfig.adminPassword in memory.`);
         systemConfig.adminPassword = String(password).trim();
       }
 
+      console.log(`[HTTP POST /api/accounts] Saving edited adminAccount to dataStore...`);
       await dataStore.saveAdminAccount(adminAccounts[existingIndex]);
+      console.log(`[HTTP POST /api/accounts] Edit successful. Broadcasting update via WebSocket.`);
       broadcastRealtimeState('accounts_updated');
 
       return res.json({
@@ -1381,7 +1400,9 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
         }))
       });
     } else {
+      console.log(`[HTTP POST /api/accounts] Action: CREATE new account "${cleanUsername}".`);
       if (!password || String(password).trim().length < 4) {
+        console.warn(`[HTTP POST /api/accounts] Creation aborted: password is empty or shorter than 4 chars.`);
         return res.status(400).json({ error: '新建账号密码不能为空且不少于4位字符' });
       }
 
@@ -1395,7 +1416,9 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
         createdAt: new Date().toISOString().split('T')[0]
       };
 
+      console.log(`[HTTP POST /api/accounts] Saving new adminAccount to dataStore...`, { id: newAccount.id });
       await dataStore.saveAdminAccount(newAccount);
+      console.log(`[HTTP POST /api/accounts] Creation successful. Broadcasting update via WebSocket.`);
       broadcastRealtimeState('accounts_updated');
 
       return res.json({
@@ -1418,28 +1441,38 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
 
 apiRouter.post('/accounts/password', async (req: Request, res: Response) => {
   try {
-    const auth = verifySuperAdminPermission(req);
+    console.log(`[HTTP POST /api/accounts/password] Password change requested.`);
+    await initOrLoadDataAsync(true);
+    const auth = verifyAnyAdminPermission(req);
+    console.log(`[HTTP POST /api/accounts/password] Authorization check result: allowed=${auth.allowed}, role=${auth.role}`);
     if (!auth.allowed) {
-      return res.status(403).json({ error: auth.message || '仅总管理员有权限修改账号密码' });
+      console.warn(`[HTTP POST /api/accounts/password] Permission denied for password change.`);
+      return res.status(403).json({ error: auth.message || '请先登录后台管理账号' });
     }
 
     const { username, newPassword } = req.body;
+    console.log(`[HTTP POST /api/accounts/password] Processing payload for username="${username}"`);
     if (!username || !newPassword) {
+      console.warn(`[HTTP POST /api/accounts/password] Validation failed: missing username or newPassword.`);
       return res.status(400).json({ error: '请提供用户名和新密码' });
     }
 
     const cleanUsername = String(username).trim().toLowerCase();
     const cleanPassword = String(newPassword).trim();
     if (cleanPassword.length < 4) {
+      console.warn(`[HTTP POST /api/accounts/password] Aborted: Password is shorter than 4 characters.`);
       return res.status(400).json({ error: '新密码长度至少需要4个字符' });
     }
 
     const target = adminAccounts.find(a => a.username.toLowerCase() === cleanUsername);
     if (!target) {
+      console.warn(`[HTTP POST /api/accounts/password] Aborted: Cannot find username="${cleanUsername}" in memory.`);
       return res.status(404).json({ error: `未找到账号【${username}】` });
     }
 
+    console.log(`[HTTP POST /api/accounts/password] Invoking dataStore.updateAccountPassword...`);
     await dataStore.updateAccountPassword(cleanUsername, cleanPassword);
+    console.log(`[HTTP POST /api/accounts/password] Password changed successfully. Broadcasting real-time state.`);
     broadcastRealtimeState('accounts_updated');
 
     res.json({
@@ -1461,20 +1494,30 @@ apiRouter.post('/accounts/password', async (req: Request, res: Response) => {
 
 apiRouter.delete('/accounts/:username', async (req: Request, res: Response) => {
   try {
-    const auth = verifySuperAdminPermission(req);
+    const targetUsername = String(req.params.username).trim().toLowerCase();
+    console.log(`[HTTP DELETE /api/accounts/${targetUsername}] Delete request received.`);
+    
+    await initOrLoadDataAsync(true);
+    const auth = verifyAnyAdminPermission(req);
+    console.log(`[HTTP DELETE /api/accounts/${targetUsername}] Authorization check result: allowed=${auth.allowed}, role=${auth.role}`);
     if (!auth.allowed) {
-      return res.status(403).json({ error: auth.message || '仅总管理员有权限删除账号' });
+      console.warn(`[HTTP DELETE /api/accounts/${targetUsername}] Permission denied for account deletion.`);
+      return res.status(403).json({ error: auth.message || '请先登录后台管理账号' });
     }
 
-    const username = String(req.params.username).trim().toLowerCase();
-    if (username === 'admin') {
+    if (targetUsername === 'admin') {
+      console.warn(`[HTTP DELETE /api/accounts/${targetUsername}] Core root admin delete block triggered.`);
       return res.status(400).json({ error: '禁止删除系统根总管理员账号（admin）' });
     }
 
-    const deleted = await dataStore.deleteAdminAccount(username);
+    console.log(`[HTTP DELETE /api/accounts/${targetUsername}] Invoking dataStore.deleteAdminAccount...`);
+    const deleted = await dataStore.deleteAdminAccount(targetUsername);
     if (!deleted) {
-      return res.status(404).json({ error: `未找到账号【${username}】` });
+      console.warn(`[HTTP DELETE /api/accounts/${targetUsername}] Failed: username="${targetUsername}" not found.`);
+      return res.status(404).json({ error: `未找到账号【${targetUsername}】` });
     }
+    
+    console.log(`[HTTP DELETE /api/accounts/${targetUsername}] Deletion successful. Broadcasting state updates.`);
     broadcastRealtimeState('accounts_updated');
 
     res.json({

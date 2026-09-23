@@ -514,10 +514,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Open in-app deletion confirm for Account
   const handleRequestDeleteAccount = (acc: AdminAccount) => {
-    if (!isSuperAdmin) {
-      showNotice('error', '权限受限：仅总管理员有权限删除账号！');
-      return;
-    }
     if (acc.username.toLowerCase() === 'admin') {
       showNotice('error', '系统安全限制：根总管理员账号（admin）受系统核心保护，禁止删除！');
       return;
@@ -533,8 +529,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Execute in-app confirmed deletion
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
-    if (!isSuperAdmin) {
-      showNotice('error', '权限受限：除了总管理员之外，其他账号没有删除班级、学生与账号的权限！');
+    if (!isSuperAdmin && deleteTarget.type !== 'account') {
+      showNotice('error', '权限受限：除了总管理员之外，其他账号没有删除班级、学生与教师的权限！');
       return;
     }
     setIsDeleting(true);
@@ -566,10 +562,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Open create account modal
   const handleOpenNewAccount = () => {
-    if (!isSuperAdmin) {
-      showNotice('error', '权限受限：仅总管理员可新建管理账号！');
-      return;
-    }
     setEditingAccount(null);
     setAccountUsername('');
     setAccountDisplayName('');
@@ -582,10 +574,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Open edit account modal
   const handleOpenEditAccount = (acc: AdminAccount) => {
-    if (!isSuperAdmin) {
-      showNotice('error', '权限受限：仅总管理员可修改管理账号资料！');
-      return;
-    }
     setEditingAccount(acc);
     setAccountUsername(acc.username);
     setAccountDisplayName(acc.displayName);
@@ -598,10 +586,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Open change password modal
   const handleOpenChangePassword = (acc: AdminAccount) => {
-    if (!isSuperAdmin) {
-      showNotice('error', '权限受限：仅总管理员可重置账号密码！');
-      return;
-    }
     setPasswordTargetAccount(acc);
     setNewAccountPassword('');
     setIsPasswordModalOpen(true);
@@ -610,10 +594,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Submit create or edit account
   const handleSaveAccountSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSuperAdmin) {
-      showNotice('error', '权限受限：仅总管理员可操作账号！');
-      return;
-    }
     const cleanUsername = accountUsername.trim().toLowerCase();
     const cleanDisplayName = accountDisplayName.trim();
     if (!cleanUsername) {
@@ -1885,25 +1865,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               )}
 
-              {isSuperAdmin ? (
-                <button
-                  type="button"
-                  onClick={handleOpenNewAccount}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>新建管理账号</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onOpenLogin}
-                  className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 transition-colors"
-                >
-                  <Lock className="w-3.5 h-3.5 text-amber-700" />
-                  <span>切换总管理员以管理账号</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleOpenNewAccount}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>新建管理账号</span>
+              </button>
             </div>
           </div>
 
@@ -1959,12 +1928,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </span>
                 </h4>
               </div>
-              {!isSuperAdmin && (
-                <span className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  <span>当前账号权限受限：仅总管理员可新建、修改或删除账号</span>
-                </span>
-              )}
+              <span className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                <span>全同工账号自主管理授权：支持任何同工新建、修改及删除管理账号</span>
+              </span>
             </div>
 
             <div className="overflow-x-auto">
@@ -2077,13 +2044,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenEditAccount(acc)}
-                              disabled={!isSuperAdmin}
-                              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
-                                isSuperAdmin 
-                                  ? 'border-slate-200 hover:bg-slate-100 text-slate-700' 
-                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
-                              }`}
-                              title={isSuperAdmin ? '修改账号姓名与角色' : '仅总管理员可修改资料'}
+                              className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border-slate-200 hover:bg-slate-100 text-slate-700"
+                              title="修改账号显示名称与角色"
                             >
                               <Edit2 className="w-3.5 h-3.5 text-slate-600" />
                               <span className="hidden sm:inline">编辑</span>
@@ -2092,13 +2054,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenChangePassword(acc)}
-                              disabled={!isSuperAdmin}
-                              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
-                                isSuperAdmin 
-                                  ? 'border-amber-200 hover:bg-amber-50 text-amber-900' 
-                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
-                              }`}
-                              title={isSuperAdmin ? '重置此账号登录密码' : '仅总管理员可重置密码'}
+                              className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border-amber-200 hover:bg-amber-50 text-amber-900"
+                              title="重置此账号登录密码"
                             >
                               <KeyRound className="w-3.5 h-3.5 text-amber-700" />
                               <span className="hidden sm:inline">改密</span>
@@ -2107,20 +2064,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleRequestDeleteAccount(acc)}
-                              disabled={!isSuperAdmin || isRootAdmin}
+                              disabled={isRootAdmin}
                               className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
                                 isRootAdmin
                                   ? 'opacity-30 border-slate-200 text-slate-300 cursor-not-allowed'
-                                  : isSuperAdmin
-                                  ? 'border-red-200 hover:bg-red-50 text-red-600'
-                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : 'border-red-200 hover:bg-red-50 text-red-600'
                               }`}
                               title={
                                 isRootAdmin 
                                   ? '系统根总管受系统保护，不可删除' 
-                                  : isSuperAdmin 
-                                  ? '删除此账号' 
-                                  : '仅总管理员可删除账号'
+                                  : '删除此账号'
                               }
                             >
                               <Trash2 className="w-3.5 h-3.5" />
