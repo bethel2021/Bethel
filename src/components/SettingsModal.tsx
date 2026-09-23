@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Settings, 
   Clock, 
@@ -99,7 +99,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'classes' | 'students' | 'teachers' | 'accounts' | 'options' | 'system'>('classes');
   
   const isSuperAdmin = currentUser?.role === 'superadmin';
-  const dbTeacherNames = Array.from(new Set(teachers.map(t => t.name).filter(Boolean)));
+  const dbTeacherNames = useMemo(() => {
+    const list = [
+      ...teachers.map(t => (t.name || '').trim().replace(/\s*老师$/, '')),
+      ...classes.map(c => (c.teacher || '').trim().replace(/\s*老师$/, '')),
+      '春来', '秋娟', '若雪', '上好', '雪成', '志安', '东丽'
+    ].filter(Boolean);
+    return Array.from(new Set(list));
+  }, [teachers, classes]);
 
   // Feedback notices
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
@@ -375,13 +382,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       showNotice('error', '权限受限：除了总管理员之外，其他账号只有管理签到权限，没有编辑班级的权限！');
       return;
     }
-    const dbTeacherNames = Array.from(new Set(teachers.map(t => t.name).filter(Boolean)));
-    const hasCustomTeacher = cls.teacher && !dbTeacherNames.includes(cls.teacher);
-    const hasCustomSubjectTeacher = cls.subjectTeacher && !dbTeacherNames.includes(cls.subjectTeacher);
+    const cleanTeacher = (cls.teacher || '').trim().replace(/\s*老师$/, '');
+    const hasCustomTeacher = Boolean(cleanTeacher && !dbTeacherNames.includes(cleanTeacher));
 
     setEditingClass({ ...cls, isHiddenFromHome: cls.isHiddenFromHome || false });
-    setShowCustomTeacherInput(!!hasCustomTeacher);
-    setShowCustomSubjectTeacherInput(!!hasCustomSubjectTeacher);
+    setShowCustomTeacherInput(hasCustomTeacher);
+    setShowCustomSubjectTeacherInput(false);
     setIsClassModalOpen(true);
   };
 
@@ -2705,7 +2711,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     班级负责 *
@@ -2713,27 +2719,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {!showCustomTeacherInput ? (
                     <div className="space-y-1">
                       <select
-                        value={editingClass.teacher || ''}
+                        value={(() => {
+                          const raw = (editingClass.teacher || '').trim();
+                          const clean = raw.replace(/\s*老师$/, '');
+                          if (dbTeacherNames.includes(clean)) return clean;
+                          if (dbTeacherNames.includes(raw)) return raw;
+                          return raw;
+                        })()}
                         onChange={e => {
                           const val = e.target.value;
                           if (val === '__custom__') {
                             setShowCustomTeacherInput(true);
                             setEditingClass({ ...editingClass, teacher: '' });
                           } else {
-                            setEditingClass({ ...editingClass, teacher: val });
+                            const formatted = val ? (val.endsWith('老师') ? val : `${val} 老师`) : '';
+                            setEditingClass({ ...editingClass, teacher: formatted });
                           }
                         }}
                         className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                       >
                         <option value="">— 选择核心负责老师 —</option>
-                        {editingClass.teacher && !dbTeacherNames.includes(editingClass.teacher) && (
-                          <option value={editingClass.teacher}>{editingClass.teacher}</option>
-                        )}
-                        {dbTeacherNames.map(name => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
+                        {(() => {
+                          const raw = (editingClass.teacher || '').trim();
+                          const clean = raw.replace(/\s*老师$/, '');
+                          const isCustom = raw && !dbTeacherNames.includes(clean) && !dbTeacherNames.includes(raw);
+                          return (
+                            <>
+                              {isCustom && <option value={raw}>{raw}</option>}
+                              {dbTeacherNames.map(name => (
+                                <option key={name} value={name}>
+                                  {name} 老师
+                                </option>
+                              ))}
+                            </>
+                          );
+                        })()}
                         <option value="__custom__" className="text-amber-600 font-medium">
                           ✍️ 手动输入自定义姓名...
                         </option>
@@ -2756,7 +2776,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             setShowCustomTeacherInput(false);
                             setEditingClass({ ...editingClass, teacher: '' });
                           }}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline mt-1 block"
+                          className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline mt-1 block cursor-pointer"
                         >
                           ⬅️ 从教师资料库中选择
                         </button>
@@ -2791,9 +2811,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             type="button"
                             onClick={() => {
                               const updated = selectedSubjectTeachers.filter((_, i) => i !== idx);
-                              setEditingClass({ ...editingClass, subjectTeacher: updated.join(', ') });
+                              setEditingClass({ ...editingClass, subjectTeacher: updated.join('、') });
                             }}
-                            className="text-amber-500 hover:text-amber-700 font-bold ml-1 text-xs focus:outline-none focus:ring-0 leading-none"
+                            className="text-amber-500 hover:text-amber-700 font-bold ml-1 text-xs focus:outline-none focus:ring-0 leading-none cursor-pointer"
                             style={{ padding: 0 }}
                           >
                             ×
@@ -2803,43 +2823,86 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     })()}
                   </div>
 
-                  <div className="flex gap-2">
-                    {/* Select from database dropdown */}
-                    <div className="flex-1">
-                      <select
-                        value=""
-                        onChange={e => {
-                          const val = e.target.value;
+                  {/* Fast Selection / Add Controls */}
+                  <div className="space-y-1.5">
+                    {/* Quick clickable chips for teachers */}
+                    {dbTeacherNames.length > 0 && (
+                      <div className="flex flex-wrap gap-1 items-center">
+                        <span className="text-[10px] text-slate-400 mr-0.5">快捷点选:</span>
+                        {dbTeacherNames.slice(0, 10).map(name => {
                           const currentTeachers = editingClass.subjectTeacher
-                            ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim()).filter(Boolean)
+                            ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim().replace(/\s*老师$/, '')).filter(Boolean)
                             : [];
+                          const isAlreadySelected = currentTeachers.includes(name);
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => {
+                                const rawTeachers = editingClass.subjectTeacher
+                                  ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim()).filter(Boolean)
+                                  : [];
+                                if (isAlreadySelected) {
+                                  const filtered = rawTeachers.filter(s => s.replace(/\s*老师$/, '') !== name);
+                                  setEditingClass({ ...editingClass, subjectTeacher: filtered.join('、') });
+                                } else {
+                                  const added = [...rawTeachers, `${name} 老师`];
+                                  setEditingClass({ ...editingClass, subjectTeacher: added.join('、') });
+                                }
+                              }}
+                              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                                isAlreadySelected
+                                  ? 'bg-amber-100 border-amber-300 text-amber-900 font-medium'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              {isAlreadySelected ? `✓ ${name}` : `+ ${name}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                          if (val === '__custom__') {
-                            setShowCustomSubjectTeacherInput(true);
-                          } else if (val && !currentTeachers.includes(val)) {
-                            const updated = [...currentTeachers, val];
-                            setEditingClass({ ...editingClass, subjectTeacher: updated.join(', ') });
-                          }
-                        }}
-                        className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
-                      >
-                        <option value="">— 快速从教师库中选取添加 —</option>
-                        {(() => {
-                          const currentTeachers = editingClass.subjectTeacher
-                            ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim()).filter(Boolean)
-                            : [];
-                          return dbTeacherNames
-                            .filter(name => !currentTeachers.includes(name))
-                            .map(name => (
-                              <option key={name} value={name}>
-                                {name}
-                              </option>
-                            ));
-                        })()}
-                        <option value="__custom__" className="text-amber-600 font-medium">
-                          ✍️ 手动添加自定义老师...
-                        </option>
-                      </select>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <select
+                          value=""
+                          onChange={e => {
+                            const val = e.target.value;
+                            const currentTeachers = editingClass.subjectTeacher
+                              ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim()).filter(Boolean)
+                              : [];
+
+                            if (val === '__custom__') {
+                              setShowCustomSubjectTeacherInput(true);
+                            } else if (val) {
+                              const formatted = val.endsWith('老师') ? val : `${val} 老师`;
+                              if (!currentTeachers.includes(formatted) && !currentTeachers.includes(val)) {
+                                const updated = [...currentTeachers, formatted];
+                                setEditingClass({ ...editingClass, subjectTeacher: updated.join('、') });
+                              }
+                            }
+                          }}
+                          className="w-full text-xs px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                        >
+                          <option value="">— 从教师库下拉选取添加 —</option>
+                          {(() => {
+                            const currentTeachers = editingClass.subjectTeacher
+                              ? editingClass.subjectTeacher.split(/[,\s，、]+/).map(s => s.trim().replace(/\s*老师$/, '')).filter(Boolean)
+                              : [];
+                            return dbTeacherNames
+                              .filter(name => !currentTeachers.includes(name))
+                              .map(name => (
+                                <option key={name} value={name}>
+                                  {name} 老师
+                                </option>
+                              ));
+                          })()}
+                          <option value="__custom__" className="text-amber-600 font-medium">
+                            ✍️ 手动添加自定义老师...
+                          </option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -2851,7 +2914,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <button
                           type="button"
                           onClick={() => setShowCustomSubjectTeacherInput(false)}
-                          className="text-[10px] text-slate-400 hover:text-slate-600 font-medium"
+                          className="text-[10px] text-slate-400 hover:text-slate-600 font-medium cursor-pointer"
                         >
                           收起
                         </button>
@@ -2872,7 +2935,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   : [];
                                 const parts = val.split(/[,\s，、]+/).map(p => p.trim()).filter(Boolean);
                                 const updated = Array.from(new Set([...currentTeachers, ...parts]));
-                                setEditingClass({ ...editingClass, subjectTeacher: updated.join(', ') });
+                                setEditingClass({ ...editingClass, subjectTeacher: updated.join('、') });
                                 e.currentTarget.value = '';
                                 setShowCustomSubjectTeacherInput(false);
                               }
@@ -2890,12 +2953,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 : [];
                               const parts = val.split(/[,\s，、]+/).map(p => p.trim()).filter(Boolean);
                               const updated = Array.from(new Set([...currentTeachers, ...parts]));
-                              setEditingClass({ ...editingClass, subjectTeacher: updated.join(', ') });
+                              setEditingClass({ ...editingClass, subjectTeacher: updated.join('、') });
                               el.value = '';
                               setShowCustomSubjectTeacherInput(false);
                             }
                           }}
-                          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
+                          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
                         >
                           添加
                         </button>

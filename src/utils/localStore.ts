@@ -231,7 +231,7 @@ export function getLocalData() {
       const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);
       return {
         ...c,
-        subjectTeacher: c.subjectTeacher || match?.subjectTeacher || '主日学专职老师',
+        subjectTeacher: typeof c.subjectTeacher === 'string' ? c.subjectTeacher : (match?.subjectTeacher || ''),
         isHiddenFromHome: isHidden
       };
     });

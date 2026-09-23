@@ -82,7 +82,7 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
         name: c.name,
         ageRange: c.age_range || c.ageRange || '',
         teacher: c.teacher || '',
-        subjectTeacher: c.subject_teacher || c.subjectTeacher || c.subject_teachers || undefined,
+        subjectTeacher: typeof c.subject_teacher === 'string' ? c.subject_teacher : (typeof c.subjectTeacher === 'string' ? c.subjectTeacher : (c.subject_teachers || '')),
         classroom: c.classroom || '',
         color: c.color || 'bg-amber-500',
         groupType: c.group_type || c.groupType || 'sunday_school',
