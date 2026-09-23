@@ -917,24 +917,28 @@ export async function getClassById(id: string): Promise<ClassGroup | undefined> 
 export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
   await initOrLoadDataAsync(false);
   const existingIdx = classes.findIndex(c => c.id === cls.id || c.name === cls.name);
+  let saved: ClassGroup;
   if (existingIdx >= 0) {
-    classes[existingIdx] = { ...classes[existingIdx], ...cls };
+    saved = { ...classes[existingIdx], ...cls };
+    classes[existingIdx] = saved;
   } else {
-    classes.push(cls);
+    saved = { ...cls };
+    classes.push(saved);
   }
-  await supabaseUpsertClass(classes[existingIdx >= 0 ? existingIdx : classes.length - 1]);
+  await supabaseUpsertClass(saved);
   await saveDataToSupabase();
-  return cls;
+  return saved;
 }
 
 export async function updateClass(id: string, updates: Partial<ClassGroup>): Promise<ClassGroup | null> {
   await initOrLoadDataAsync(false);
   const existingIdx = classes.findIndex(c => c.id === id || c.name === id);
   if (existingIdx === -1) return null;
-  classes[existingIdx] = { ...classes[existingIdx], ...updates };
-  await supabaseUpsertClass(classes[existingIdx]);
+  const updated = { ...classes[existingIdx], ...updates };
+  classes[existingIdx] = updated;
+  await supabaseUpsertClass(updated);
   await saveDataToSupabase();
-  return classes[existingIdx];
+  return updated;
 }
 
 export async function saveClassVisibility(classId: string, isHidden: boolean, clientHiddenIds?: string[]): Promise<void> {
@@ -1016,45 +1020,62 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
 }
 
 export async function saveStudent(student: Student): Promise<Student> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const existingIdx = students.findIndex(s => s.id === student.id || (student.memberCode && s.memberCode === student.memberCode));
+  let saved: Student;
   if (existingIdx >= 0) {
-    students[existingIdx] = { ...students[existingIdx], ...student };
+    saved = { ...students[existingIdx], ...student };
+    students[existingIdx] = saved;
   } else {
-    students.push(student);
+    saved = { ...student };
+    students.push(saved);
   }
-  await supabaseUpsertStudent(student);
+  await supabaseUpsertStudent(saved);
   await saveDataToSupabase();
-  return student;
+  return saved;
 }
 
 export async function saveStudentsBatch(newStudents: Student[]): Promise<Student[]> {
-  await initOrLoadDataAsync(true);
-  students.push(...newStudents);
+  await initOrLoadDataAsync(false);
+  const existingIds = new Set(students.map(s => s.id));
+  const toAppend: Student[] = [];
+  for (const s of newStudents) {
+    if (existingIds.has(s.id)) {
+      const idx = students.findIndex(e => e.id === s.id);
+      if (idx !== -1) students[idx] = { ...students[idx], ...s };
+    } else {
+      toAppend.push(s);
+      existingIds.add(s.id);
+    }
+  }
+  if (toAppend.length > 0) {
+    students.push(...toAppend);
+  }
   await supabaseUpsertStudentsBatch(newStudents);
   await saveDataToSupabase();
   return newStudents;
 }
 
 export async function updateStudent(id: string, updates: Partial<Student>): Promise<Student | null> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
-  students[existingIdx] = { ...students[existingIdx], ...updates };
+  const updated: Student = { ...students[existingIdx], ...updates };
+  students[existingIdx] = updated;
   if (updates.name || updates.classId) {
-    setRecords(records.map(r => r.studentId === students[existingIdx].id ? {
+    setRecords(records.map(r => r.studentId === updated.id ? {
       ...r,
       studentName: updates.name || r.studentName,
       classId: updates.classId || r.classId
     } : r));
   }
-  await supabaseUpsertStudent(students[existingIdx]);
+  await supabaseUpsertStudent(updated);
   await saveDataToSupabase();
-  return students[existingIdx];
+  return updated;
 }
 
 export async function deleteStudent(id: string): Promise<Student | null> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
   const removed = students[existingIdx];

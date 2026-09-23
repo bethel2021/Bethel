@@ -80,14 +80,14 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
       const mappedClasses: ClassGroup[] = rawClasses.map(c => ({
         id: c.id,
         name: c.name,
-        ageRange: c.age_range || '',
+        ageRange: c.age_range || c.ageRange || '',
         teacher: c.teacher || '',
-        subjectTeacher: c.subject_teacher || undefined,
+        subjectTeacher: c.subject_teacher || c.subjectTeacher || c.subject_teachers || undefined,
         classroom: c.classroom || '',
-        color: c.color || 'bg-blue-500',
-        groupType: c.group_type || 'sunday_school',
+        color: c.color || 'bg-amber-500',
+        groupType: c.group_type || c.groupType || 'sunday_school',
         description: c.description || undefined,
-        isHiddenFromHome: Boolean(c.is_hidden_from_home)
+        isHiddenFromHome: Boolean(c.is_hidden_from_home ?? c.is_hidden ?? c.isHiddenFromHome)
       }));
 
       const mappedStudents: Student[] = rawStudents.map(s => ({
@@ -545,20 +545,31 @@ export async function supabaseUpsertStudent(s: Student): Promise<boolean> {
   const client = getSupabase();
   if (!client) return false;
   try {
-    await client.from('students').upsert({
+    let classIdVal = (s.classId && String(s.classId).trim() !== '') ? String(s.classId).trim() : null;
+    if (classIdVal) {
+      const { data: clsExists } = await client.from('classes').select('id').eq('id', classIdVal).maybeSingle();
+      if (!clsExists) {
+        classIdVal = null;
+      }
+    }
+    const { error } = await client.from('students').upsert({
       id: s.id,
       name: s.name,
-      gender: s.gender,
-      birth_date: s.birthDate,
+      gender: s.gender || 'boy',
+      birth_date: s.birthDate || '2019-06-01',
       age: s.age || null,
-      class_id: s.classId,
-      parent_name: s.parentName,
-      parent_phone: s.parentPhone,
+      class_id: classIdVal,
+      parent_name: s.parentName || null,
+      parent_phone: s.parentPhone || null,
       member_code: s.memberCode || null,
       avatar_icon: s.avatarIcon || null,
-      join_date: s.joinDate,
+      join_date: s.joinDate || new Date().toISOString().split('T')[0],
       updated_at: new Date().toISOString()
     }, { onConflict: 'id' });
+    if (error) {
+      console.warn('[Supabase DB Error] supabaseUpsertStudent failed with error:', error);
+      return false;
+    }
     return true;
   } catch (err) {
     console.warn('[Supabase DB] supabaseUpsertStudent failed:', err);
@@ -570,21 +581,32 @@ export async function supabaseUpsertStudentsBatch(students: Student[]): Promise<
   const client = getSupabase();
   if (!client || students.length === 0) return false;
   try {
-    const rows = students.map(s => ({
-      id: s.id,
-      name: s.name,
-      gender: s.gender,
-      birth_date: s.birthDate,
-      age: s.age || null,
-      class_id: s.classId,
-      parent_name: s.parentName,
-      parent_phone: s.parentPhone,
-      member_code: s.memberCode || null,
-      avatar_icon: s.avatarIcon || null,
-      join_date: s.joinDate,
-      updated_at: new Date().toISOString()
-    }));
-    await client.from('students').upsert(rows, { onConflict: 'id' });
+    // Collect valid class IDs to prevent FK violations
+    const { data: existingClasses } = await client.from('classes').select('id');
+    const validClassSet = new Set((existingClasses || []).map(c => c.id));
+
+    const rows = students.map(s => {
+      const classIdVal = (s.classId && validClassSet.has(s.classId)) ? s.classId : null;
+      return {
+        id: s.id,
+        name: s.name,
+        gender: s.gender || 'boy',
+        birth_date: s.birthDate || '2019-06-01',
+        age: s.age || null,
+        class_id: classIdVal,
+        parent_name: s.parentName || null,
+        parent_phone: s.parentPhone || null,
+        member_code: s.memberCode || null,
+        avatar_icon: s.avatarIcon || null,
+        join_date: s.joinDate || new Date().toISOString().split('T')[0],
+        updated_at: new Date().toISOString()
+      };
+    });
+    const { error } = await client.from('students').upsert(rows, { onConflict: 'id' });
+    if (error) {
+      console.warn('[Supabase DB Error] supabaseUpsertStudentsBatch failed with error:', error);
+      return false;
+    }
     return true;
   } catch (err) {
     console.warn('[Supabase DB] supabaseUpsertStudentsBatch failed:', err);

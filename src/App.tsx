@@ -1075,29 +1075,29 @@ export default function App() {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加或编辑学员的权限！');
     }
 
+    const assignedId = studentData.id || `s-${Date.now()}`;
+    const payload = { ...studentData, id: assignedId };
+
     const saveLocally = () => {
       setStudents(prev => {
         let updated: Student[];
-        if (studentData.id) {
-          updated = prev.map(s => s.id === studentData.id ? { ...s, ...studentData } : s);
+        const exists = prev.some(s => s.id === payload.id);
+        if (exists) {
+          updated = prev.map(s => s.id === payload.id ? { ...s, ...payload } : s);
         } else {
-          const newStudent: Student = {
-            ...studentData,
-            id: `s-${Date.now()}`
-          };
-          updated = [...prev, newStudent];
+          updated = [...prev, payload];
         }
         saveLocalData({ students: updated });
         return updated;
       });
 
       // If updating student, also sync attendance record names
-      if (studentData.id && studentData.name) {
+      if (payload.id && payload.name) {
         setRecords(prev => {
-          const updated = prev.map(r => r.studentId === studentData.id ? { 
+          const updated = prev.map(r => r.studentId === payload.id ? { 
             ...r, 
-            studentName: studentData.name, 
-            classId: studentData.classId || r.classId 
+            studentName: payload.name, 
+            classId: payload.classId || r.classId 
           } : r);
           saveLocalData({ records: updated });
           return updated;
@@ -1112,11 +1112,26 @@ export default function App() {
       const res = await fetch('/api/students', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(studentData),
+        body: JSON.stringify(payload),
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
         setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number') {
+          syncVersionRef.current = data.syncVersion;
+        }
+        if (Array.isArray(data.students) && data.students.length > 0) {
+          setStudents(data.students);
+          saveLocalData({ students: data.students });
+        } else if (data.student) {
+          setStudents(prev => {
+            const exists = prev.some(s => s.id === data.student.id);
+            const updated = exists ? prev.map(s => s.id === data.student.id ? data.student : s) : [...prev, data.student];
+            saveLocalData({ students: updated });
+            return updated;
+          });
+        }
         await loadState(false);
       }
     } catch {
@@ -1162,7 +1177,15 @@ export default function App() {
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
         setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number') {
+          syncVersionRef.current = data.syncVersion;
+        }
+        if (Array.isArray(data.students) && data.students.length > 0) {
+          setStudents(data.students);
+          saveLocalData({ students: data.students });
+        }
         await loadState(false);
       }
     } catch {
@@ -1199,7 +1222,15 @@ export default function App() {
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
         setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number') {
+          syncVersionRef.current = data.syncVersion;
+        }
+        if (Array.isArray(data.students)) {
+          setStudents(data.students);
+          saveLocalData({ students: data.students });
+        }
         await loadState(false);
       }
     } catch {

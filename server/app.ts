@@ -944,6 +944,8 @@ apiRouter.post('/classes', async (req: Request, res: Response) => {
       return res.status(403).json({ error: auth.message });
     }
 
+    await initOrLoadDataAsync(false);
+
     const { id, name, ageRange, teacher, subjectTeacher, classroom, color, groupType, description, isHiddenFromHome } = req.body;
     if (!name) {
       return res.status(400).json({ error: '班级/团契名称为必填项' });
@@ -951,7 +953,7 @@ apiRouter.post('/classes', async (req: Request, res: Response) => {
 
     const idx = classes.findIndex(c => (id && c.id === id) || (name && c.name === name));
     if (idx !== -1) {
-      classes[idx] = {
+      const updatedClass: ClassGroup = {
         ...classes[idx],
         name,
         ageRange: ageRange !== undefined ? ageRange : classes[idx].ageRange,
@@ -963,14 +965,14 @@ apiRouter.post('/classes', async (req: Request, res: Response) => {
         description: description !== undefined ? description : classes[idx].description,
         isHiddenFromHome: isHiddenFromHome !== undefined ? !!isHiddenFromHome : (classes[idx].isHiddenFromHome || false),
       };
-      await dataStore.saveClass(classes[idx]);
+      const saved = await dataStore.saveClass(updatedClass);
       systemConfig.hiddenClassIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
       await dataStore.saveSystemConfig(systemConfig);
-      return res.json({ success: true, class: classes[idx], classes, syncVersion, message: '班级信息修改成功' });
+      return res.json({ success: true, class: saved, classes, syncVersion, message: '班级信息修改成功' });
     }
 
     const newClass: ClassGroup = {
-      id: `class-${Date.now().toString().slice(-6)}`,
+      id: (id && String(id).trim()) || `class-${Date.now().toString().slice(-6)}`,
       name,
       ageRange: ageRange || '自选年龄段',
       teacher: teacher || '班级负责人',
@@ -981,10 +983,10 @@ apiRouter.post('/classes', async (req: Request, res: Response) => {
       description: description || '',
       isHiddenFromHome: !!isHiddenFromHome,
     };
-    await dataStore.saveClass(newClass);
+    const saved = await dataStore.saveClass(newClass);
     systemConfig.hiddenClassIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
     await dataStore.saveSystemConfig(systemConfig);
-    res.json({ success: true, class: newClass, classes, syncVersion, message: '成功新增班级/团契' });
+    res.json({ success: true, class: saved, classes, syncVersion, message: '成功新增班级/团契' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1061,6 +1063,8 @@ apiRouter.post('/students', async (req: Request, res: Response) => {
       return res.status(403).json({ error: auth.message });
     }
 
+    await initOrLoadDataAsync(false);
+
     let { id, name, gender, birthDate, age, classId, parentName, parentPhone, memberCode } = req.body;
     if (!name || !classId) {
       return res.status(400).json({ error: '姓名与所属班级/团契为必填项' });
@@ -1082,7 +1086,7 @@ apiRouter.post('/students', async (req: Request, res: Response) => {
     );
     if (idx !== -1) {
       const targetId = students[idx].id;
-      students[idx] = { 
+      const updatedStudent: Student = { 
         ...students[idx], 
         name, 
         gender: gender || students[idx].gender || 'boy', 
@@ -1095,13 +1099,14 @@ apiRouter.post('/students', async (req: Request, res: Response) => {
       };
       // Also update studentName in historical records
       setRecords(records.map(r => r.studentId === targetId ? { ...r, studentName: name, classId } : r));
-      await dataStore.saveStudent(students[idx]);
-      return res.json({ success: true, student: students[idx], message: '学员信息已更新' });
+      const saved = await dataStore.saveStudent(updatedStudent);
+      return res.json({ success: true, student: saved, students, syncVersion, message: '学员信息已更新' });
     }
 
     const nextCodeNum = students.length + 1;
+    const studentId = (id && String(id).trim()) || `s-${Date.now().toString().slice(-6)}`;
     const newStudent: Student = {
-      id: `s-${Date.now().toString().slice(-6)}`,
+      id: studentId,
       name,
       gender: gender || 'boy',
       birthDate,
@@ -1112,8 +1117,8 @@ apiRouter.post('/students', async (req: Request, res: Response) => {
       memberCode: memberCode || `BTL-${String(nextCodeNum).padStart(2, '0')}`,
       joinDate: new Date().toISOString().split('T')[0]
     };
-    await dataStore.saveStudent(newStudent);
-    res.json({ success: true, student: newStudent, message: '学员档案建立成功' });
+    const saved = await dataStore.saveStudent(newStudent);
+    res.json({ success: true, student: saved, students, syncVersion, message: '学员档案建立成功' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1126,6 +1131,8 @@ apiRouter.post('/students/batch', async (req: Request, res: Response) => {
     if (!auth.allowed) {
       return res.status(403).json({ error: auth.message });
     }
+
+    await initOrLoadDataAsync(false);
 
     const { classId, namesText, defaultGender = 'boy', defaultBirthDate, defaultAge } = req.body;
     if (!classId || !namesText) {
@@ -1168,7 +1175,7 @@ apiRouter.post('/students/batch', async (req: Request, res: Response) => {
 
     await dataStore.saveStudentsBatch(added);
 
-    res.json({ success: true, count: added.length, message: `成功批量录入 ${added.length} 名学员，已自动推算年龄为 ${computedAge} 岁！` });
+    res.json({ success: true, count: added.length, students, syncVersion, message: `成功批量录入 ${added.length} 名学员，已自动推算年龄为 ${computedAge} 岁！` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1182,6 +1189,8 @@ apiRouter.delete('/students/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ error: auth.message });
     }
 
+    await initOrLoadDataAsync(false);
+
     const { id } = req.params;
     let idx = students.findIndex(s => s.id === id);
     if (idx === -1) {
@@ -1190,7 +1199,7 @@ apiRouter.delete('/students/:id', async (req: Request, res: Response) => {
     if (idx !== -1) {
       const removed = students[idx];
       await dataStore.deleteStudent(removed.id);
-      return res.json({ success: true, message: `学员【${removed.name}】已成功从名册中彻底删除！` });
+      return res.json({ success: true, students, syncVersion, message: `学员【${removed.name}】已成功从名册中彻底删除！` });
     }
     res.status(404).json({ error: '学员不存在或已被删除' });
   } catch (err: any) {
