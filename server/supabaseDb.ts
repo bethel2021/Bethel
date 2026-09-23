@@ -369,7 +369,8 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
       for (const a of payload.adminAccounts) {
         if (!a || !a.username) continue;
         const validClassId = (a.assignedClassId && validClassIds.has(a.assignedClassId)) ? a.assignedClassId : null;
-        const row = {
+        
+        const rowWithClass = {
           id: a.id || `acc-${a.username.toLowerCase()}`,
           username: a.username.toLowerCase(),
           display_name: a.displayName,
@@ -379,20 +380,57 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
           assigned_class_id: validClassId
         };
 
-        const { error: err1 } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
-        if (err1) {
-          const { error: err2 } = await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
-          if (err2) {
-            const { data: existing } = await client.from('admin_accounts').select('id').ilike('username', a.username).maybeSingle();
-            if (existing) {
-              await client.from('admin_accounts').update({
-                display_name: a.displayName,
-                role: a.role,
-                password: a.password,
-                assigned_class_id: validClassId
-              }).eq('id', existing.id);
-            } else {
-              await client.from('admin_accounts').insert(row);
+        const rowWithoutClass = {
+          id: a.id || `acc-${a.username.toLowerCase()}`,
+          username: a.username.toLowerCase(),
+          display_name: a.displayName,
+          role: a.role,
+          password: a.password,
+          created_at: a.createdAt || new Date().toISOString().split('T')[0]
+        };
+
+        const trySingleUpsert = async (useClass: boolean) => {
+          const row = useClass ? rowWithClass : rowWithoutClass;
+          const { error: err1 } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
+          if (err1) {
+            const { error: err2 } = await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
+            if (err2) {
+              const { data: existing } = await client.from('admin_accounts').select('id').ilike('username', a.username).maybeSingle();
+              if (existing) {
+                const updatePayload = useClass ? {
+                  display_name: a.displayName,
+                  role: a.role,
+                  password: a.password,
+                  assigned_class_id: validClassId
+                } : {
+                  display_name: a.displayName,
+                  role: a.role,
+                  password: a.password
+                };
+                const { error: errUpdate } = await client.from('admin_accounts').update(updatePayload).eq('id', existing.id);
+                if (errUpdate) throw errUpdate;
+              } else {
+                const { error: errInsert } = await client.from('admin_accounts').insert(row);
+                if (errInsert) throw errInsert;
+              }
+            }
+          }
+        };
+
+        try {
+          await trySingleUpsert(true);
+        } catch (upsertErr: any) {
+          console.warn('[Supabase DB Snapshot] Account upsert with assigned_class_id failed, retrying without assigned_class_id...', upsertErr);
+          const isMissingColumn = upsertErr && (
+            upsertErr.code === '42703' ||
+            String(upsertErr.message || '').includes('assigned_class_id') ||
+            String(upsertErr.details || '').includes('assigned_class_id')
+          );
+          if (isMissingColumn) {
+            try {
+              await trySingleUpsert(false);
+            } catch (retryErr) {
+              console.error('[Supabase DB Snapshot] Backup retry failed:', retryErr);
             }
           }
         }
@@ -764,7 +802,7 @@ export async function supabaseUpsertAdminAccount(a: ServerAdminAccount): Promise
     }
 
     const rowId = a.id || `acc-${a.username.toLowerCase()}`;
-    const row = {
+    const rowWithClass = {
       id: rowId,
       username: a.username.toLowerCase(),
       display_name: a.displayName,
@@ -774,30 +812,72 @@ export async function supabaseUpsertAdminAccount(a: ServerAdminAccount): Promise
       assigned_class_id: validClassId
     };
 
-    // 1. Check if user already exists by username
-    const { data: existingByUsername } = await client.from('admin_accounts').select('id').ilike('username', a.username).maybeSingle();
-    if (existingByUsername) {
-      const { error: updateErr } = await client.from('admin_accounts').update({
-        display_name: a.displayName,
-        role: a.role,
-        password: a.password,
-        assigned_class_id: validClassId
-      }).eq('id', existingByUsername.id);
-      if (!updateErr) return true;
-    }
+    const rowWithoutClass = {
+      id: rowId,
+      username: a.username.toLowerCase(),
+      display_name: a.displayName,
+      role: a.role,
+      password: a.password,
+      created_at: a.createdAt || new Date().toISOString().split('T')[0]
+    };
 
-    // 2. Try upsert with onConflict: 'username'
-    let { error: err1 } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
-    if (err1) {
-      // 3. Try upsert with onConflict: 'id'
-      let { error: err2 } = await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
-      if (err2) {
-        await client.from('admin_accounts').insert(row);
+    const tryUpsert = async (useClass: boolean) => {
+      const targetRow = useClass ? rowWithClass : rowWithoutClass;
+      
+      const { data: existingByUsername, error: selectErr } = await client.from('admin_accounts').select('id').ilike('username', a.username).maybeSingle();
+      if (selectErr) {
+        throw selectErr;
+      }
+
+      if (existingByUsername) {
+        const updatePayload = useClass ? {
+          display_name: a.displayName,
+          role: a.role,
+          password: a.password,
+          assigned_class_id: validClassId
+        } : {
+          display_name: a.displayName,
+          role: a.role,
+          password: a.password
+        };
+        const { error: updateErr } = await client.from('admin_accounts').update(updatePayload).eq('id', existingByUsername.id);
+        if (updateErr) {
+          throw updateErr;
+        }
+        return true;
+      }
+
+      let { error: err1 } = await client.from('admin_accounts').upsert(targetRow, { onConflict: 'username' });
+      if (err1) {
+        let { error: err2 } = await client.from('admin_accounts').upsert(targetRow, { onConflict: 'id' });
+        if (err2) {
+          const { error: err3 } = await client.from('admin_accounts').insert(targetRow);
+          if (err3) {
+            throw err3;
+          }
+        }
+      }
+      return true;
+    };
+
+    try {
+      await tryUpsert(true);
+    } catch (upsertErr: any) {
+      console.warn('[Supabase DB] Upsert with assigned_class_id failed, retrying without assigned_class_id...', upsertErr);
+      const isMissingColumn = upsertErr && (
+        upsertErr.code === '42703' ||
+        String(upsertErr.message || '').includes('assigned_class_id') ||
+        String(upsertErr.details || '').includes('assigned_class_id')
+      );
+      if (isMissingColumn) {
+        await tryUpsert(false);
+      } else {
+        throw upsertErr;
       }
     }
     return true;
   } catch (err) {
-    console.warn('[Supabase DB] supabaseUpsertAdminAccount failed:', err);
+    console.warn('[Supabase DB] supabaseUpsertAdminAccount failed completely:', err);
     return false;
   }
 }
