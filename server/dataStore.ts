@@ -1188,7 +1188,14 @@ export async function getSystemConfig(): Promise<SystemConfig> {
 }
 
 export async function saveSystemConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
-  setSystemConfig({ ...systemConfig, ...updates });
+  await initOrLoadDataAsync(false);
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  const nextConfig = {
+    ...systemConfig,
+    ...updates,
+    hiddenClassIds: Array.isArray(updates.hiddenClassIds) ? updates.hiddenClassIds : (systemConfig.hiddenClassIds || hiddenIds)
+  };
+  setSystemConfig(nextConfig);
   await supabaseUpsertSystemConfig(systemConfig);
   await saveDataToSupabase();
   return systemConfig;

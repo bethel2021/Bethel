@@ -207,6 +207,13 @@ export default function App() {
       setTeachers(prev => isDataEqual(prev, data.teachers) ? prev : data.teachers);
     }
 
+    if (data.config && typeof data.config === 'object') {
+      setConfig(prev => {
+        const nextConfig = { ...prev, ...data.config };
+        return isDataEqual(prev, nextConfig) ? prev : nextConfig;
+      });
+    }
+
     if (data.accounts && Array.isArray(data.accounts) && data.accounts.length > 0) {
       setAccounts(prev => isDataEqual(prev, data.accounts) ? prev : data.accounts);
     } else if (!data.accounts) {

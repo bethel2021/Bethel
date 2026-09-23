@@ -2216,10 +2216,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className="text-slate-600 font-semibold">迟到判定时刻:</span>
                   <input
                     type="time"
-                    value={optionsState.lateThresholdTime}
+                    value={optionsState.lateThresholdTime || ''}
                     onChange={e => {
                       const val = e.target.value;
-                      handleToggleOption('lateThresholdTime', val);
+                      setOptionsState(prev => ({ ...prev, lateThresholdTime: val }));
+                      if (val) {
+                        handleToggleOption('lateThresholdTime', val);
+                      }
                     }}
                     className="px-2 py-1 rounded-lg border border-slate-300 bg-white font-mono text-xs"
                   />

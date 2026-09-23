@@ -222,11 +222,6 @@ export function getLocalData() {
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const config: SystemConfig = rawConfig ? { ...initialSystemConfig, ...JSON.parse(rawConfig) } : initialSystemConfig;
 
-    // Upgrade old default checkin times to 11:00, 16:00, 15:00 if they were set to old defaults
-    if (config.checkinStartTime === '08:30') config.checkinStartTime = '11:00';
-    if (config.checkinEndTime === '12:30') config.checkinEndTime = '16:00';
-    if (config.lateThresholdTime === '09:30') config.lateThresholdTime = '15:00';
-
     classes = classes.map(c => {
       const isHidden = typeof c.isHiddenFromHome === 'boolean'
         ? c.isHiddenFromHome
