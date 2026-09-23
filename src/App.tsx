@@ -1035,10 +1035,8 @@ export default function App() {
             return updated;
           });
         }
-        // Force an immediate reload and local storage rewrite from authoritative state
         pendingClassMutationsRef.current.delete(classId);
-        await loadState(false);
-        showSyncNotification(`✅ 班级【${classData.name || '信息'}】已通过状态校验并同步！`);
+        showSyncNotification(`✅ 班级【${classData.name || '信息'}】已保存并同步！`);
       }
     } catch {
       // Offline fallback
@@ -1190,7 +1188,6 @@ export default function App() {
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         setIsServerAvailable(true);
-        await loadState(false);
         showSyncNotification('✅ 班级及关联数据已成功删除并同步！');
       }
     } catch {
@@ -1262,8 +1259,8 @@ export default function App() {
             return updated;
           });
         }
-        await loadState(false);
-        showSyncNotification(`✅ 学员【${payload.name}】档案已通过状态校验并成功同步！`);
+        expectedEntitiesRef.current.delete(assignedId);
+        showSyncNotification(`✅ 学员【${payload.name}】档案已保存并同步！`);
       }
     } catch {
       // Offline fallback
@@ -1321,8 +1318,7 @@ export default function App() {
           setStudents(data.students);
           saveLocalData({ students: data.students });
         }
-        await loadState(false);
-        showSyncNotification(`✅ 批量录入学员成功，已通过双向状态校验并同步！`);
+        showSyncNotification(`✅ 批量录入学员成功并同步！`);
       }
     } catch {
       // Offline fallback
@@ -1369,7 +1365,6 @@ export default function App() {
           setStudents(data.students);
           saveLocalData({ students: data.students });
         }
-        await loadState(false);
         showSyncNotification('✅ 学员档案已成功删除并同步！');
       }
     } catch {
@@ -1417,7 +1412,14 @@ export default function App() {
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
-        if (data.teacher) {
+        setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number') {
+          syncVersionRef.current = data.syncVersion;
+        }
+        if (Array.isArray(data.teachers) && data.teachers.length > 0) {
+          setTeachers(data.teachers);
+          saveLocalData({ teachers: data.teachers } as any);
+        } else if (data.teacher) {
           setTeachers(prev => {
             const idx = prev.findIndex(t => (data.teacher.id && t.id === data.teacher.id) || (data.teacher.name && t.name === data.teacher.name));
             let updated;
@@ -1431,9 +1433,8 @@ export default function App() {
             return updated;
           });
         }
-        setIsServerAvailable(true);
-        await loadState(false);
-        showSyncNotification(`✅ 教师【${fullTeacherData.name}】资料已通过状态校验并同步！`);
+        expectedEntitiesRef.current.delete(teacherId);
+        showSyncNotification(`✅ 教师【${fullTeacherData.name}】资料已保存并同步！`);
       } else {
         const errData = contentType.includes('application/json') ? await res.json() : null;
         throw new Error(errData?.error || `保存教师资料失败 (${res.status})`);
@@ -1469,8 +1470,15 @@ export default function App() {
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
         setIsServerAvailable(true);
-        await loadState(false);
+        if (typeof data.syncVersion === 'number') {
+          syncVersionRef.current = data.syncVersion;
+        }
+        if (Array.isArray(data.teachers)) {
+          setTeachers(data.teachers);
+          saveLocalData({ teachers: data.teachers } as any);
+        }
         showSyncNotification('✅ 教师资料已成功删除！');
       }
     } catch {

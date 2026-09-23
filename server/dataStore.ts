@@ -893,6 +893,16 @@ export function mergeClientData(payload: SyncPayload): {
 // All business logic routes through these data access layer methods.
 // =========================================================================
 
+let snapshotTimer: NodeJS.Timeout | null = null;
+export function scheduleSupabaseSnapshotSave(delayMs = 1500) {
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotTimer = setTimeout(() => {
+    saveDataToSupabase().catch(err => {
+      console.warn('[Supabase Snapshot] Background snapshot backup error:', err);
+    });
+  }, delayMs);
+}
+
 // --- Classes ---
 export async function getClasses(assignedClassId?: string): Promise<ClassGroup[]> {
   await initOrLoadDataAsync(true);
@@ -913,7 +923,6 @@ export async function getClassById(id: string): Promise<ClassGroup | undefined> 
 }
 
 export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
-  await initOrLoadDataAsync(false);
   const existingIdx = classes.findIndex(c => c.id === cls.id || c.name === cls.name);
   let saved: ClassGroup;
   if (existingIdx >= 0) {
@@ -923,25 +932,28 @@ export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
     saved = { ...cls };
     classes.push(saved);
   }
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpsertClass(saved);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return saved;
 }
 
 export async function updateClass(id: string, updates: Partial<ClassGroup>): Promise<ClassGroup | null> {
-  await initOrLoadDataAsync(false);
   const existingIdx = classes.findIndex(c => c.id === id || c.name === id);
   if (existingIdx === -1) return null;
   const updated = { ...classes[existingIdx], ...updates };
   classes[existingIdx] = updated;
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpsertClass(updated);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return updated;
 }
 
 export async function saveClassVisibility(classId: string, isHidden: boolean, clientHiddenIds?: string[]): Promise<void> {
-  await initOrLoadDataAsync(true);
-  
   const idx = classes.findIndex(c => c.id === classId);
   if (idx !== -1) {
     classes[idx] = {
@@ -964,8 +976,10 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
 
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   setSystemConfig({ ...systemConfig, hiddenClassIds: hiddenIds });
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
 
-  // Persist only the changed class(es) and the system config to database in parallel
   const changedClasses = classes.filter(c => c.id === classId || (Array.isArray(clientHiddenIds) && clientHiddenIds.includes(c.id)));
   
   await Promise.all([
@@ -973,7 +987,7 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
     supabaseUpsertSystemConfig(systemConfig)
   ]);
 
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
 }
 
 export async function deleteClass(id: string): Promise<boolean> {
@@ -994,8 +1008,12 @@ export async function deleteClass(id: string): Promise<boolean> {
     }
   });
 
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
+
   await supabaseDeleteClass(clsId);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return true;
 }
 
@@ -1018,7 +1036,6 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
 }
 
 export async function saveStudent(student: Student): Promise<Student> {
-  await initOrLoadDataAsync(false);
   const existingIdx = students.findIndex(s => s.id === student.id || (student.memberCode && s.memberCode === student.memberCode));
   let saved: Student;
   if (existingIdx >= 0) {
@@ -1028,13 +1045,15 @@ export async function saveStudent(student: Student): Promise<Student> {
     saved = { ...student };
     students.push(saved);
   }
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpsertStudent(saved);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return saved;
 }
 
 export async function saveStudentsBatch(newStudents: Student[]): Promise<Student[]> {
-  await initOrLoadDataAsync(false);
   const existingIds = new Set(students.map(s => s.id));
   const toAppend: Student[] = [];
   for (const s of newStudents) {
@@ -1049,13 +1068,15 @@ export async function saveStudentsBatch(newStudents: Student[]): Promise<Student
   if (toAppend.length > 0) {
     students.push(...toAppend);
   }
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpsertStudentsBatch(newStudents);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return newStudents;
 }
 
 export async function updateStudent(id: string, updates: Partial<Student>): Promise<Student | null> {
-  await initOrLoadDataAsync(false);
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
   const updated: Student = { ...students[existingIdx], ...updates };
@@ -1067,20 +1088,25 @@ export async function updateStudent(id: string, updates: Partial<Student>): Prom
       classId: updates.classId || r.classId
     } : r));
   }
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpsertStudent(updated);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return updated;
 }
 
 export async function deleteStudent(id: string): Promise<Student | null> {
-  await initOrLoadDataAsync(false);
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
   const removed = students[existingIdx];
   setStudents(students.filter(s => s.id !== removed.id && s.memberCode !== removed.memberCode));
   setRecords(records.filter(r => r.studentId !== removed.id && r.studentName !== removed.name));
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseDeleteStudent(removed.id);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return removed;
 }
 
@@ -1096,7 +1122,6 @@ export async function getTeacherById(id: string): Promise<any | undefined> {
 }
 
 export async function saveTeacher(teacher: any): Promise<any> {
-  await initOrLoadDataAsync(false);
   const teacherId = (teacher.id && String(teacher.id).trim()) || `t-${Date.now().toString().slice(-6)}`;
   const cleanName = teacher.name ? String(teacher.name).trim().replace(/\s*老师$/, '') : '';
 
@@ -1119,28 +1144,35 @@ export async function saveTeacher(teacher: any): Promise<any> {
     };
     teachers.push(savedTeacher);
   }
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpsertTeacher(savedTeacher);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return savedTeacher;
 }
 
 export async function updateTeacher(id: string, updates: any): Promise<any | null> {
-  await initOrLoadDataAsync(false);
   const existingIdx = teachers.findIndex(t => t.id === id);
   if (existingIdx === -1) return null;
   teachers[existingIdx] = { ...teachers[existingIdx], ...updates };
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpsertTeacher(teachers[existingIdx]);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return teachers[existingIdx];
 }
 
 export async function deleteTeacher(id: string): Promise<any | null> {
-  await initOrLoadDataAsync(false);
   const existingIdx = teachers.findIndex(t => t.id === id || t.name === id);
   if (existingIdx === -1) return null;
   const removed = teachers.splice(existingIdx, 1)[0];
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseDeleteTeacher(removed.id);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return removed;
 }
 

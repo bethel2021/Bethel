@@ -1237,7 +1237,7 @@ apiRouter.post('/teachers', async (req: Request, res: Response) => {
 
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
-    return res.json({ success: true, teacher: savedTeacher, message: '教师资料已成功保存' });
+    return res.json({ success: true, teacher: savedTeacher, teachers, syncVersion, message: '教师资料已成功保存' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1258,7 +1258,7 @@ apiRouter.delete('/teachers/:id', async (req: Request, res: Response) => {
 
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
-    return res.json({ success: true, message: `教师【${removed.name}】已成功从名册中彻底删除！` });
+    return res.json({ success: true, teachers, syncVersion, message: `教师【${removed.name}】已成功从名册中彻底删除！` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
