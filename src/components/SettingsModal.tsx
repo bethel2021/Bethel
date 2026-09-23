@@ -2392,7 +2392,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 礼拜天签到开放起始时间 {!isSuperAdmin && <span className="text-[10px] text-amber-800">(锁定)</span>}
@@ -2415,21 +2415,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 disabled={!isSuperAdmin}
                 value={endTime}
                 onChange={e => setEndTime(e.target.value)}
-                className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white font-mono disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                <span>后台管理员登录密码</span>
-                <span className="text-[10px] text-amber-800">{isSuperAdmin ? '可自定义修改' : '仅总管理员可见'}</span>
-              </label>
-              <input
-                type="text"
-                disabled={!isSuperAdmin}
-                value={isSuperAdmin ? adminPassword : '•••••••• (已锁定保护)'}
-                onChange={e => setAdminPassword(e.target.value)}
-                placeholder="密码 (默认 bethel2026)"
                 className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white font-mono disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
               />
             </div>
