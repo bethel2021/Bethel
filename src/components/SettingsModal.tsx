@@ -215,8 +215,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!rt) return '班级负责';
     const trimmed = rt.trim();
     if (trimmed === '班主任' || trimmed === '主日学班主任' || trimmed === '负责人' || trimmed === '团契负责人' || trimmed === '班级负责') return '班级负责';
-    if (trimmed === '主日学同工' || trimmed === '讲员' || trimmed === '主讲' || trimmed === '主讲' || trimmed === '上课') return '上课';
-    if (trimmed === '助教' || trimmed === '助教' || trimmed === '辅助' || trimmed === '副班主任' || trimmed === '协工') return '辅助';
+    if (trimmed === '主日学同工' || trimmed === '讲员' || trimmed === '主讲' || trimmed === '上课' || trimmed === '上课老师') return '上课老师';
+    if (trimmed === '助教' || trimmed === '辅助' || trimmed === '副班主任' || trimmed === '协工' || trimmed === '辅助老师') return '辅助老师';
     if (trimmed === '主日学校长' || trimmed === '主日学讲员') return '班级负责';
     return trimmed;
   };
@@ -227,10 +227,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (rt === '班级负责' || rt === '班主任' || rt === '主日学班主任' || rt.includes('负责人') || rt.includes('班主任')) {
       return 1;
     }
-    if (rt === '上课' || rt === '讲员' || rt === '主讲' || rt === '主讲' || rt === '主日学同工') {
+    if (rt === '上课老师' || rt === '讲员' || rt === '主讲' || rt === '主日学同工') {
       return 2;
     }
-    if (rt === '辅助' || rt === '助教' || rt === '助教' || rt === '协工' || rt === '辅助' || rt === '副班主任') {
+    if (rt === '辅助老师' || rt === '助教' || rt === '协工' || rt === '副班主任') {
       return 3;
     }
     return 4;
@@ -2769,7 +2769,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>上课 (可多选)</span>
+                    <span>上课老师 (可多选)</span>
                     <button type="button" onClick={() => setEditingClass({ ...editingClass, subjectTeacher: '' })} className="text-[10px] text-red-500 hover:text-red-700 underline">全部清除</button>
                   </label>
                   
@@ -2865,7 +2865,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     <option value="">— 从教师库下拉选取添加 —</option>
                     {teachers
-                      .filter(t => ['上课', '辅助'].includes(normalizeRoleTitle(t.roleTitle)))
+                      .filter(t => ['上课老师', '辅助老师'].includes(normalizeRoleTitle(t.roleTitle)))
                       .filter(t => !(editingClass.subjectTeacher || '').split(/[,\s，、]+/).map(s => s.trim()).filter(Boolean).includes(t.name))
                       .map(t => (
                         <option key={t.id} value={t.name}>
