@@ -259,24 +259,15 @@ export function getLocalData() {
     const activeSunday = rawSunday || getActiveSundayDate();
 
     const rawTeachers = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-    let teachers: Teacher[] = rawTeachers ? JSON.parse(rawTeachers) : initialTeachers;
-    if (!Array.isArray(teachers) || teachers.length === 0) {
-      teachers = initialTeachers;
+    let teachers: Teacher[] = initialTeachers;
+    if (rawTeachers) {
+      try {
+        const parsed = JSON.parse(rawTeachers);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          teachers = parsed;
+        }
+      } catch {}
     }
-    // Normalize gender and roleTitle for teachers
-    teachers = teachers.map(t => {
-      let updatedGender = t.gender;
-      if (t.name && (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成'))) {
-        updatedGender = 'girl';
-      }
-      let updatedRoleTitle = t.roleTitle;
-      if (updatedRoleTitle === '主日学班主任') updatedRoleTitle = '班主任';
-      else if (updatedRoleTitle === '主日学同工') updatedRoleTitle = '上课老师';
-      else if (updatedRoleTitle === '助教老师' || updatedRoleTitle === '助教') updatedRoleTitle = '辅助老师';
-      else if (updatedRoleTitle === '主日学校长' || updatedRoleTitle === '主日学讲员') updatedRoleTitle = '班主任';
-      return { ...t, gender: updatedGender, roleTitle: updatedRoleTitle || '班主任' };
-    });
-    localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(teachers));
 
     return { classes, students, config, records, activeSunday, teachers };
   } catch (e) {

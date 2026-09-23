@@ -222,8 +222,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setEditingTeacher(t);
     const cleanName = (t.name || '').replace(/\s*老师$/, '');
     setTeacherName(cleanName);
-    const isSister = t.gender === 'girl' || ['春来', '上好', '雪成', '秋娟', '若雪', '东丽'].some(n => cleanName.includes(n));
-    setTeacherGender(isSister ? 'girl' : (t.gender || 'boy'));
+    setTeacherGender(t.gender || 'boy');
     setTeacherPhone(t.phone || '');
     setTeacherWechat(t.wechat || '');
     setTeacherClassId(t.classId || '');
@@ -1044,7 +1043,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       ).map(t => {
                         const cls = classes.find(c => c.id === t.classId);
                         const cleanTeacherName = (t.name || '').replace(/\s*老师$/, '');
-                        const isSister = t.gender === 'girl' || ['春来', '上好', '雪成', '秋娟', '若雪', '东丽'].some(n => cleanTeacherName.includes(n));
+                        const isSister = t.gender === 'girl';
                         return (
                           <tr key={t.id} className="hover:bg-amber-50/40 transition-colors">
                             <td className="px-3.5 py-2.5">
@@ -2724,6 +2723,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                       >
                         <option value="">— 选择核心负责老师 —</option>
+                        {editingClass.teacher && !dbTeacherNames.includes(editingClass.teacher) && (
+                          <option value={editingClass.teacher}>{editingClass.teacher}</option>
+                        )}
                         {dbTeacherNames.map(name => (
                           <option key={name} value={name}>
                             {name}

@@ -1211,9 +1211,10 @@ apiRouter.post('/teachers', async (req: Request, res: Response) => {
     }
 
     const cleanName = String(name).trim().replace(/\s*老师$/, '');
+    const teacherId = (id && String(id).trim()) || `t-${Date.now().toString().slice(-6)}`;
 
     const savedTeacher = await dataStore.saveTeacher({
-      id,
+      id: teacherId,
       name: cleanName,
       gender: gender || 'boy',
       phone: phone || '',
@@ -1226,7 +1227,7 @@ apiRouter.post('/teachers', async (req: Request, res: Response) => {
 
     // Broadcast real-time update
     broadcastRealtimeState('teachers_updated');
-    return res.json({ success: true, teacher: savedTeacher, message: '教师资料已已成功保存' });
+    return res.json({ success: true, teacher: savedTeacher, message: '教师资料已成功保存' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

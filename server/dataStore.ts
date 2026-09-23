@@ -341,16 +341,16 @@ function sanitizeYageData() {
   teachers.forEach(t => {
     if (t && typeof t.name === 'string') {
       t.name = t.name.replace(/\s*老师$/, '');
-      if (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成')) {
-        t.gender = 'girl';
+      if (!t.gender) {
+        if (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成') || t.name.includes('秋娟') || t.name.includes('若雪') || t.name.includes('东丽')) {
+          t.gender = 'girl';
+        } else {
+          t.gender = 'boy';
+        }
       }
     }
-    if (t) {
-      if (t.roleTitle === '主日学班主任') t.roleTitle = '班主任';
-      else if (t.roleTitle === '主日学同工') t.roleTitle = '上课老师';
-      else if (t.roleTitle === '助教老师' || t.roleTitle === '助教') t.roleTitle = '辅助老师';
-      else if (t.roleTitle === '主日学校长' || t.roleTitle === '主日学讲员') t.roleTitle = '班主任';
-      else if (!t.roleTitle) t.roleTitle = '班主任';
+    if (t && !t.roleTitle) {
+      t.roleTitle = '班主任';
     }
   });
 
@@ -463,13 +463,13 @@ export function loadFromDisk(): boolean {
         teachers.push(...data.teachers);
       } else {
         const defaultTeachers = [
-          { id: 't-1', name: '春来 老师', gender: 'girl', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-2', name: '秋娟 老师', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-3', name: '若雪 老师', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-4', name: '上好 老师', gender: 'girl', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-5', name: '雪成 老师', gender: 'girl', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-6', name: '志安 老师', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-7', name: '东丽 老师', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '班主任', joinDate: '2026-01-01' }
+          { id: 't-1', name: '春来', gender: 'girl', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-2', name: '秋娟', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-3', name: '若雪', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-4', name: '上好', gender: 'girl', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-5', name: '雪成', gender: 'girl', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-6', name: '任志安', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '班主任', joinDate: '2026-01-01' },
+          { id: 't-7', name: '毛东丽', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '班主任', joinDate: '2026-01-01' }
         ];
         teachers.length = 0;
         teachers.push(...defaultTeachers);
@@ -498,13 +498,13 @@ export function loadFromDisk(): boolean {
 
     if (!fs.existsSync(filePath)) {
       const defaultTeachers = [
-        { id: 't-1', name: '春来', gender: 'girl', phone: '13812345671', classId: 'class-1', roleTitle: '班主任' },
-        { id: 't-2', name: '秋娟', gender: 'girl', phone: '13812345672', classId: 'class-2', roleTitle: '班主任' },
-        { id: 't-3', name: '若雪', gender: 'girl', phone: '13812345673', classId: 'class-3', roleTitle: '班主任' },
-        { id: 't-4', name: '上好', gender: 'girl', phone: '13812345674', classId: 'class-4', roleTitle: '班主任' },
-        { id: 't-5', name: '雪成', gender: 'girl', phone: '13812345675', classId: 'class-5', roleTitle: '班主任' },
-        { id: 't-6', name: '志安', gender: 'boy', phone: '13812345676', classId: 'class-6', roleTitle: '班主任' },
-        { id: 't-7', name: '东丽', gender: 'girl', phone: '13812345677', classId: 'class-7', roleTitle: '班主任' }
+        { id: 't-1', name: '春来', gender: 'girl', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
+        { id: 't-2', name: '秋娟', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '班主任', joinDate: '2026-01-01' },
+        { id: 't-3', name: '若雪', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '班主任', joinDate: '2026-01-01' },
+        { id: 't-4', name: '上好', gender: 'girl', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '班主任', joinDate: '2026-01-01' },
+        { id: 't-5', name: '雪成', gender: 'girl', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '班主任', joinDate: '2026-01-01' },
+        { id: 't-6', name: '任志安', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '班主任', joinDate: '2026-01-01' },
+        { id: 't-7', name: '毛东丽', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '班主任', joinDate: '2026-01-01' }
       ];
       teachers.length = 0;
       teachers.push(...defaultTeachers);
@@ -850,10 +850,18 @@ export function mergeClientData(payload: SyncPayload): {
     const teacherMap = new Map<string, any>(teachers.map(t => [t.id, t]));
     let teachersChanged = false;
     for (const t of (payload as any).teachers) {
-      if (t && t.id && !teacherMap.has(t.id)) {
-        teacherMap.set(t.id, t);
-        teachersChanged = true;
-        changed = true;
+      if (t && t.id) {
+        if (!teacherMap.has(t.id)) {
+          teacherMap.set(t.id, t);
+          teachersChanged = true;
+          changed = true;
+        } else {
+          const current = teacherMap.get(t.id);
+          const merged = { ...current, ...t };
+          teacherMap.set(t.id, merged);
+          teachersChanged = true;
+          changed = true;
+        }
       }
     }
     if (teachersChanged) {
@@ -909,20 +917,20 @@ export async function getClassById(id: string): Promise<ClassGroup | undefined> 
 }
 
 export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const existingIdx = classes.findIndex(c => c.id === cls.id || c.name === cls.name);
   if (existingIdx >= 0) {
     classes[existingIdx] = { ...classes[existingIdx], ...cls };
   } else {
     classes.push(cls);
   }
-  await supabaseUpsertClass(cls);
+  await supabaseUpsertClass(classes[existingIdx >= 0 ? existingIdx : classes.length - 1]);
   await saveDataToSupabase();
   return cls;
 }
 
 export async function updateClass(id: string, updates: Partial<ClassGroup>): Promise<ClassGroup | null> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const existingIdx = classes.findIndex(c => c.id === id || c.name === id);
   if (existingIdx === -1) return null;
   classes[existingIdx] = { ...classes[existingIdx], ...updates };
@@ -1071,16 +1079,26 @@ export async function getTeacherById(id: string): Promise<any | undefined> {
 }
 
 export async function saveTeacher(teacher: any): Promise<any> {
-  await initOrLoadDataAsync(true);
-  const existingIdx = teachers.findIndex(t => (teacher.id && t.id === teacher.id) || (teacher.name && t.name === teacher.name));
+  await initOrLoadDataAsync(false);
+  const teacherId = (teacher.id && String(teacher.id).trim()) || `t-${Date.now().toString().slice(-6)}`;
+  const cleanName = teacher.name ? String(teacher.name).trim().replace(/\s*老师$/, '') : '';
+
+  const existingIdx = teachers.findIndex(t => (t.id && t.id === teacherId) || (cleanName && t.name === cleanName));
   let savedTeacher: any;
   if (existingIdx >= 0) {
-    teachers[existingIdx] = { ...teachers[existingIdx], ...teacher };
-    savedTeacher = teachers[existingIdx];
+    const existing = teachers[existingIdx];
+    savedTeacher = {
+      ...existing,
+      ...teacher,
+      id: existing.id || teacherId,
+      name: cleanName || existing.name
+    };
+    teachers[existingIdx] = savedTeacher;
   } else {
     savedTeacher = {
-      id: teacher.id || `t-${Date.now().toString().slice(-6)}`,
-      ...teacher
+      ...teacher,
+      id: teacherId,
+      name: cleanName
     };
     teachers.push(savedTeacher);
   }
@@ -1090,7 +1108,7 @@ export async function saveTeacher(teacher: any): Promise<any> {
 }
 
 export async function updateTeacher(id: string, updates: any): Promise<any | null> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const existingIdx = teachers.findIndex(t => t.id === id);
   if (existingIdx === -1) return null;
   teachers[existingIdx] = { ...teachers[existingIdx], ...updates };
@@ -1100,8 +1118,8 @@ export async function updateTeacher(id: string, updates: any): Promise<any | nul
 }
 
 export async function deleteTeacher(id: string): Promise<any | null> {
-  await initOrLoadDataAsync(true);
-  const existingIdx = teachers.findIndex(t => t.id === id);
+  await initOrLoadDataAsync(false);
+  const existingIdx = teachers.findIndex(t => t.id === id || t.name === id);
   if (existingIdx === -1) return null;
   const removed = teachers.splice(existingIdx, 1)[0];
   await supabaseDeleteTeacher(removed.id);

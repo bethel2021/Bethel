@@ -109,13 +109,7 @@ export default function App() {
   const [teachers, setTeachers] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
       const local = getLocalData();
-      const list = (local as any).teachers && (local as any).teachers.length > 0 ? (local as any).teachers : initialTeachers;
-      return list.map((t: any) => {
-        if (t.name && (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成'))) {
-          return { ...t, gender: 'girl' };
-        }
-        return t;
-      });
+      return (local as any).teachers && (local as any).teachers.length > 0 ? (local as any).teachers : initialTeachers;
     }
     return initialTeachers;
   });
@@ -210,13 +204,7 @@ export default function App() {
     }
 
     if (Array.isArray(data.teachers)) {
-      const normalizedTeachers = data.teachers.map((t: any) => {
-        if (t.name && (t.name.includes('春来') || t.name.includes('上好') || t.name.includes('雪成'))) {
-          return { ...t, gender: 'girl' };
-        }
-        return t;
-      });
-      setTeachers(prev => isDataEqual(prev, normalizedTeachers) ? prev : normalizedTeachers);
+      setTeachers(prev => isDataEqual(prev, data.teachers) ? prev : data.teachers);
     }
 
     if (data.accounts && Array.isArray(data.accounts) && data.accounts.length > 0) {
@@ -372,6 +360,7 @@ export default function App() {
           classes: classes.length > 0 ? classes : local.classes,
           students: students.length > 0 ? students : local.students,
           records: records.length > 0 ? records : local.records,
+          teachers: teachers.length > 0 ? teachers : (local as any).teachers,
           deletedRecordKeys: Array.from(getLocalDeletedRecordKeys()),
           config
         })
@@ -1214,19 +1203,18 @@ export default function App() {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有管理教师的权限！');
     }
 
+    const teacherId = (teacherData.id && String(teacherData.id).trim()) || `t-${Date.now().toString().slice(-6)}`;
+    const fullTeacherData = { ...teacherData, id: teacherId };
+
     const saveLocally = () => {
       setTeachers(prev => {
         let updated;
-        const idx = prev.findIndex(t => teacherData.id && t.id === teacherData.id);
+        const idx = prev.findIndex(t => (t.id && t.id === teacherId) || (t.name && t.name === fullTeacherData.name));
         if (idx !== -1) {
           updated = [...prev];
-          updated[idx] = { ...updated[idx], ...teacherData };
+          updated[idx] = { ...updated[idx], ...fullTeacherData };
         } else {
-          const newTeacher = {
-            id: teacherData.id || `t-${Date.now().toString().slice(-6)}`,
-            ...teacherData
-          };
-          updated = [...prev, newTeacher];
+          updated = [...prev, fullTeacherData];
         }
         saveLocalData({ teachers: updated } as any);
         return updated;
@@ -1243,7 +1231,7 @@ export default function App() {
           'Content-Type': 'application/json',
           ...getAuthHeaders()
         },
-        body: JSON.stringify(teacherData)
+        body: JSON.stringify(fullTeacherData)
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
@@ -1264,9 +1252,12 @@ export default function App() {
         }
         setIsServerAvailable(true);
         await loadState(false);
+      } else {
+        const errData = contentType.includes('application/json') ? await res.json() : null;
+        throw new Error(errData?.error || `保存教师资料失败 (${res.status})`);
       }
-    } catch {
-      // Offline fallback
+    } catch (err: any) {
+      throw err;
     }
   };
 
