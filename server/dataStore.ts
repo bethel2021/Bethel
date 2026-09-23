@@ -946,6 +946,7 @@ export async function getClassById(id: string): Promise<ClassGroup | undefined> 
 }
 
 export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
+  await initOrLoadDataAsync(true);
   const existingIdx = classes.findIndex(c => c.id === cls.id || c.name === cls.name);
   let saved: ClassGroup;
   if (existingIdx >= 0) {
@@ -964,6 +965,7 @@ export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
 }
 
 export async function updateClass(id: string, updates: Partial<ClassGroup>): Promise<ClassGroup | null> {
+  await initOrLoadDataAsync(true);
   const existingIdx = classes.findIndex(c => c.id === id || c.name === id);
   if (existingIdx === -1) return null;
   const updated = { ...classes[existingIdx], ...updates };
@@ -977,6 +979,7 @@ export async function updateClass(id: string, updates: Partial<ClassGroup>): Pro
 }
 
 export async function saveClassVisibility(classId: string, isHidden: boolean, clientHiddenIds?: string[]): Promise<void> {
+  await initOrLoadDataAsync(true);
   const idx = classes.findIndex(c => c.id === classId);
   if (idx !== -1) {
     classes[idx] = {

@@ -1064,8 +1064,13 @@ export default function App() {
     }
     saveLocalHiddenClassIds(hiddenSet);
 
-    // 2. Protect with in-flight mutation ref to prevent trailing race-condition poll overwrites
-    pendingClassMutationsRef.current.set(classId, { ...currentClass, isHiddenFromHome });
+    // 2. Protect with in-flight mutation ref with timestamp to prevent trailing race-condition poll overwrites
+    const mutationTimestamp = Date.now();
+    pendingClassMutationsRef.current.set(classId, { 
+      ...currentClass, 
+      isHiddenFromHome,
+      _ts: mutationTimestamp 
+    } as any);
     syncVersionRef.current = (syncVersionRef.current || 0) + 1;
 
     // 3. Memory state consistency check for hiddenClassIds & classes to prevent cross-device state rollback
@@ -1103,6 +1108,16 @@ export default function App() {
       return updated;
     });
 
+    const safeDeletePending = () => {
+      // Defer deleting the pending mutation by 3.5 seconds to fully absorb any trailing in-flight server updates
+      setTimeout(() => {
+        const currentPending = pendingClassMutationsRef.current.get(classId) as any;
+        if (currentPending && currentPending._ts === mutationTimestamp) {
+          pendingClassMutationsRef.current.delete(classId);
+        }
+      }, 3500);
+    };
+
     try {
       const res = await fetch(`/api/classes/${classId}/visibility`, {
         method: 'POST',
@@ -1130,8 +1145,6 @@ export default function App() {
             return updated;
           });
         }
-        // Update mutation state without full state reload
-        pendingClassMutationsRef.current.delete(classId);
         showSyncNotification(isHiddenFromHome ? '✅ 班级已设置为不在首页展示' : '✅ 班级已恢复在首页正常展示');
       } else {
         // Fallback to /api/classes
@@ -1145,14 +1158,13 @@ export default function App() {
           if (typeof fallbackData.syncVersion === 'number') {
             syncVersionRef.current = fallbackData.syncVersion;
           }
-          pendingClassMutationsRef.current.delete(classId);
           showSyncNotification('✅ 班级展示状态已同步保存');
         }
       }
     } catch {
       // Offline fallback
     } finally {
-      pendingClassMutationsRef.current.delete(classId);
+      safeDeletePending();
       notifyCrossTabSync();
     }
   };
