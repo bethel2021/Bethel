@@ -2757,11 +2757,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                   >
                     <option value="">— 选择核心负责 —</option>
-                    {dbTeacherNames.map(name => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
+                    {teachers
+                      .filter(t => normalizeRoleTitle(t.roleTitle) === '班级负责')
+                      .map(t => (
+                        <option key={t.id} value={t.name}>
+                          {t.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -2862,11 +2864,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="w-full text-xs px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                   >
                     <option value="">— 从教师库下拉选取添加 —</option>
-                    {dbTeacherNames
-                      .filter(name => !(editingClass.subjectTeacher || '').split(/[,\s，、]+/).map(s => s.trim()).filter(Boolean).includes(name))
-                      .map(name => (
-                        <option key={name} value={name}>
-                          {name}
+                    {teachers
+                      .filter(t => ['上课', '辅助'].includes(normalizeRoleTitle(t.roleTitle)))
+                      .filter(t => !(editingClass.subjectTeacher || '').split(/[,\s，、]+/).map(s => s.trim()).filter(Boolean).includes(t.name))
+                      .map(t => (
+                        <option key={t.id} value={t.name}>
+                          {t.name}
                         </option>
                       ))}
                   </select>
