@@ -27,14 +27,7 @@
       "class-4",
       "class-5",
       "class-7"
-    ],
-    "config": {
-      "accountClassIsolation": {
-        "btlgzbls": "class-6",
-        "btlczbls": "class-5",
-        "fellowship": "class-7"
-      }
-    }
+    ]
   },
   "classes": [
     {
@@ -594,5 +587,5 @@
       "joinDate": "2026-01-01"
     }
   ],
-  "updatedAt": "2026-09-23T19:12:47.615Z"
+  "updatedAt": "2026-09-23T19:12:47.615+00:00"
 }

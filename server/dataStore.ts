@@ -987,6 +987,21 @@ export function scheduleSupabaseSnapshotSave(delayMs = 1500) {
   }, delayMs);
 }
 
+export function validateTeacherExistence(names: string[]): string[] {
+  const missingTeachers: string[] = [];
+  const existingTeacherNames = new Set(teachers.map(t => (t.name || '').trim()));
+  
+  names.forEach(name => {
+    // Trim and remove "老师" suffix for validation
+    const cleanName = name.trim().replace(/\s*老师$/, '');
+    if (name && !existingTeacherNames.has(cleanName)) {
+      missingTeachers.push(name);
+    }
+  });
+  
+  return missingTeachers;
+}
+
 // --- Classes ---
 export async function getClasses(assignedClassId?: string): Promise<ClassGroup[]> {
   await initOrLoadDataAsync(true);
@@ -1008,7 +1023,19 @@ export async function getClassById(id: string): Promise<ClassGroup | undefined> 
 
 export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
   await initOrLoadDataAsync(true);
+  
+  const teachersToValidate = [
+    cls.teacher?.replace(/\s*老师$/, ''), 
+    ...(cls.subjectTeacher ? cls.subjectTeacher.split(/[,\s，、]+/).map(s => s.replace(/\s*老师$/, '')) : [])
+  ].filter(Boolean);
+  const missing = validateTeacherExistence(teachersToValidate);
+  if (missing.length > 0) {
+    console.error(`[Data Integrity Error] Attempted to assign non-existent teachers to class ${cls.name}: ${missing.join(', ')}`);
+    throw new Error(`以下教师未在资料库中找到，请先添加：${missing.join(', ')}`);
+  }
+
   const existingIdx = classes.findIndex(c => c.id === cls.id || c.name === cls.name);
+
   let saved: ClassGroup;
   if (existingIdx >= 0) {
     saved = { ...classes[existingIdx], ...cls };
@@ -1029,8 +1056,17 @@ export async function updateClass(id: string, updates: Partial<ClassGroup>): Pro
   await initOrLoadDataAsync(true);
   const existingIdx = classes.findIndex(c => c.id === id || c.name === id);
   if (existingIdx === -1) return null;
+  
   const updated = { ...classes[existingIdx], ...updates };
+  const teachersToValidate = [updated.teacher, ...(updated.subjectTeacher ? updated.subjectTeacher.split(/[,\s，、]+/) : [])].filter(Boolean);
+  const missing = validateTeacherExistence(teachersToValidate);
+  if (missing.length > 0) {
+    console.error(`[Data Integrity Error] Attempted to assign non-existent teachers to class ${updated.name}: ${missing.join(', ')}`);
+    throw new Error(`以下教师未在资料库中找到，请先添加：${missing.join(', ')}`);
+  }
+
   classes[existingIdx] = updated;
+
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   saveDataToFile();
