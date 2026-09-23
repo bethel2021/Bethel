@@ -72,6 +72,7 @@ export function getCurrentStatePayload(eventType: string = 'state_update', extra
       username: a.username,
       displayName: a.displayName,
       role: a.role,
+      assignedClassId: a.assignedClassId,
       createdAt: a.createdAt
     })),
     activeSunday: currentSunday,
@@ -1365,6 +1366,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
       }
 
       await dataStore.saveAdminAccount(adminAccounts[existingIndex]);
+      broadcastRealtimeState('accounts_updated');
 
       return res.json({
         success: true,
@@ -1394,6 +1396,7 @@ apiRouter.post('/accounts', async (req: Request, res: Response) => {
       };
 
       await dataStore.saveAdminAccount(newAccount);
+      broadcastRealtimeState('accounts_updated');
 
       return res.json({
         success: true,
@@ -1437,6 +1440,7 @@ apiRouter.post('/accounts/password', async (req: Request, res: Response) => {
     }
 
     await dataStore.updateAccountPassword(cleanUsername, cleanPassword);
+    broadcastRealtimeState('accounts_updated');
 
     res.json({
       success: true,
@@ -1446,6 +1450,7 @@ apiRouter.post('/accounts/password', async (req: Request, res: Response) => {
         username: a.username,
         displayName: a.displayName,
         role: a.role,
+        assignedClassId: a.assignedClassId,
         createdAt: a.createdAt
       }))
     });
@@ -1470,6 +1475,7 @@ apiRouter.delete('/accounts/:username', async (req: Request, res: Response) => {
     if (!deleted) {
       return res.status(404).json({ error: `未找到账号【${username}】` });
     }
+    broadcastRealtimeState('accounts_updated');
 
     res.json({
       success: true,
@@ -1479,6 +1485,7 @@ apiRouter.delete('/accounts/:username', async (req: Request, res: Response) => {
         username: a.username,
         displayName: a.displayName,
         role: a.role,
+        assignedClassId: a.assignedClassId,
         createdAt: a.createdAt
       }))
     });

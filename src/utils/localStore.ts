@@ -127,6 +127,7 @@ export function saveLocalAccount(accountData: Partial<AdminAccount> & { username
       ...accounts[index],
       displayName: accountData.displayName || accounts[index].displayName,
       role: (cleanUsername === 'admin' ? 'superadmin' : (accountData.role || accounts[index].role)),
+      assignedClassId: accountData.role === 'superadmin' ? undefined : (accountData.assignedClassId !== undefined ? accountData.assignedClassId : accounts[index].assignedClassId),
       password: accountData.password || accounts[index].password
     };
   } else {
@@ -136,6 +137,7 @@ export function saveLocalAccount(accountData: Partial<AdminAccount> & { username
       username: cleanUsername,
       displayName: accountData.displayName || cleanUsername,
       role: accountData.role || 'teacher',
+      assignedClassId: accountData.role === 'superadmin' ? undefined : accountData.assignedClassId,
       password: accountData.password || '123456',
       createdAt: new Date().toISOString().split('T')[0]
     };

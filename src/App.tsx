@@ -19,6 +19,7 @@ import {
   saveLocalData, 
   resetLocalData, 
   getLocalAccounts, 
+  saveLocalAccounts,
   saveLocalAccount, 
   deleteLocalAccount, 
   updateLocalAccountPassword,
@@ -1545,8 +1546,13 @@ export default function App() {
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
         setIsServerAvailable(true);
-        await loadState(false);
+        if (Array.isArray(data.accounts) && data.accounts.length > 0) {
+          setAccounts(data.accounts);
+          saveLocalAccounts(data.accounts);
+        }
+        showSyncNotification(`✅ 管理账号【${accountData.displayName || accountData.username}】已成功保存并同步！`);
       }
     } catch {
       // Offline fallback
@@ -1574,8 +1580,13 @@ export default function App() {
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
         setIsServerAvailable(true);
-        await loadState(false);
+        if (Array.isArray(data.accounts)) {
+          setAccounts(data.accounts);
+          saveLocalAccounts(data.accounts);
+        }
+        showSyncNotification('✅ 管理账号已成功删除！');
       }
     } catch {
       // Offline fallback
@@ -1604,8 +1615,13 @@ export default function App() {
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
         setIsServerAvailable(true);
-        await loadState(false);
+        if (Array.isArray(data.accounts)) {
+          setAccounts(data.accounts);
+          saveLocalAccounts(data.accounts);
+        }
+        showSyncNotification('✅ 账号密码已成功更新！');
       }
     } catch {
       // Offline fallback

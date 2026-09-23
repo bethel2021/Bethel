@@ -138,12 +138,13 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
       }));
 
       const mappedAdmins: ServerAdminAccount[] = rawAdmins.map(a => ({
-        id: a.id,
+        id: a.id || `acc-${a.username}`,
         username: a.username,
-        displayName: a.display_name,
-        role: a.role,
+        displayName: a.display_name || a.displayName || a.username,
+        role: a.role || 'teacher',
         password: a.password,
-        createdAt: a.created_at
+        createdAt: a.created_at || a.createdAt || '2026-01-01',
+        assignedClassId: a.assigned_class_id || a.assignedClassId || undefined
       }));
 
       // Deleted record keys from deleted_attendance_records table
@@ -366,21 +367,24 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
     if (Array.isArray(payload.adminAccounts) && payload.adminAccounts.length > 0) {
       const adminRows = payload.adminAccounts.map(a => ({
         id: a.id,
-        username: a.username,
+        username: a.username.toLowerCase(),
         display_name: a.displayName,
         role: a.role,
         password: a.password,
         created_at: a.createdAt,
-        ...(a.assignedClassId ? { assigned_class_id: a.assignedClassId } : {})
+        assigned_class_id: a.assignedClassId || null
       }));
-      await Promise.resolve(client.from('admin_accounts').upsert(adminRows, { onConflict: 'id' }));
+      const { error: upsertErr } = await client.from('admin_accounts').upsert(adminRows, { onConflict: 'username' });
+      if (upsertErr) {
+        await client.from('admin_accounts').upsert(adminRows, { onConflict: 'id' });
+      }
 
       // Reconcile deleted admin accounts in Supabase
       try {
-        const { data: existingAdmins } = await client.from('admin_accounts').select('id');
+        const { data: existingAdmins } = await client.from('admin_accounts').select('id, username');
         if (existingAdmins && existingAdmins.length > 0) {
-          const keepSet = new Set(payload.adminAccounts.map(a => a.id));
-          const toDelete = existingAdmins.map(a => a.id).filter(id => !keepSet.has(id));
+          const keepSet = new Set(payload.adminAccounts.map(a => a.username.toLowerCase()));
+          const toDelete = existingAdmins.filter(a => !keepSet.has(a.username.toLowerCase())).map(a => a.id);
           if (toDelete.length > 0) {
             await client.from('admin_accounts').delete().in('id', toDelete);
           }
@@ -743,15 +747,20 @@ export async function supabaseUpsertAdminAccount(a: ServerAdminAccount): Promise
   const client = getSupabase();
   if (!client) return false;
   try {
-    await client.from('admin_accounts').upsert({
+    const row = {
       id: a.id,
-      username: a.username,
+      username: a.username.toLowerCase(),
       display_name: a.displayName,
       role: a.role,
       password: a.password,
       created_at: a.createdAt,
-      ...(a.assignedClassId ? { assigned_class_id: a.assignedClassId } : {})
-    }, { onConflict: 'id' });
+      assigned_class_id: a.assignedClassId || null
+    };
+    const { error } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
+    if (error) {
+      console.warn('[Supabase DB Error] supabaseUpsertAdminAccount onConflict username failed, trying id:', error);
+      await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
+    }
     return true;
   } catch (err) {
     console.warn('[Supabase DB] supabaseUpsertAdminAccount failed:', err);

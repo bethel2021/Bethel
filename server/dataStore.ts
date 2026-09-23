@@ -1259,14 +1259,24 @@ export async function getAdminAccounts(): Promise<ServerAdminAccount[]> {
 export async function saveAdminAccount(account: ServerAdminAccount): Promise<ServerAdminAccount> {
   account.password = hashPasswordIfNeeded(account.password);
   const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === account.username.toLowerCase());
+  let targetAccount: ServerAdminAccount;
   if (existingIdx >= 0) {
-    adminAccounts[existingIdx] = { ...adminAccounts[existingIdx], ...account };
+    adminAccounts[existingIdx] = { 
+      ...adminAccounts[existingIdx], 
+      ...account,
+      id: adminAccounts[existingIdx].id // preserve ID
+    };
+    targetAccount = adminAccounts[existingIdx];
   } else {
-    adminAccounts.push(account);
+    targetAccount = { ...account };
+    adminAccounts.push(targetAccount);
   }
-  await supabaseUpsertAdminAccount(adminAccounts[existingIdx >= 0 ? existingIdx : adminAccounts.length - 1]);
-  await saveDataToSupabase();
-  return adminAccounts[existingIdx >= 0 ? existingIdx : adminAccounts.length - 1];
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
+  await supabaseUpsertAdminAccount(targetAccount);
+  scheduleSupabaseSnapshotSave();
+  return targetAccount;
 }
 
 export async function updateAdminAccount(username: string, updates: Partial<ServerAdminAccount>): Promise<ServerAdminAccount | null> {
@@ -1276,8 +1286,11 @@ export async function updateAdminAccount(username: string, updates: Partial<Serv
     updates.password = hashPasswordIfNeeded(updates.password);
   }
   adminAccounts[existingIdx] = { ...adminAccounts[existingIdx], ...updates };
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpsertAdminAccount(adminAccounts[existingIdx]);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return adminAccounts[existingIdx];
 }
 
@@ -1289,8 +1302,11 @@ export async function updateAccountPassword(username: string, newPassword: strin
   if (username.toLowerCase() === 'admin') {
     systemConfig.adminPassword = hashed;
   }
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseUpdateAccountPassword(username, hashed);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return true;
 }
 
@@ -1298,8 +1314,11 @@ export async function deleteAdminAccount(username: string): Promise<ServerAdminA
   const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === username.toLowerCase());
   if (existingIdx === -1) return null;
   const deleted = adminAccounts.splice(existingIdx, 1)[0];
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   await supabaseDeleteAdminAccount(username);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave();
   return deleted;
 }
 
