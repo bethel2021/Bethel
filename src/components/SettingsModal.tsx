@@ -1866,7 +1866,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                支持总管理员、主日学上课老师、团契负责人账号的新建。根据安全规定，账号一旦创建，禁止修改资料、重置密码或删除。
+                支持总管理员、主日学上课老师、团契负责人账号的新建、修改资料、重置密码与删除。修改即刻多端同步生效。
               </p>
             </div>
 
@@ -2076,31 +2076,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
-                              disabled={true}
-                              className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-not-allowed opacity-40 border-slate-200 text-slate-400"
-                              title="安全规定限制：管理账号一旦创建，禁止修改资料"
+                              onClick={() => handleOpenEditAccount(acc)}
+                              disabled={!isSuperAdmin}
+                              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                                isSuperAdmin 
+                                  ? 'border-slate-200 hover:bg-slate-100 text-slate-700' 
+                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
+                              }`}
+                              title={isSuperAdmin ? '修改账号姓名与角色' : '仅总管理员可修改资料'}
                             >
-                              <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+                              <Edit2 className="w-3.5 h-3.5 text-slate-600" />
                               <span className="hidden sm:inline">编辑</span>
                             </button>
 
                             <button
                               type="button"
-                              disabled={true}
-                              className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-not-allowed opacity-40 border-slate-200 text-slate-400"
-                              title="安全规定限制：管理账号一旦创建，禁止重置密码"
+                              onClick={() => handleOpenChangePassword(acc)}
+                              disabled={!isSuperAdmin}
+                              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                                isSuperAdmin 
+                                  ? 'border-amber-200 hover:bg-amber-50 text-amber-900' 
+                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
+                              }`}
+                              title={isSuperAdmin ? '重置此账号登录密码' : '仅总管理员可重置密码'}
                             >
-                              <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                              <KeyRound className="w-3.5 h-3.5 text-amber-700" />
                               <span className="hidden sm:inline">改密</span>
                             </button>
 
                             <button
                               type="button"
-                              disabled={true}
-                              className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-not-allowed opacity-40 border-slate-200 text-slate-400"
-                              title="安全规定限制：管理账号一旦创建，禁止删除"
+                              onClick={() => handleRequestDeleteAccount(acc)}
+                              disabled={!isSuperAdmin || isRootAdmin}
+                              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                                isRootAdmin
+                                  ? 'opacity-30 border-slate-200 text-slate-300 cursor-not-allowed'
+                                  : isSuperAdmin
+                                  ? 'border-red-200 hover:bg-red-50 text-red-600'
+                                  : 'opacity-40 border-slate-200 text-slate-400 cursor-not-allowed'
+                              }`}
+                              title={
+                                isRootAdmin 
+                                  ? '系统根总管受系统保护，不可删除' 
+                                  : isSuperAdmin 
+                                  ? '删除此账号' 
+                                  : '仅总管理员可删除账号'
+                              }
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                              <Trash2 className="w-3.5 h-3.5" />
                               <span className="hidden sm:inline">删除</span>
                             </button>
                           </div>

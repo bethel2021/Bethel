@@ -581,7 +581,6 @@ export async function initOrLoadDataAsync(force = false) {
           });
         }
         if (Array.isArray(cloudData.adminAccounts)) {
-          console.log(`[Supabase DB Read] Syncing admin accounts. Cloud records count: ${cloudData.adminAccounts.length}. Local records count in memory: ${adminAccounts.length}`);
           if (cloudData.adminAccounts.length > 0) {
             // Cloud Supabase DB is authoritative for admin_accounts
             const memoryPassMap = new Map<string, string>();
@@ -591,33 +590,20 @@ export async function initOrLoadDataAsync(force = false) {
               }
             });
 
-            const authoritativeAdmins = cloudData.adminAccounts.map(a => {
-              const pass = a.password || memoryPassMap.get(a.username.toLowerCase()) || '';
-              return {
-                ...a,
-                password: pass
-              };
-            });
-
-            console.log('[Supabase DB Sync] Replacing local in-memory adminAccounts with authoritative cloud list:', 
-              authoritativeAdmins.map(a => `[id:${a.id}, user:${a.username}, role:${a.role}, hasPass:${!!a.password}]`).join(', ')
-            );
+            const authoritativeAdmins = cloudData.adminAccounts.map(a => ({
+              ...a,
+              password: a.password || memoryPassMap.get(a.username.toLowerCase()) || ''
+            }));
 
             adminAccounts.length = 0;
             adminAccounts.push(...authoritativeAdmins);
           } else if (adminAccounts.length > 0) {
             // Supabase admin_accounts table is empty, seed local accounts to Supabase
-            console.log(`[Supabase DB Sync] Cloud admin_accounts table is empty. Seeding local in-memory adminAccounts (${adminAccounts.length} records) to Supabase...`);
             for (const localAcc of adminAccounts) {
-              console.log(`[Supabase DB Sync] Seeding local account to Supabase: username=${localAcc.username}, role=${localAcc.role}`);
-              supabaseUpsertAdminAccount(localAcc).then(success => {
-                console.log(`[Supabase DB Sync] Seed status for ${localAcc.username}: ${success ? 'SUCCESS' : 'FAILED'}`);
-              }).catch(err => {
+              supabaseUpsertAdminAccount(localAcc).catch(err => {
                 console.warn('[Sync Admin Account Error] Failed to seed initial account:', localAcc.username, err);
               });
             }
-          } else {
-            console.log('[Supabase DB Sync] Both Cloud and memory adminAccounts lists are empty.');
           }
         }
         if (Array.isArray(cloudData.teachers) && cloudData.teachers.length > 0) {
@@ -1336,32 +1322,16 @@ export async function saveSystemConfig(updates: Partial<SystemConfig>): Promise<
 
 // --- Admin Accounts ---
 export async function getAdminAccounts(): Promise<ServerAdminAccount[]> {
-  console.log(`[dataStore.getAdminAccounts] Request received. Syncing from DB...`);
   await initOrLoadDataAsync(true);
-  console.log(`[dataStore.getAdminAccounts] Sync completed. Returning ${adminAccounts.length} in-memory account records:`, 
-    adminAccounts.map(a => `[id:${a.id}, user:${a.username}, role:${a.role}]`).join(', ')
-  );
   return [...adminAccounts];
 }
 
 export async function saveAdminAccount(account: ServerAdminAccount): Promise<ServerAdminAccount> {
-  const targetUsername = account.username.toLowerCase();
-  console.log(`[dataStore.saveAdminAccount] Initiated for username="${targetUsername}". Saving data payload:`, {
-    ...account,
-    password: account.password ? '[EXISTS/REDACTED]' : '[NONE]'
-  });
-
-  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === targetUsername);
+  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === account.username.toLowerCase());
   let targetAccount: ServerAdminAccount;
-
   if (existingIdx >= 0) {
     const existing = adminAccounts[existingIdx];
     const newPassword = account.password ? hashPasswordIfNeeded(account.password) : existing.password;
-    console.log(`[dataStore.saveAdminAccount] Found existing account at memory index ${existingIdx}. Merging changes.`, {
-      from: { id: existing.id, displayName: existing.displayName, role: existing.role },
-      to: { displayName: account.displayName, role: account.role }
-    });
-    
     adminAccounts[existingIdx] = { 
       ...existing, 
       ...account,
@@ -1370,7 +1340,6 @@ export async function saveAdminAccount(account: ServerAdminAccount): Promise<Ser
     };
     targetAccount = adminAccounts[existingIdx];
   } else {
-    console.log(`[dataStore.saveAdminAccount] No existing account found for username="${targetUsername}". Creating new account in memory.`);
     targetAccount = {
       ...account,
       id: account.id || `acc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -1378,117 +1347,54 @@ export async function saveAdminAccount(account: ServerAdminAccount): Promise<Ser
     };
     adminAccounts.push(targetAccount);
   }
-
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  
-  console.log(`[dataStore.saveAdminAccount] Memory state updated (version: ${syncVersion}). Persisting snapshot asynchronously to disk...`);
   saveDataToFile();
-
-  console.log(`[dataStore.saveAdminAccount] Upserting to Supabase DB: targetAccount.username="${targetAccount.username}"...`);
-  const dbSuccess = await supabaseUpsertAdminAccount(targetAccount);
-  console.log(`[dataStore.saveAdminAccount] Supabase DB upsert finished. Status: ${dbSuccess ? 'SUCCESS' : 'FAILED'}`);
-
-  console.log(`[dataStore.saveAdminAccount] Scheduling snapshot snapshot update to DB...`);
+  await supabaseUpsertAdminAccount(targetAccount);
   scheduleSupabaseSnapshotSave();
-
   return targetAccount;
 }
 
 export async function updateAdminAccount(username: string, updates: Partial<ServerAdminAccount>): Promise<ServerAdminAccount | null> {
-  const targetUsername = username.toLowerCase();
-  console.log(`[dataStore.updateAdminAccount] Initiated for username="${targetUsername}". Updates payload:`, {
-    ...updates,
-    password: updates.password ? '[EXISTS/REDACTED]' : '[NONE]'
-  });
-
-  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === targetUsername);
-  if (existingIdx === -1) {
-    console.warn(`[dataStore.updateAdminAccount] Error: Account "${targetUsername}" not found in memory (accounts count: ${adminAccounts.length}).`);
-    return null;
-  }
-
+  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === username.toLowerCase());
+  if (existingIdx === -1) return null;
   if (updates.password) {
     updates.password = hashPasswordIfNeeded(updates.password);
   }
-
-  console.log(`[dataStore.updateAdminAccount] Applying partial updates to memory record index ${existingIdx}:`, updates);
   adminAccounts[existingIdx] = { ...adminAccounts[existingIdx], ...updates };
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-
-  console.log(`[dataStore.updateAdminAccount] Saving local disk backup...`);
   saveDataToFile();
-
-  console.log(`[dataStore.updateAdminAccount] Upserting updated record to Supabase DB: targetUsername="${targetUsername}"...`);
-  const dbSuccess = await supabaseUpsertAdminAccount(adminAccounts[existingIdx]);
-  console.log(`[dataStore.updateAdminAccount] Supabase DB upsert finished. Status: ${dbSuccess ? 'SUCCESS' : 'FAILED'}`);
-
-  console.log(`[dataStore.updateAdminAccount] Scheduling snapshot save...`);
+  await supabaseUpsertAdminAccount(adminAccounts[existingIdx]);
   scheduleSupabaseSnapshotSave();
-
   return adminAccounts[existingIdx];
 }
 
 export async function updateAccountPassword(username: string, newPassword: string): Promise<boolean> {
-  const targetUsername = username.toLowerCase();
-  console.log(`[dataStore.updateAccountPassword] Requested password reset for username="${targetUsername}"`);
-
-  const target = adminAccounts.find(a => a.username.toLowerCase() === targetUsername);
-  if (!target) {
-    console.warn(`[dataStore.updateAccountPassword] Error: Cannot find account "${targetUsername}" in memory to update password.`);
-    return false;
-  }
-
+  const target = adminAccounts.find(a => a.username.toLowerCase() === username.toLowerCase());
+  if (!target) return false;
   const hashed = hashPasswordIfNeeded(newPassword);
   target.password = hashed;
-  if (targetUsername === 'admin') {
-    console.log(`[dataStore.updateAccountPassword] Core Admin account detected. Updating fallback systemConfig.adminPassword too.`);
+  if (username.toLowerCase() === 'admin') {
     systemConfig.adminPassword = hashed;
   }
-
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  
-  console.log(`[dataStore.updateAccountPassword] Saving local disk backup...`);
   saveDataToFile();
-
-  console.log(`[dataStore.updateAccountPassword] Writing updated password hash to Supabase DB...`);
-  const dbSuccess = await supabaseUpdateAccountPassword(targetUsername, hashed);
-  console.log(`[dataStore.updateAccountPassword] Supabase DB write finished. Status: ${dbSuccess ? 'SUCCESS' : 'FAILED'}`);
-
-  console.log(`[dataStore.updateAccountPassword] Scheduling snapshot save...`);
+  await supabaseUpdateAccountPassword(username, hashed);
   scheduleSupabaseSnapshotSave();
-
   return true;
 }
 
 export async function deleteAdminAccount(username: string): Promise<ServerAdminAccount | null> {
-  const targetUsername = username.toLowerCase();
-  console.log(`[dataStore.deleteAdminAccount] Request received for username="${targetUsername}"`);
-
-  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === targetUsername);
-  if (existingIdx === -1) {
-    console.warn(`[dataStore.deleteAdminAccount] Error: Cannot delete "${targetUsername}" because it was not found in memory.`);
-    return null;
-  }
-
+  const existingIdx = adminAccounts.findIndex(a => a.username.toLowerCase() === username.toLowerCase());
+  if (existingIdx === -1) return null;
   const deleted = adminAccounts.splice(existingIdx, 1)[0];
-  console.log(`[dataStore.deleteAdminAccount] Successfully spliced "${targetUsername}" from memory array. Remaining count: ${adminAccounts.length}`);
-
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  
-  console.log(`[dataStore.deleteAdminAccount] Writing memory state to local disk backup...`);
   await saveDataToFile();
-
-  console.log(`[dataStore.deleteAdminAccount] Executing physical row deletion query on Supabase DB for username="${targetUsername}"...`);
-  const dbSuccess = await supabaseDeleteAdminAccount(targetUsername);
-  console.log(`[dataStore.deleteAdminAccount] Supabase DB deletion finished. Status: ${dbSuccess ? 'SUCCESS' : 'FAILED'}`);
-
-  console.log(`[dataStore.deleteAdminAccount] Scheduling snapshot save...`);
+  await supabaseDeleteAdminAccount(username);
   scheduleSupabaseSnapshotSave();
-
   return deleted;
 }
 
