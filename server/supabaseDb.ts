@@ -365,18 +365,37 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
     // Step 5: Upsert 'admin_accounts' table & reconcile deleted
     // --------------------------------------------------------------------------
     if (Array.isArray(payload.adminAccounts) && payload.adminAccounts.length > 0) {
-      const adminRows = payload.adminAccounts.map(a => ({
-        id: a.id,
-        username: a.username.toLowerCase(),
-        display_name: a.displayName,
-        role: a.role,
-        password: a.password,
-        created_at: a.createdAt,
-        assigned_class_id: a.assignedClassId || null
-      }));
-      const { error: upsertErr } = await client.from('admin_accounts').upsert(adminRows, { onConflict: 'username' });
-      if (upsertErr) {
-        await client.from('admin_accounts').upsert(adminRows, { onConflict: 'id' });
+      const validClassIds = new Set((payload.classes || []).map(c => c.id));
+      for (const a of payload.adminAccounts) {
+        if (!a || !a.username) continue;
+        const validClassId = (a.assignedClassId && validClassIds.has(a.assignedClassId)) ? a.assignedClassId : null;
+        const row = {
+          id: a.id,
+          username: a.username.toLowerCase(),
+          display_name: a.displayName,
+          role: a.role,
+          password: a.password,
+          created_at: a.createdAt || new Date().toISOString().split('T')[0],
+          assigned_class_id: validClassId
+        };
+
+        const { error: err1 } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
+        if (err1) {
+          const { error: err2 } = await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
+          if (err2) {
+            const { data: existing } = await client.from('admin_accounts').select('id').ilike('username', a.username).maybeSingle();
+            if (existing) {
+              await client.from('admin_accounts').update({
+                display_name: a.displayName,
+                role: a.role,
+                password: a.password,
+                assigned_class_id: validClassId
+              }).eq('id', existing.id);
+            } else {
+              await client.from('admin_accounts').insert(row);
+            }
+          }
+        }
       }
 
       // Reconcile deleted admin accounts in Supabase
@@ -766,24 +785,25 @@ export async function supabaseUpsertAdminAccount(a: ServerAdminAccount): Promise
       assigned_class_id: validClassId
     };
 
-    // 1. Try upsert with onConflict: 'id'
-    let { error } = await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
-    if (error) {
-      // 2. Try upsert with onConflict: 'username'
-      const { error: err2 } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
+    // 1. Check if user already exists by username
+    const { data: existingByUsername } = await client.from('admin_accounts').select('id').ilike('username', a.username).maybeSingle();
+    if (existingByUsername) {
+      const { error: updateErr } = await client.from('admin_accounts').update({
+        display_name: a.displayName,
+        role: a.role,
+        password: a.password,
+        assigned_class_id: validClassId
+      }).eq('id', existingByUsername.id);
+      if (!updateErr) return true;
+    }
+
+    // 2. Try upsert with onConflict: 'username'
+    let { error: err1 } = await client.from('admin_accounts').upsert(row, { onConflict: 'username' });
+    if (err1) {
+      // 3. Try upsert with onConflict: 'id'
+      let { error: err2 } = await client.from('admin_accounts').upsert(row, { onConflict: 'id' });
       if (err2) {
-        // 3. Fallback: try update if existing row matches username, else insert
-        const { data: existing } = await client.from('admin_accounts').select('id').ilike('username', a.username).maybeSingle();
-        if (existing) {
-          await client.from('admin_accounts').update({
-            display_name: a.displayName,
-            role: a.role,
-            password: a.password,
-            assigned_class_id: validClassId
-          }).eq('id', existing.id);
-        } else {
-          await client.from('admin_accounts').insert(row);
-        }
+        await client.from('admin_accounts').insert(row);
       }
     }
     return true;

@@ -585,14 +585,27 @@ export async function initOrLoadDataAsync(force = false) {
           cloudData.adminAccounts.forEach(acc => {
             if (acc && acc.username) accountMap.set(acc.username.toLowerCase(), acc);
           });
+          const unsyncedLocals: ServerAdminAccount[] = [];
           adminAccounts.forEach(acc => {
-            if (acc && acc.username && !accountMap.has(acc.username.toLowerCase())) {
-              accountMap.set(acc.username.toLowerCase(), acc);
+            if (acc && acc.username) {
+              const uKey = acc.username.toLowerCase();
+              if (!accountMap.has(uKey)) {
+                accountMap.set(uKey, acc);
+                unsyncedLocals.push(acc);
+              }
             }
           });
           const mergedAdmins = Array.from(accountMap.values());
           adminAccounts.length = 0;
           adminAccounts.push(...mergedAdmins);
+
+          if (unsyncedLocals.length > 0) {
+            for (const localAcc of unsyncedLocals) {
+              supabaseUpsertAdminAccount(localAcc).catch(err => {
+                console.warn('[Sync Admin Account Error] Failed to background sync local account:', localAcc.username, err);
+              });
+            }
+          }
         }
         if (Array.isArray(cloudData.teachers) && cloudData.teachers.length > 0) {
           teachers.length = 0;

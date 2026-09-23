@@ -1540,6 +1540,7 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setIsServerAvailable(true);
+        saveLocalAccount(accountData);
         if (Array.isArray(data.accounts) && data.accounts.length > 0) {
           setAccounts(data.accounts);
           saveLocalAccounts(data.accounts);

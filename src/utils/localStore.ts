@@ -110,7 +110,23 @@ export function getLocalAccounts(): AdminAccount[] {
 export function saveLocalAccounts(accounts: AdminAccount[]): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(accounts));
+    const existing = getLocalAccounts();
+    const existingPassMap = new Map<string, string>();
+    existing.forEach(a => {
+      if (a.username && a.password) {
+        existingPassMap.set(a.username.toLowerCase(), a.password);
+      }
+    });
+
+    const merged = accounts.map(a => {
+      const uKey = a.username ? a.username.toLowerCase() : '';
+      return {
+        ...a,
+        password: a.password || existingPassMap.get(uKey) || (uKey === 'admin' ? 'bethel2026' : '123456')
+      };
+    });
+
+    localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(merged));
   } catch (e) {
     console.warn('Failed to save accounts to localStorage', e);
   }
