@@ -18,7 +18,8 @@ import {
   UserCheck,
   RefreshCw,
   Smartphone,
-  ArrowRightLeft
+  ArrowRightLeft,
+  BookOpen
 } from 'lucide-react';
 import type { SystemConfig, AdminUser } from '../types';
 import { checkIsWithinSundayWindow, getDayOfWeekName } from '../utils/dateUtils';
@@ -160,45 +161,71 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* Admin Login / Logout State Button */}
-            {currentUser ? (
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 text-slate-800 text-xs px-2.5 py-1.5 rounded-lg shadow-2xs">
-                {currentUser.role === 'superadmin' ? (
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
-                ) : (
-                  <ShieldAlert className="w-3.5 h-3.5 text-sky-600" />
-                )}
-                <span className="font-semibold truncate max-w-[120px]" title={currentUser.displayName}>
-                  {currentUser.displayName}
-                </span>
-                {currentUser.role !== 'superadmin' && (
-                  <span className="bg-sky-100 text-sky-900 border border-sky-300 text-[10px] font-semibold px-1.5 py-0.2 rounded flex items-center gap-0.5" title="普通同工账号：仅限管理签到，无班级/学生增删权限">
-                    <Lock className="w-2.5 h-2.5" />
-                    <span>仅签到权限</span>
+            {currentUser ? (() => {
+              const isSuper = currentUser.role === 'superadmin';
+              const isFellowship = currentUser.role === 'fellowship_leader';
+              const isTeacher = currentUser.role === 'teacher';
+
+              let containerClass = "bg-slate-50 border-slate-200 text-slate-800";
+              let badgeClass = "bg-slate-100 text-slate-800 border-slate-300";
+              let roleName = "普通同工";
+              let iconElement = <ShieldAlert className="w-3.5 h-3.5 text-slate-600 shrink-0" />;
+
+              if (isSuper) {
+                containerClass = "bg-amber-50/90 border-amber-200/90 text-amber-950";
+                badgeClass = "bg-amber-100 text-amber-900 border-amber-300 shadow-2xs";
+                roleName = "总管理员";
+                iconElement = <ShieldCheck className="w-3.5 h-3.5 text-amber-700 shrink-0" />;
+              } else if (isTeacher) {
+                containerClass = "bg-sky-50/90 border-sky-200/90 text-sky-950";
+                badgeClass = "bg-sky-100 text-sky-900 border-sky-300";
+                roleName = "主日学老师";
+                iconElement = <BookOpen className="w-3.5 h-3.5 text-sky-700 shrink-0" />;
+              } else if (isFellowship) {
+                containerClass = "bg-emerald-50/90 border-emerald-200/90 text-emerald-950";
+                badgeClass = "bg-emerald-100 text-emerald-900 border-emerald-300";
+                roleName = "团契同工";
+                iconElement = <Users className="w-3.5 h-3.5 text-emerald-700 shrink-0" />;
+              }
+
+              return (
+                <div className={`flex items-center gap-2 border text-xs px-2.5 py-1.5 rounded-xl shadow-2xs transition-all duration-300 ${containerClass}`}>
+                  {iconElement}
+                  <span className="font-bold truncate max-w-[120px]" title={currentUser.displayName}>
+                    {currentUser.displayName}
                   </span>
-                )}
-                {currentUser.role === 'superadmin' && (
+                  
+                  {/* Color-Coded Identity Badge */}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${badgeClass}`}>
+                    {!isSuper && <Lock className="w-2.5 h-2.5 shrink-0 text-slate-500" />}
+                    <span>{roleName}</span>
+                  </span>
+
+                  {isSuper && (
+                    <button
+                      onClick={() => setActiveTab(activeTab === 'settings' ? 'today' : 'settings')}
+                      className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all duration-300 cursor-pointer ml-1 ${
+                        activeTab === 'settings'
+                          ? 'bg-slate-950 text-white hover:bg-slate-800'
+                          : 'bg-amber-700 hover:bg-amber-800 text-white shadow-2xs'
+                      }`}
+                      title={activeTab === 'settings' ? '返回主日签到前台' : '进入后台综合管理系统'}
+                    >
+                      <Settings className="w-3 h-3" />
+                      <span>{activeTab === 'settings' ? '返回前台' : '管理'}</span>
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => setActiveTab(activeTab === 'settings' ? 'today' : 'settings')}
-                    className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ml-1 ${
-                      activeTab === 'settings'
-                        ? 'bg-slate-900 text-white shadow-2xs'
-                        : 'bg-amber-700 hover:bg-amber-800 text-white shadow-2xs'
-                    }`}
-                    title={activeTab === 'settings' ? '返回主日签到前台' : '进入后台综合管理系统'}
+                    onClick={onLogout}
+                    className="ml-1 text-slate-400 hover:text-red-700 hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer p-0.5 shrink-0"
+                    title="退出登录"
                   >
-                    <Settings className="w-3 h-3" />
-                    <span>{activeTab === 'settings' ? '返回前台' : '后台管理'}</span>
+                    <LogOut className="w-3.5 h-3.5 text-inherit" />
                   </button>
-                )}
-                <button
-                  onClick={onLogout}
-                  className="ml-0.5 text-slate-400 hover:text-red-700 cursor-pointer p-0.5"
-                  title="退出登录"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
+                </div>
+              );
+            })() : (
               <button
                 onClick={onOpenLogin}
                 className="text-xs px-2.5 py-1.5 rounded-lg font-semibold bg-slate-900 hover:bg-slate-800 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
