@@ -975,6 +975,9 @@ export default function App() {
     const mutationKey = `${data.studentId}_KEY_SPLIT_${data.date}`;
     pendingMutationsRef.current.add(mutationKey);
 
+    // Get current in-memory record before optimistic update to use as version baseline
+    const baseExistingRec = recordsRef.current.find(r => r.studentId === data.studentId && r.date === data.date);
+
     // 1. Optimistically update local state for instantaneous UI response
     updateLocally();
 
@@ -983,14 +986,34 @@ export default function App() {
       timestamp: Date.now()
     });
 
-    // 2. Always persist to serverless / cloud backend
+    // 2. Always persist to serverless / cloud backend with transaction timestamp
     try {
+      const payloadWithVersion = {
+        ...data,
+        expectedTimestamp: baseExistingRec?.timestamp,
+        expectedRecordId: baseExistingRec?.id,
+        syncVersion: syncVersionRef.current,
+        clientLastModified: lastSyncTime
+      };
+
       const res = await fetch('/api/manual-checkin', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(data),
+        body: JSON.stringify(payloadWithVersion),
       });
       const contentType = res.headers.get('content-type') || '';
+      
+      if (res.status === 409) {
+        // Multi-device transaction version disparity detected
+        recentRecordMutationsRef.current.delete(mutationKey);
+        const conflictData = await res.json();
+        if (conflictData && conflictData.currentState) {
+          applyServerState(conflictData.currentState);
+        }
+        showSyncNotification('⚠️ 检测到其他设备正在更新考勤，已触发状态强同步！');
+        return;
+      }
+
       if (res.ok && contentType.includes('application/json')) {
         setIsServerAvailable(true);
         const result = await res.json();

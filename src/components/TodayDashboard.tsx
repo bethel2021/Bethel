@@ -858,7 +858,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                           <FileText className="w-3 h-3 shrink-0" />
                         )}
                         <span>
-                          {record.status === 'present' ? '已准时签到' : record.status === 'late' ? '迟到打卡' : '已请假'}
+                          {record.status === 'present' ? '已准时签到' : record.status === 'late' ? '迟到' : '已请假'}
                         </span>
                       </span>
                       {record.status === 'late' && (

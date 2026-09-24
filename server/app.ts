@@ -774,7 +774,24 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
       return res.status(400).json({ error: check.message });
     }
 
-    const { studentId, date, status, memoryVerseCompleted, offeringCompleted, notes } = req.body;
+    const { 
+      studentId, 
+      date, 
+      status, 
+      memoryVerseCompleted, 
+      offeringCompleted, 
+      notes,
+      expectedVersion,
+      syncVersion: clientSyncVersion,
+      clientLastModified,
+      lastModified: clientLastModifiedAlt,
+      expectedTimestamp,
+      baseTimestamp,
+      clientRecordTimestamp,
+      versionTimestamp,
+      expectedRecordId
+    } = req.body || {};
+
     const student = students.find(s => s.id === studentId);
     if (!student) {
       return res.status(404).json({ error: '学员不存在' });
@@ -790,6 +807,68 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
     const targetDate = date || getActiveSundayDate();
     const studentDateKey = `${studentId}_${targetDate}`;
     const existingIdx = records.findIndex(r => r.studentId === studentId && r.date === targetDate);
+    const existingRecord = existingIdx !== -1 ? records[existingIdx] : undefined;
+
+    // =========================================================================
+    // 🔒 事务级校验逻辑 (Transaction-Level Version & Timestamp Consistency Check)
+    // 在执行签到更新前，对比内存记录与请求数据的版本时间戳，如果检测到差异则直接拒绝并触发一次强制的状态拉取
+    // =========================================================================
+    const reqRecordTimestamp = expectedTimestamp || baseTimestamp || clientRecordTimestamp || versionTimestamp;
+    const reqSystemTimestamp = clientLastModified || clientLastModifiedAlt;
+    const reqSyncVersion = expectedVersion !== undefined ? expectedVersion : clientSyncVersion;
+
+    let hasVersionDisparity = false;
+    let disparityReason = '';
+
+    // 1) 记录级时间戳校验：如果客户端指定了期望基准记录时间戳，对比内存中现有记录的 timestamp
+    if (reqRecordTimestamp && existingRecord) {
+      const clientRecordTime = new Date(reqRecordTimestamp).getTime();
+      const serverRecordTime = new Date(existingRecord.timestamp).getTime();
+      if (!isNaN(clientRecordTime) && !isNaN(serverRecordTime) && Math.abs(serverRecordTime - clientRecordTime) > 1000) {
+        hasVersionDisparity = true;
+        disparityReason = `记录版本时间戳不一致 (客户端版本: ${reqRecordTimestamp}, 内存当前版本: ${existingRecord.timestamp})`;
+      }
+    }
+
+    // 2) 记录ID版本乐观锁校验：客户端指定的记录ID与内存记录不一致
+    if (expectedRecordId && existingRecord && existingRecord.id !== expectedRecordId) {
+      hasVersionDisparity = true;
+      disparityReason = `记录ID版本冲突 (期望: ${expectedRecordId}, 内存当前: ${existingRecord.id})`;
+    }
+
+    // 3) 全局同步时间戳/版本校验：如果检测到客户端版本严重落后且内存记录已被修改
+    if (reqSystemTimestamp && typeof reqSystemTimestamp === 'string' && existingRecord) {
+      const clientSystemTime = new Date(reqSystemTimestamp).getTime();
+      const serverRecordTime = new Date(existingRecord.timestamp).getTime();
+      if (!isNaN(clientSystemTime) && !isNaN(serverRecordTime) && serverRecordTime > clientSystemTime + 2000) {
+        hasVersionDisparity = true;
+        disparityReason = `客户端时间戳已滞后于该记录的最新更新时间 (${existingRecord.timestamp})`;
+      }
+    }
+
+    // 🚨 检测到版本时间戳差异：直接拒绝更新并触发强制状态拉取
+    if (hasVersionDisparity) {
+      console.warn(`[Transaction Version Conflict] /api/manual-checkin rejected for student ${studentId}: ${disparityReason}`);
+      
+      // 触发服务端强制状态同步与全网广播拉取
+      await dataStore.initOrLoadDataAsync(true);
+      broadcastRealtimeState('conflict_resolution', {
+        studentId,
+        date: targetDate,
+        reason: disparityReason
+      });
+
+      return res.status(409).json({
+        success: false,
+        error: `检测到多设备版本时间戳冲突（${disparityReason}），已触发强制状态拉取，请核对最新记录！`,
+        code: 'TRANSACTION_VERSION_CONFLICT',
+        conflict: true,
+        disparityReason,
+        serverSyncVersion: getSyncVersion(),
+        serverLastModified: getLastModifiedTimestamp(),
+        currentState: getCurrentStatePayload('state_force_sync')
+      });
+    }
 
     if (status === 'absent') {
       let removedRecId: string | undefined;
