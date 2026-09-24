@@ -205,43 +205,43 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-slate-100">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 pt-2.5 border-t border-slate-100">
           <button
             onClick={() => setActiveTab('today')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+            className={`w-full py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
               activeTab === 'today'
                 ? 'bg-amber-700 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                : 'bg-slate-50/80 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/60'
             }`}
           >
-            <Users className="w-4 h-4 text-inherit" />
-            <span>主日签到</span>
+            <Users className="w-4 h-4 text-inherit shrink-0" />
+            <span className="truncate">主日签到</span>
           </button>
 
           <button
             onClick={() => setActiveTab('attendance')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+            className={`w-full py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
               activeTab === 'attendance' || activeTab === 'monthly' || activeTab === 'annual'
                 ? 'bg-amber-700 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                : 'bg-slate-50/80 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/60'
             }`}
           >
-            <CalendarCheck className="w-4 h-4 text-inherit" />
-            <span>考勤统计</span>
+            <CalendarCheck className="w-4 h-4 text-inherit shrink-0" />
+            <span className="truncate">考勤统计</span>
           </button>
 
           <button
             onClick={() => setActiveTab('birthday')}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+            className={`w-full py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
               activeTab === 'birthday'
                 ? 'bg-amber-700 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                : 'bg-slate-50/80 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/60'
             }`}
           >
-            <Contact className="w-4 h-4 text-inherit" />
-            <span>学生档案</span>
+            <Contact className="w-4 h-4 text-inherit shrink-0" />
+            <span className="truncate">学生档案</span>
             {upcomingBirthdayCount > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold shrink-0 ${
                 activeTab === 'birthday' 
                   ? 'bg-white/20 text-white' 
                   : 'bg-amber-100 text-amber-900 border border-amber-300'

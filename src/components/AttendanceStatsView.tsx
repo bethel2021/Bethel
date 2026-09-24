@@ -814,9 +814,9 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
         <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-4">
           <Lock className="w-7 h-7" />
         </div>
-        <h3 className="text-base font-bold text-slate-900 mb-2">学生考勤统计与年度档案仅供主日学同工查阅</h3>
+        <h3 className="text-base font-bold text-slate-900 mb-2">学生考勤统计与年度档案受权限保护</h3>
         <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-          为保护主日学未成年孩童与团契成员信息安全，月度考勤明细、出勤档案及荣誉结业证书受权限保护。请使用教师或管理员账号登录后查阅。
+          为保护主日学未成年孩童与团契成员信息安全，月度考勤明细及荣誉结业证书受权限保护。请使用教师或管理员账号登录后查阅。
         </p>
         <button
           onClick={onOpenLogin}

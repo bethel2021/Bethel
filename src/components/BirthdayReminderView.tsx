@@ -296,7 +296,7 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
           className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs cursor-pointer"
         >
           <LogIn className="w-4 h-4" />
-          <span>主日学 / 同工登录</span>
+          <span>主日学老师 / 同工登录</span>
         </button>
       </div>
     );

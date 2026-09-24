@@ -1964,7 +1964,7 @@ export default function App() {
             <Church className="w-4 h-4 text-amber-700" />
             <span className="font-semibold text-slate-800">{config.churchName}</span>
             <span>•</span>
-            <span>{config.schoolTitle}</span>
+            <span>版权所有2026</span>
           </p>
         </div>
       </footer>
