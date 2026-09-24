@@ -138,7 +138,8 @@
     background: transparent !important;
   }
 
-  #printable-certificate {
+  #printable-certificate,
+  #printable-certificate-sheet {
     border: 5px double #b45309 !important;
     border-radius: 12px !important;
     box-shadow: none !important;
@@ -164,7 +165,8 @@
     overflow: hidden !important;
   }
 
-  #printable-certificate > div {
+  #printable-certificate > div,
+  #printable-certificate-sheet > div {
     padding: 16px 22px !important;
     flex: 1 1 auto !important;
     display: flex !important;

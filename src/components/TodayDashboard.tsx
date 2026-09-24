@@ -90,6 +90,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   const [excuseModalStudent, setExcuseModalStudent] = useState<Student | null>(null);
   const [excuseReason, setExcuseReason] = useState<string>('');
   const [loadingMap, setLoadingMap] = useState<Record<string, 'present' | 'late' | 'excused' | 'absent'>>({});
+  const [successFeedbackMap, setSuccessFeedbackMap] = useState<Record<string, { type: 'present' | 'late' | 'excused'; id: number }>>({});
   const [noticeDialog, setNoticeDialog] = useState<{ title: string; content: string } | null>(null);
   const processingRef = useRef<Set<string>>(new Set());
   const rosterRef = useRef<HTMLDivElement>(null);
@@ -233,6 +234,21 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         memoryVerseCompleted: false,
         offeringCompleted: false,
       });
+      // 成功即时反馈动画（仅到校、迟到等签到操作触发，删除记录不触发弹窗）
+      if (status !== 'absent') {
+        const feedbackId = Date.now();
+        setSuccessFeedbackMap(prev => ({ ...prev, [studentId]: { type: status, id: feedbackId } }));
+        setTimeout(() => {
+          setSuccessFeedbackMap(prev => {
+            if (prev[studentId]?.id === feedbackId) {
+              const next = { ...prev };
+              delete next[studentId];
+              return next;
+            }
+            return prev;
+          });
+        }, 1800);
+      }
     } catch (err: any) {
       showCheckinErrorDialog(err);
     } finally {
@@ -293,6 +309,19 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
         notes: excuseReason,
       });
       setExcuseModalStudent(null);
+      // 成功即时反馈动画
+      const feedbackId = Date.now();
+      setSuccessFeedbackMap(prev => ({ ...prev, [targetStudentId]: { type: 'excused', id: feedbackId } }));
+      setTimeout(() => {
+        setSuccessFeedbackMap(prev => {
+          if (prev[targetStudentId]?.id === feedbackId) {
+            const next = { ...prev };
+            delete next[targetStudentId];
+            return next;
+          }
+          return prev;
+        });
+      }, 1800);
     } catch (err: any) {
       showCheckinErrorDialog(err);
     } finally {
@@ -691,6 +720,34 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
       </div>
 
+      {/* CSS Animation Keyframes for Smooth Feedback */}
+      <style>{`
+        @keyframes checkinPopIn {
+          0% { transform: scale(0.35) translateY(12px); opacity: 0; }
+          50% { transform: scale(1.12) translateY(-2px); opacity: 1; }
+          75% { transform: scale(0.96) translateY(0); opacity: 1; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        @keyframes successGlowPulse {
+          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+          50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        @keyframes checkBounce {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.35); }
+        }
+        .animate-checkin-pop {
+          animation: checkinPopIn 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .animate-success-pulse {
+          animation: successGlowPulse 1.2s ease-out;
+        }
+        .animate-check-bounce {
+          animation: checkBounce 0.45s ease-in-out;
+        }
+      `}</style>
+
       {/* Students Roster Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
         {filteredStudents.map(student => {
@@ -702,20 +759,61 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
           const isLateLoading = currentAction === 'late';
           const isExcusedLoading = currentAction === 'excused';
           const isAbsentLoading = currentAction === 'absent';
+          const feedback = successFeedbackMap[student.id];
+          const isSuccessFeedback = !!feedback;
 
           return (
             <div
               key={student.id}
-              className={`bg-white rounded-xl border p-3 sm:p-3.5 shadow-2xs transition-all relative ${
-                record?.status === 'present'
-                  ? 'border-emerald-200/90 ring-1 ring-emerald-500/20'
-                  : record?.status === 'late'
-                    ? 'border-amber-300 ring-1 ring-amber-500/20'
-                    : record?.status === 'excused'
-                      ? 'border-blue-200 bg-blue-50/20'
-                      : 'border-slate-200/80 hover:border-amber-300'
+              className={`bg-white rounded-xl border p-3 sm:p-3.5 shadow-2xs transition-all duration-300 relative ${
+                isSuccessFeedback
+                  ? feedback.type === 'present'
+                    ? 'border-emerald-500 ring-2 ring-emerald-500/40 bg-emerald-50/40 animate-success-pulse'
+                    : feedback.type === 'late'
+                      ? 'border-amber-500 ring-2 ring-amber-500/40 bg-amber-50/40'
+                      : 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-50/40'
+                  : record?.status === 'present'
+                    ? 'border-emerald-200/90 ring-1 ring-emerald-500/20'
+                    : record?.status === 'late'
+                      ? 'border-amber-300 ring-1 ring-amber-500/20'
+                      : record?.status === 'excused'
+                        ? 'border-blue-200 bg-blue-50/20'
+                        : 'border-slate-200/80 hover:border-amber-300'
               }`}
             >
+              {/* Micro Floating Confirmation Pop-up Animation on Check-in (Only for present/late/excused) */}
+              {isSuccessFeedback && (
+                <div className="absolute -top-2.5 right-3 z-30 pointer-events-none animate-checkin-pop">
+                  <div className={`px-2.5 py-1 rounded-full shadow-md flex items-center gap-1.5 text-xs font-bold text-white transition-all ${
+                    feedback.type === 'present'
+                      ? 'bg-emerald-600 border border-emerald-400 shadow-emerald-500/30'
+                      : feedback.type === 'late'
+                        ? 'bg-amber-600 border border-amber-400 shadow-amber-500/30'
+                        : 'bg-blue-600 border border-blue-400 shadow-blue-500/30'
+                  }`}>
+                    <span className="w-3.5 h-3.5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                      {feedback.type === 'present' ? (
+                        <Check className="w-2.5 h-2.5 text-white stroke-[3] animate-check-bounce" />
+                      ) : feedback.type === 'late' ? (
+                        <Clock className="w-2.5 h-2.5 text-white stroke-[3]" />
+                      ) : (
+                        <FileText className="w-2.5 h-2.5 text-white stroke-[3]" />
+                      )}
+                    </span>
+                    <span>
+                      {feedback.type === 'present'
+                        ? '签到成功！'
+                        : feedback.type === 'late'
+                          ? '已记录迟到'
+                          : '已登记请假'}
+                    </span>
+                    {feedback.type === 'present' && (
+                      <Sparkles className="w-3 h-3 text-emerald-200 shrink-0 animate-pulse" />
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Top Row: Name, Class, Status Badge */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5">
@@ -741,7 +839,9 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 <div className="h-9 flex flex-col items-end justify-center shrink-0">
                   {record ? (
                     <div className="text-right">
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 transition-all duration-300 ${
+                        isSuccessFeedback ? 'scale-105 shadow-xs' : ''
+                      } ${
                         record.status === 'present'
                           ? 'bg-emerald-100 text-emerald-800'
                           : record.status === 'late'
@@ -751,7 +851,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                         {isStudentLoading ? (
                           <Loader2 className="w-3 h-3 animate-spin shrink-0 text-current" />
                         ) : record.status === 'present' ? (
-                          <Check className="w-3 h-3 shrink-0" />
+                          <Check className={`w-3 h-3 shrink-0 ${isSuccessFeedback ? 'animate-check-bounce text-emerald-700 stroke-[3]' : ''}`} />
                         ) : record.status === 'late' ? (
                           <Clock className="w-3 h-3 shrink-0" />
                         ) : (

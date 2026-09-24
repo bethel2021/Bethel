@@ -61,6 +61,23 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
   const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0]?.id || '');
   const [certificateViewStudent, setCertificateViewStudent] = useState<Student | null>(students[0] || null);
 
+  // Certificate Print & Export Modal State
+  const [showCertificateModal, setShowCertificateModal] = useState<boolean>(false);
+  const [certScope, setCertScope] = useState<'current' | 'all' | 'full_attendance' | 'class'>('current');
+  const [certClassId, setCertClassId] = useState<string>(classes[0]?.id || 'all');
+  const [certIssueDate, setCertIssueDate] = useState<string>(`${config.currentYear || 2026}年9月`);
+  const [certPrincipal, setCertPrincipal] = useState<string>('');
+  const [certVerseIndex, setCertVerseIndex] = useState<number>(0);
+  const [certNotice, setCertNotice] = useState<string | null>(null);
+  const [certPreviewIndex, setCertPreviewIndex] = useState<number>(0);
+
+  const SCRIPTURE_VERSES = [
+    { text: '“你当竭力在神面前得蒙喜悦，作无愧的工人，按着正意分解真理的道。”', ref: '—— 提摩太后书 2:15' },
+    { text: '“你的话是我脚前的灯，是我路上的光。”', ref: '—— 诗篇 119:105' },
+    { text: '“教养孩童，使他走当行的道，就是到老他也不偏离。”', ref: '—— 箴言 22:6' },
+    { text: '“我靠着那加给我力量的，凡事都能做。”', ref: '—— 腓立比书 4:13' }
+  ];
+
   // --- Monthly Computations ---
   const sundaysInMonth = getSundaysInMonth(selectedYear, selectedMonth);
   const monthName = `${selectedYear}年${selectedMonth + 1}月`;
@@ -362,8 +379,433 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
 
   const activeStat = studentAnnualStats.find(s => s.student.id === (certificateViewStudent?.id || selectedStudentId)) || studentAnnualStats[0];
 
-  const handlePrintCertificate = () => {
-    window.print();
+  // Get list of students for certificate printing based on chosen scope
+  const getTargetCertificateStats = () => {
+    if (certScope === 'current') {
+      return activeStat ? [activeStat] : [];
+    }
+    if (certScope === 'full_attendance') {
+      return studentAnnualStats.filter(s => s.rate >= 95);
+    }
+    if (certScope === 'class') {
+      if (certClassId === 'all') return studentAnnualStats;
+      return studentAnnualStats.filter(s => s.student.classId === certClassId);
+    }
+    // 'all'
+    return studentAnnualStats;
+  };
+
+  // Generate self-contained HTML for certificate printing / export
+  const generateCertificateHTML = (targetStats: typeof studentAnnualStats) => {
+    const selectedVerse = SCRIPTURE_VERSES[certVerseIndex] || SCRIPTURE_VERSES[0];
+    const certPages = targetStats.map((stat, idx) => {
+      const studentClass = classes.find(c => c.id === stat.student.classId);
+      const className = studentClass?.name || '主日学班级';
+      const teacherName = studentClass?.teacher || '主日学专职教师';
+      const cleanStudentId = stat.student.id.replace(/[^0-9a-zA-Z]/g, '').slice(-4).toUpperCase() || String(idx + 1).padStart(4, '0');
+      const certNo = `BTL-${selectedAnnualYear}-${cleanStudentId}`;
+
+      return `
+      <div class="cert-page">
+        <div class="cert-outer-border">
+          <div class="corner-ornament corner-tl">✥</div>
+          <div class="corner-ornament corner-tr">✥</div>
+          <div class="corner-ornament corner-bl">✥</div>
+          <div class="corner-ornament corner-br">✥</div>
+
+          <div class="cert-inner-border">
+            <div class="cert-header">
+              <div class="cert-cross-icon">✝</div>
+              <div class="cert-church-name">意大利普拉托伯特利教会</div>
+              <h1 class="cert-main-title">主 日 学 结 业 荣 誉 证 书</h1>
+              <div class="cert-sub-title">Certificate of Sunday School Excellence & Attendance</div>
+              <div class="gold-divider"></div>
+            </div>
+
+            <div class="cert-body">
+              <div class="cert-student-line">
+                兹证明 <span class="student-name">${stat.student.name}</span> 同学：
+              </div>
+              <div class="cert-paragraph">
+                在 <strong>${selectedAnnualYear}年度</strong> 参与 <strong>${className}</strong> 学习与团契生活期间，风雨无阻、渴慕真理。全年度出勤率达到 <span class="rate-highlight">${stat.rate}%</span>，荣获教会师生一致称赞与肯定。
+              </div>
+              <div class="cert-badge-wrapper">
+                <div class="cert-badge">特授予：『 ${stat.honorTitle} 』</div>
+              </div>
+            </div>
+
+            <div class="verse-box">
+              <div class="verse-text">${selectedVerse.text}</div>
+              <div class="verse-ref">${selectedVerse.ref}</div>
+            </div>
+
+            <div class="cert-footer">
+              <div class="sig-col sig-left">
+                <div class="sig-label">主日学班主任：</div>
+                <div class="sig-name">${teacherName}</div>
+                <div class="sig-label" style="margin-top: 6px;">发证日期：</div>
+                <div class="sig-val">${certIssueDate || `${selectedAnnualYear}年9月`}</div>
+              </div>
+
+              <div class="seal-col">
+                <div class="red-seal">
+                  <div class="seal-inner">
+                    <div class="seal-title">伯特利教会</div>
+                    <div class="seal-mid">★ 主日学印 ★</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sig-col sig-right">
+                <div class="sig-label">主日学校长签名：</div>
+                <div class="sig-name">${certPrincipal || '&nbsp;'}</div>
+                <div class="sig-label" style="margin-top: 6px;">编号：</div>
+                <div class="sig-val font-mono">${certNo}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('\n');
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>意大利普拉托伯特利教会 - ${selectedAnnualYear}年度主日学结业荣誉证书</title>
+  <style>
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .cert-page {
+        page-break-inside: avoid !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        height: 100vh !important;
+        max-height: 297mm !important;
+        margin: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Songti SC", "SimSun", serif;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+    .cert-page {
+      width: 210mm;
+      min-height: 296mm;
+      max-height: 297mm;
+      margin: 0 auto 20px auto;
+      background: #fffdfa;
+      padding: 10mm;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+    }
+    .cert-outer-border {
+      border: 6px double #b45309;
+      border-radius: 12px;
+      padding: 8mm;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background-color: #fffdfa;
+      background-image: radial-gradient(#d97706 0.6px, transparent 0.6px);
+      background-size: 16px 16px;
+    }
+    .corner-ornament {
+      position: absolute;
+      font-size: 24px;
+      color: rgba(180, 83, 9, 0.7);
+      line-height: 1;
+    }
+    .corner-tl { top: 6px; left: 8px; }
+    .corner-tr { top: 6px; right: 8px; }
+    .corner-bl { bottom: 6px; left: 8px; }
+    .corner-br { bottom: 6px; right: 8px; }
+    .cert-inner-border {
+      border: 2px solid #f59e0b;
+      border-radius: 8px;
+      padding: 6mm 8mm;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: center;
+      background: rgba(255, 253, 250, 0.94);
+    }
+    .cert-header { margin-bottom: 4px; }
+    .cert-cross-icon {
+      width: 36px;
+      height: 36px;
+      background: #b45309;
+      color: #fff;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      margin-bottom: 6px;
+    }
+    .cert-church-name {
+      font-size: 12px;
+      letter-spacing: 3px;
+      color: #92400e;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .cert-main-title {
+      font-size: 26px;
+      font-weight: 900;
+      color: #451a03;
+      letter-spacing: 6px;
+      margin: 6px 0 2px 0;
+      font-family: "PingFang SC", "Songti SC", "SimSun", serif;
+    }
+    .cert-sub-title {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: #92400e;
+      text-transform: uppercase;
+    }
+    .gold-divider {
+      width: 140px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #b45309, transparent);
+      margin: 10px auto;
+    }
+    .cert-body { margin: 8px 0; }
+    .cert-student-line {
+      font-size: 15px;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+    .student-name {
+      font-size: 20px;
+      font-weight: bold;
+      color: #78350f;
+      text-decoration: underline;
+      text-underline-offset: 6px;
+      text-decoration-color: #d97706;
+      padding: 0 8px;
+    }
+    .cert-paragraph {
+      font-size: 13px;
+      line-height: 1.8;
+      color: #334155;
+      text-align: justify;
+      max-width: 520px;
+      margin: 0 auto 10px auto;
+    }
+    .rate-highlight {
+      font-weight: bold;
+      color: #92400e;
+      font-size: 15px;
+    }
+    .cert-badge-wrapper { margin: 8px 0; }
+    .cert-badge {
+      display: inline-block;
+      padding: 6px 18px;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+      color: #78350f;
+    }
+    .verse-box {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 8px 14px;
+      max-width: 500px;
+      margin: 6px auto;
+      text-align: left;
+    }
+    .verse-text {
+      font-size: 11px;
+      font-style: italic;
+      color: #1e293b;
+      line-height: 1.5;
+    }
+    .verse-ref {
+      font-size: 11px;
+      font-weight: bold;
+      color: #92400e;
+      text-align: right;
+      margin-top: 3px;
+    }
+    .cert-footer {
+      border-top: 1.5px solid #fde68a;
+      padding-top: 10px;
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-size: 11px;
+    }
+    .sig-col { text-align: left; width: 170px; }
+    .sig-right { text-align: right; }
+    .sig-label { font-size: 10px; color: #64748b; margin-bottom: 2px; }
+    .sig-name { font-size: 13px; font-weight: bold; color: #0f172a; min-height: 18px; margin-bottom: 2px; }
+    .sig-val { font-size: 10px; font-weight: 500; color: #334155; }
+    .seal-col {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .red-seal {
+      width: 82px;
+      height: 68px;
+      border-radius: 4px;
+      border: 4px solid #dc2626;
+      padding: 2.5px;
+      transform: rotate(-3deg);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      background-color: rgba(255, 255, 255, 0.4);
+    }
+    .seal-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 2px;
+      border: 2px solid #dc2626;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #dc2626;
+      font-weight: 900;
+      text-align: center;
+      padding: 2px;
+      box-sizing: border-box;
+      gap: 3px;
+    }
+    .seal-title {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      line-height: 1.1;
+      color: #dc2626;
+    }
+    .seal-mid {
+      font-size: 10.5px;
+      letter-spacing: 1.5px;
+      line-height: 1.1;
+      color: #dc2626;
+      white-space: nowrap;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  ${certPages}
+</body>
+</html>`;
+  };
+
+  // Ultra-reliable print execution via isolated print iframe
+  const executeCertificatePrint = () => {
+    const targets = getTargetCertificateStats();
+    if (targets.length === 0) {
+      setCertNotice('未找到符合条件的学员证书！');
+      return;
+    }
+
+    setCertNotice(`正在准备打印 ${targets.length} 份荣誉结业证书...`);
+    const html = generateCertificateHTML(targets);
+
+    try {
+      // Remove any existing print iframe
+      const oldIframe = document.getElementById('cert-print-iframe');
+      if (oldIframe) {
+        document.body.removeChild(oldIframe);
+      }
+
+      const iframe = document.createElement('iframe');
+      iframe.id = 'cert-print-iframe';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (iframeDoc) {
+        iframeDoc.open();
+        iframeDoc.write(html);
+        iframeDoc.close();
+
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            setCertNotice(`已成功调起系统打印（共 ${targets.length} 份证书）。`);
+          } catch {
+            // Fallback for sandboxed environments
+            window.print();
+          }
+        }, 500);
+      } else {
+        window.print();
+      }
+    } catch {
+      window.print();
+    }
+  };
+
+  // Download standalone printable HTML file
+  const handleDownloadCertificateHTML = () => {
+    const targets = getTargetCertificateStats();
+    if (targets.length === 0) {
+      setCertNotice('未找到符合条件的学员证书！');
+      return;
+    }
+    const html = generateCertificateHTML(targets);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const scopeLabel = certScope === 'current' && activeStat ? activeStat.student.name : certScope === 'full_attendance' ? '全勤优秀学员' : '全员汇总';
+    link.href = url;
+    link.download = `${config.churchName || '伯特利教会'}-${selectedAnnualYear}年度主日学荣誉结业证书-${scopeLabel}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setCertNotice('证书离线打印文件已下载！双击打开即可随时打印。');
+  };
+
+  const handleOpenCertificateModal = (targetStudent?: Student) => {
+    if (targetStudent) {
+      setCertificateViewStudent(targetStudent);
+      setCertScope('current');
+    }
+    setCertPreviewIndex(0);
+    setCertNotice(null);
+    setShowCertificateModal(true);
   };
 
   if (!currentUser) {
@@ -919,16 +1361,16 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
                 全年度共计 52 次主日
               </div>
               <button
-                onClick={handlePrintCertificate}
+                onClick={() => handleOpenCertificateModal(activeStat?.student)}
                 className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span>打印荣誉证书 / 报告</span>
+                <span>打印 / 批量导出荣誉结业证书</span>
               </button>
             </div>
           </div>
@@ -1092,7 +1534,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                           <Church className="w-7 h-7" />
                         </div>
                         <h4 className="text-sm font-serif tracking-[0.25em] text-amber-900 font-bold uppercase">
-                          {config.churchName} • {config.schoolTitle}
+                          意大利普拉托伯特利教会
                         </h4>
                         
                         {/* Certificate Title */}
@@ -1109,7 +1551,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                       {/* Body Text */}
                       <div className="max-w-xl mx-auto space-y-5 text-slate-800 text-sm sm:text-base leading-relaxed font-serif my-4">
                         <p className="text-base sm:text-lg">
-                          兹证明学员{' '}
+                          兹证明{' '}
                           <span className="text-xl sm:text-2xl font-bold text-amber-900 underline underline-offset-8 decoration-amber-600 decoration-2 px-3">
                             {activeStat.student.name}
                           </span>{' '}
@@ -1118,7 +1560,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                         <p className="text-justify text-sm sm:text-base text-slate-700 leading-loose">
                           在 <span className="font-semibold text-slate-900">{selectedAnnualYear}年度</span> 参与{' '}
                           <span className="font-semibold text-slate-900">{classes.find(c => c.id === activeStat.student.classId)?.name}</span>{' '}
-                          主日学修道与团契生活期间，风雨无阻、渴慕真理，积极背诵经文与参与奉献。全年度出勤率达到{' '}
+                          学习与团契生活期间，风雨无阻、渴慕真理。全年度出勤率达到{' '}
                           <span className="font-bold text-amber-900 font-mono text-lg">{activeStat.rate}%</span>
                           ，荣获教会师生一致称赞与肯定。
                         </p>
@@ -1142,31 +1584,40 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
 
                       {/* Signatures & Seal Area */}
                       <div className="mt-8 pt-6 border-t-2 border-amber-200/80 flex items-end justify-between max-w-xl mx-auto text-xs sm:text-sm text-slate-700">
-                        <div className="text-left space-y-1.5">
-                          <p className="text-xs text-slate-500">主日学授课导师：</p>
+                        <div className="text-left space-y-1">
+                          <p className="text-xs text-slate-500">主日学班主任：</p>
                           <p className="font-serif font-bold text-slate-900 text-sm sm:text-base">
                             {classes.find(c => c.id === activeStat.student.classId)?.teacher || '主日学专职教师'}
                           </p>
-                          <p className="text-xs text-slate-500">
-                            发证日期：{selectedAnnualYear}年9月
-                          </p>
+                          <div className="pt-1.5 space-y-0.5">
+                            <p className="text-xs text-slate-500">发证日期：</p>
+                            <p className="text-xs font-medium text-slate-700">{selectedAnnualYear}年9月</p>
+                          </div>
                         </div>
 
-                        {/* Red Mock Seal Stamp */}
-                        <div className="relative my-[-10px]">
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-red-600/90 flex items-center justify-center p-1 transform rotate-[-6deg] opacity-90 shadow-xs">
-                            <div className="w-full h-full rounded-full border border-dashed border-red-500 flex flex-col items-center justify-center text-center text-red-600 text-[10px] font-serif font-bold leading-tight">
-                              <span>★ {config.churchName} ★</span>
-                              <span className="text-xs tracking-wider">主日学印</span>
-                              <span className="text-[9px]">BETHEL CHURCH</span>
+                        {/* Red Bold Square Seal Stamp */}
+                        <div className="relative my-[-6px]">
+                          <div 
+                            className="w-22 sm:w-26 h-18 sm:h-20 rounded-md border-4 border-solid border-red-600 flex items-center justify-center p-0.5 transform rotate-[-3deg] opacity-95 shadow-xs bg-white/40"
+                            style={{ border: '4px solid #dc2626' }}
+                          >
+                            <div 
+                              className="w-full h-full rounded-xs border-2 border-solid border-red-600 flex flex-col items-center justify-center text-center text-red-600 font-serif leading-tight px-1 py-1 gap-1"
+                              style={{ border: '1.8px solid #dc2626' }}
+                            >
+                              <span className="text-xs sm:text-sm font-black tracking-wider whitespace-nowrap leading-tight">伯特利教会</span>
+                              <span className="text-[10px] sm:text-[11px] tracking-wider whitespace-nowrap font-bold">★ 主日学印 ★</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-right space-y-1.5">
-                          <p className="text-xs text-slate-500">教牧长同工签名：</p>
-                          <p className="font-serif font-bold text-slate-900 text-sm sm:text-base">教会总管理员 / 牧长</p>
-                          <p className="text-xs text-slate-500 font-mono">编号: BTL-{selectedAnnualYear}-{activeStat.student.id.replace(/[^0-9a-zA-Z]/g, '').slice(-4).toUpperCase()}</p>
+                        <div className="text-right space-y-1">
+                          <p className="text-xs text-slate-500">主日学校长签名：</p>
+                          <div className="h-6 sm:h-7 border-b border-dashed border-slate-300 min-w-[100px] mb-1"></div>
+                          <div className="pt-1.5 space-y-0.5">
+                            <p className="text-xs text-slate-500">编号：</p>
+                            <p className="text-xs text-slate-600 font-mono">BTL-{selectedAnnualYear}-{activeStat.student.id.replace(/[^0-9a-zA-Z]/g, '').slice(-4).toUpperCase()}</p>
+                          </div>
                         </div>
                       </div>
 
@@ -1175,17 +1626,19 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                 )}
 
                 {/* Quick Actions under Certificate */}
-                <div className="mt-4 flex items-center justify-between">
+                <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <span className="text-xs text-slate-500">
-                    可点击左侧列表切换其他学员姓名实时生成对应证书
+                    可点击左侧列表切换其他学员姓名，或点击右侧一键批量/单张打印
                   </span>
-                  <button
-                    onClick={handlePrintCertificate}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 shadow-xs cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>立即打印本张荣誉证书</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenCertificateModal(activeStat?.student)}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>打印本张 / 批量证书</span>
+                    </button>
+                  </div>
                 </div>
 
               </div>
@@ -1403,6 +1856,302 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          VIEW 3: CERTIFICATE PRINT & EXPORT PREVIEW MODAL
+          ========================================================= */}
+      {showCertificateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[94vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-slate-200 bg-amber-50/70 flex flex-wrap items-center justify-between gap-3 shrink-0 no-print">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-700" />
+                  <span>主日学荣誉结业证书（打印与导出）</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  标准 A4 纸张排版 • 支持单张打印与全班/全员一键批量导出
+                </p>
+              </div>
+
+              {/* Top Action Buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={executeCertificatePrint}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>开始打印 ({getTargetCertificateStats().length} 份)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadCertificateHTML}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="下载独立HTML文件以备随时打印或分发"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>导出离线网页</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCertificateModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-800 transition-colors ml-1 cursor-pointer"
+                  aria-label="关闭"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* In-Modal Control & Parameter Settings */}
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700 no-print shrink-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 font-medium">打印范围：</span>
+                  <select
+                    value={certScope}
+                    onChange={(e) => {
+                      setCertScope(e.target.value as any);
+                      setCertPreviewIndex(0);
+                    }}
+                    className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="current">仅当前选中学员 ({activeStat?.student.name || '未选择'})</option>
+                    <option value="full_attendance">仅卓越全勤模范学员 (≥95%, {studentAnnualStats.filter(s => s.rate >= 95).length}人)</option>
+                    <option value="class">指定班级学员批量打印</option>
+                    <option value="all">全校所有在册学员 ({studentAnnualStats.length}人)</option>
+                  </select>
+                </div>
+
+                {certScope === 'class' && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500 font-medium">选择班级：</span>
+                    <select
+                      value={certClassId}
+                      onChange={(e) => {
+                        setCertClassId(e.target.value);
+                        setCertPreviewIndex(0);
+                      }}
+                      className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="all">全部班级汇总</option>
+                      {classes.map(c => (
+                        <option key={c.id} value={c.id}>{c.name} ({studentAnnualStats.filter(s => s.student.classId === c.id).length}人)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 font-medium">发证日期：</span>
+                  <input
+                    type="text"
+                    value={certIssueDate}
+                    onChange={(e) => setCertIssueDate(e.target.value)}
+                    placeholder="如：2026年9月"
+                    className="px-2.5 py-1 w-28 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 font-medium">金句：</span>
+                  <select
+                    value={certVerseIndex}
+                    onChange={(e) => setCertVerseIndex(Number(e.target.value))}
+                    className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  >
+                    {SCRIPTURE_VERSES.map((v, idx) => (
+                      <option key={idx} value={idx}>{v.ref.replace('—— ', '')}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="text-xs text-amber-800 font-medium">
+                待打印：<span className="font-bold text-sm text-amber-900">{getTargetCertificateStats().length}</span> 份证书
+              </div>
+            </div>
+
+            {certNotice && (
+              <div className="mx-5 mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs no-print flex items-center justify-between">
+                <span>{certNotice}</span>
+                <button onClick={() => setCertNotice(null)} className="text-amber-700 hover:text-amber-900 font-bold ml-2">×</button>
+              </div>
+            )}
+
+            {/* Certificate Preview Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-100/70 flex flex-col items-center">
+              {(() => {
+                const targets = getTargetCertificateStats();
+                if (targets.length === 0) {
+                  return (
+                    <div className="py-16 text-center text-slate-400">
+                      <FileText className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                      <p className="text-sm font-medium">所选范围暂无学员荣誉证书可生成</p>
+                    </div>
+                  );
+                }
+
+                const currentPreviewStat = targets[certPreviewIndex] || targets[0];
+                const studentClass = classes.find(c => c.id === currentPreviewStat.student.classId);
+                const className = studentClass?.name || '主日学班级';
+                const teacherName = studentClass?.teacher || '主日学专职教师';
+                const cleanStudentId = currentPreviewStat.student.id.replace(/[^0-9a-zA-Z]/g, '').slice(-4).toUpperCase() || '0001';
+                const certNo = `BTL-${selectedAnnualYear}-${cleanStudentId}`;
+                const selectedVerse = SCRIPTURE_VERSES[certVerseIndex] || SCRIPTURE_VERSES[0];
+
+                return (
+                  <div className="w-full flex flex-col items-center">
+                    {/* Batch Pagination Switcher if multiple */}
+                    {targets.length > 1 && (
+                      <div className="flex items-center gap-3 mb-4 bg-white px-3.5 py-1.5 rounded-full border border-slate-200 shadow-2xs no-print">
+                        <button
+                          type="button"
+                          disabled={certPreviewIndex <= 0}
+                          onClick={() => setCertPreviewIndex(prev => Math.max(0, prev - 1))}
+                          className="p-1 rounded-md hover:bg-slate-100 disabled:opacity-30 cursor-pointer"
+                          aria-label="上一页"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-xs font-semibold text-slate-700">
+                          正在预览：{currentPreviewStat.student.name} ({certPreviewIndex + 1} / {targets.length})
+                        </span>
+                        <button
+                          type="button"
+                          disabled={certPreviewIndex >= targets.length - 1}
+                          onClick={() => setCertPreviewIndex(prev => Math.min(targets.length - 1, prev + 1))}
+                          className="p-1 rounded-md hover:bg-slate-100 disabled:opacity-30 cursor-pointer"
+                          aria-label="下一页"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Actual A4 Certificate Card Preview */}
+                    <div 
+                      id="printable-certificate-sheet"
+                      className="bg-amber-50/20 border-8 border-double border-amber-700/80 p-6 sm:p-10 rounded-2xl relative shadow-lg overflow-hidden text-center max-w-2xl w-full min-h-[760px] flex flex-col justify-between"
+                      style={{
+                        backgroundImage: 'radial-gradient(#d97706 0.6px, transparent 0.6px)',
+                        backgroundSize: '16px 16px',
+                        backgroundColor: '#fffdfa'
+                      }}
+                    >
+                      {/* Corner Ornaments */}
+                      <div className="absolute top-3 left-3 text-amber-800/60 text-2xl font-serif">✥</div>
+                      <div className="absolute top-3 right-3 text-amber-800/60 text-2xl font-serif">✥</div>
+                      <div className="absolute bottom-3 left-3 text-amber-800/60 text-2xl font-serif">✥</div>
+                      <div className="absolute bottom-3 right-3 text-amber-800/60 text-2xl font-serif">✥</div>
+
+                      {/* Inner Decorative Border */}
+                      <div className="border-2 border-amber-400/90 p-6 sm:p-8 rounded-xl relative flex-1 flex flex-col justify-between bg-white/70">
+                        {/* Header */}
+                        <div>
+                          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-700 text-white shadow-md mb-2">
+                            <Church className="w-6 h-6" />
+                          </div>
+                          <h4 className="text-xs font-serif tracking-[0.25em] text-amber-900 font-bold uppercase">
+                            意大利普拉托伯特利教会
+                          </h4>
+                          <h3 className="text-xl sm:text-3xl font-bold text-amber-950 font-serif tracking-widest mt-3">
+                            主 日 学 结 业 荣 誉 证 书
+                          </h3>
+                          <p className="text-[10px] font-serif text-amber-800 tracking-[0.2em] uppercase mt-0.5">
+                            Certificate of Sunday School Excellence & Attendance
+                          </p>
+                          <div className="w-32 h-0.5 bg-linear-to-r from-transparent via-amber-700 to-transparent mx-auto my-4" />
+                        </div>
+
+                        {/* Body Text */}
+                        <div className="max-w-lg mx-auto space-y-4 text-slate-800 text-xs sm:text-sm leading-relaxed font-serif my-2">
+                          <p className="text-sm sm:text-base">
+                            兹证明{' '}
+                            <span className="text-lg sm:text-xl font-bold text-amber-900 underline underline-offset-6 decoration-amber-600 decoration-2 px-2">
+                              {currentPreviewStat.student.name}
+                            </span>{' '}
+                            同学：
+                          </p>
+                          <p className="text-justify text-xs sm:text-sm text-slate-700 leading-loose">
+                            在 <span className="font-semibold text-slate-900">{selectedAnnualYear}年度</span> 参与{' '}
+                            <span className="font-semibold text-slate-900">{className}</span>{' '}
+                            学习与团契生活期间，风雨无阻、渴慕真理。全年度出勤率达到{' '}
+                            <span className="font-bold text-amber-900 font-mono text-base">{currentPreviewStat.rate}%</span>
+                            ，荣获教会师生一致称赞与肯定。
+                          </p>
+                          
+                          <div className="py-1">
+                            <span className="inline-block px-5 py-1.5 rounded-xl bg-amber-100/90 border border-amber-300 font-bold text-sm sm:text-base text-amber-950 shadow-2xs">
+                              特授予：『 {currentPreviewStat.honorTitle} 』
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Scripture Verse */}
+                        <div className="my-4 p-3.5 bg-amber-50/90 border border-amber-300/80 rounded-xl text-left max-w-md mx-auto shadow-2xs">
+                          <p className="text-xs text-slate-800 font-serif italic leading-relaxed">
+                            {selectedVerse.text}
+                          </p>
+                          <p className="text-[11px] text-amber-900 text-right mt-1 font-bold">
+                            {selectedVerse.ref}
+                          </p>
+                        </div>
+
+                        {/* Signatures & Red Seal */}
+                        <div className="mt-4 pt-4 border-t-2 border-amber-200/80 flex items-end justify-between max-w-lg mx-auto text-xs text-slate-700">
+                          <div className="text-left space-y-1">
+                            <p className="text-[10px] text-slate-500">主日学班主任：</p>
+                            <p className="font-serif font-bold text-slate-900 text-xs sm:text-sm">
+                              {teacherName}
+                            </p>
+                            <div className="pt-1 space-y-0.5">
+                              <p className="text-[10px] text-slate-500">发证日期：</p>
+                              <p className="text-[10px] font-medium text-slate-700">{certIssueDate || `${selectedAnnualYear}年9月`}</p>
+                            </div>
+                          </div>
+
+                          {/* Red Bold Square Seal Stamp */}
+                          <div className="relative my-[-4px]">
+                            <div 
+                              className="w-18 sm:w-20 h-14 sm:h-16 rounded-md border-[3.5px] border-solid border-red-600 flex items-center justify-center p-0.5 transform rotate-[-3deg] opacity-95 shadow-xs bg-white/40"
+                              style={{ border: '3.5px solid #dc2626' }}
+                            >
+                              <div 
+                                className="w-full h-full rounded-xs border-[1.8px] border-solid border-red-600 flex flex-col items-center justify-center text-center text-red-600 font-serif leading-tight px-1 py-0.5 gap-0.5"
+                                style={{ border: '1.8px solid #dc2626' }}
+                              >
+                                <span className="text-[11px] sm:text-xs font-black tracking-wider whitespace-nowrap leading-tight">伯特利教会</span>
+                                <span className="text-[9px] sm:text-[10px] tracking-wider whitespace-nowrap font-bold">★ 主日学印 ★</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right space-y-1">
+                            <p className="text-[10px] text-slate-500">主日学校长签名：</p>
+                            <div className="h-5 sm:h-6 border-b border-dashed border-slate-300 min-w-[90px] mb-0.5">
+                              {certPrincipal && <span className="font-serif font-bold text-slate-900 text-xs sm:text-sm">{certPrincipal}</span>}
+                            </div>
+                            <div className="pt-1 space-y-0.5">
+                              <p className="text-[10px] text-slate-500">编号：</p>
+                              <p className="text-[10px] text-slate-600 font-mono">{certNo}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
