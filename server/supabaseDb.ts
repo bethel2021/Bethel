@@ -510,41 +510,61 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
     // Step 7: Manage 'deleted_attendance_records' table and purge from attendance_records
     // --------------------------------------------------------------------------
     if (Array.isArray(payload.deletedRecordKeys) && payload.deletedRecordKeys.length > 0) {
-      const deletedRows = payload.deletedRecordKeys.map(key => {
-        let studentId: string | null = null;
-        let dateStr: string | null = null;
-        if (typeof key === 'string' && key.includes('_')) {
-          const parts = key.split('_');
-          studentId = parts[0] || null;
-          dateStr = parts[1] || null;
-        }
-        return {
-          id: key,
-          record_id: key,
-          student_id: studentId,
-          date: dateStr,
-          deleted_at: new Date().toISOString()
-        };
-      });
+      const activeRecordKeys = new Set<string>();
+      if (Array.isArray(payload.records)) {
+        payload.records.forEach(r => {
+          if (r.id) activeRecordKeys.add(r.id);
+          if (r.studentId && r.date) activeRecordKeys.add(`${r.studentId}_${r.date}`);
+        });
+      }
 
-      await Promise.resolve(client.from('deleted_attendance_records').upsert(deletedRows, { onConflict: 'id' }));
+      // Filter out keys that actually have active records in payload
+      const validDeletedKeys = payload.deletedRecordKeys.filter(k => typeof k === 'string' && k && !activeRecordKeys.has(k));
 
-      // Purge matching records from attendance_records table
-      for (const item of deletedRows) {
-        if (item.student_id && item.date) {
-          await Promise.resolve(
-            client.from('attendance_records')
-              .delete()
-              .eq('student_id', item.student_id)
-              .eq('date', item.date)
-          );
-        } else if (item.id) {
-          await Promise.resolve(
-            client.from('attendance_records')
-              .delete()
-              .eq('id', item.id)
-          );
+      if (validDeletedKeys.length > 0) {
+        const deletedRows = validDeletedKeys.map(key => {
+          let studentId: string | null = null;
+          let dateStr: string | null = null;
+          if (typeof key === 'string' && key.includes('_')) {
+            const parts = key.split('_');
+            studentId = parts[0] || null;
+            dateStr = parts[1] || null;
+          }
+          return {
+            id: key,
+            record_id: key,
+            student_id: studentId,
+            date: dateStr,
+            deleted_at: new Date().toISOString()
+          };
+        });
+
+        await Promise.resolve(client.from('deleted_attendance_records').upsert(deletedRows, { onConflict: 'id' }));
+
+        // Purge truly deleted matching records from attendance_records table
+        for (const item of deletedRows) {
+          if (item.student_id && item.date) {
+            await Promise.resolve(
+              client.from('attendance_records')
+                .delete()
+                .eq('student_id', item.student_id)
+                .eq('date', item.date)
+            );
+          } else if (item.id) {
+            await Promise.resolve(
+              client.from('attendance_records')
+                .delete()
+                .eq('id', item.id)
+            );
+          }
         }
+      }
+
+      // If active records had stale entries in deleted_attendance_records, remove them from deleted table
+      if (activeRecordKeys.size > 0) {
+        await Promise.resolve(
+          client.from('deleted_attendance_records').delete().in('id', Array.from(activeRecordKeys))
+        );
       }
     }
 

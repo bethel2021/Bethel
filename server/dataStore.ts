@@ -601,28 +601,36 @@ export async function initOrLoadDataAsync(force = false) {
           students.length = 0;
           students.push(...cloudData.students);
         }
-        if (Array.isArray(cloudData.records)) {
-          const cloudRecordMap = new Map<string, AttendanceRecord>();
-          for (const cr of cloudData.records) {
-            cloudRecordMap.set(`${cr.studentId}_${cr.date}`, cr);
-          }
-          // Preserve any in-memory records that are active and not deleted
-          for (const mr of records) {
-            const key = `${mr.studentId}_${mr.date}`;
-            if (!deletedRecordKeys.has(mr.id) && !deletedRecordKeys.has(key)) {
-              if (!cloudRecordMap.has(key)) {
-                cloudRecordMap.set(key, mr);
-              }
-            }
-          }
-          records.length = 0;
-          records.push(...Array.from(cloudRecordMap.values()));
-        }
         if (Array.isArray(cloudData.deletedRecordKeys)) {
           deletedRecordKeys.clear();
           cloudData.deletedRecordKeys.forEach(k => {
             if (typeof k === 'string' && k) deletedRecordKeys.add(k);
           });
+        }
+        if (Array.isArray(cloudData.records)) {
+          const cloudRecordMap = new Map<string, AttendanceRecord>();
+          for (const cr of cloudData.records) {
+            if (cr && cr.studentId && cr.date) {
+              const key = `${cr.studentId}_${cr.date}`;
+              cloudRecordMap.set(key, cr);
+              // Active records must never be in deletedRecordKeys
+              if (cr.id) deletedRecordKeys.delete(cr.id);
+              deletedRecordKeys.delete(key);
+            }
+          }
+          // Preserve any in-memory records that are active and not deleted
+          for (const mr of records) {
+            if (mr && mr.studentId && mr.date) {
+              const key = `${mr.studentId}_${mr.date}`;
+              if (!deletedRecordKeys.has(mr.id) && !deletedRecordKeys.has(key)) {
+                if (!cloudRecordMap.has(key)) {
+                  cloudRecordMap.set(key, mr);
+                }
+              }
+            }
+          }
+          records.length = 0;
+          records.push(...Array.from(cloudRecordMap.values()));
         }
         if (Array.isArray(cloudData.adminAccounts)) {
           if (cloudData.adminAccounts.length > 0) {
@@ -902,49 +910,73 @@ export function mergeClientData(payload: SyncPayload): {
     students.push(...mergedStudents);
   }
 
-  // 3. Merge attendance records (by unique ID)
-  if (Array.isArray((payload as any).deletedRecordKeys)) {
-    (payload as any).deletedRecordKeys.forEach((k: string) => {
-      if (typeof k === 'string' && k) deletedRecordKeys.add(k);
+  // 3. Merge attendance records (keyed by studentId + date to guarantee exactly one authoritative record per student per Sunday)
+  const incomingActiveKeys = new Set<string>();
+  if (Array.isArray(payload.records)) {
+    payload.records.forEach(r => {
+      if (r && r.studentId && r.date && r.status && r.status !== 'absent') {
+        const studentDateKey = `${r.studentId}_${r.date}`;
+        incomingActiveKeys.add(studentDateKey);
+        if (r.id) incomingActiveKeys.add(r.id);
+        // An active checkin unblocks from deletedRecordKeys
+        deletedRecordKeys.delete(studentDateKey);
+        if (r.id) deletedRecordKeys.delete(r.id);
+      }
     });
   }
 
-  if (Array.isArray(payload.records)) {
-    const recordMap = new Map<string, AttendanceRecord>(records.map(r => [r.id, r]));
+  // Register client deleted keys ONLY if they are not actively checked in on server or in payload
+  if (Array.isArray((payload as any).deletedRecordKeys)) {
+    (payload as any).deletedRecordKeys.forEach((k: string) => {
+      if (typeof k === 'string' && k && !incomingActiveKeys.has(k)) {
+        // Only accept deletion if current server records don't have a fresh checkin
+        const matchingRecord = records.find(r => r.id === k || `${r.studentId}_${r.date}` === k);
+        if (!matchingRecord || matchingRecord.status === 'absent') {
+          deletedRecordKeys.add(k);
+        }
+      }
+    });
+  }
 
-    // Purge any server records matching deletedRecordKeys
-    for (const [id, r] of Array.from(recordMap.entries())) {
-      const studentDateKey = `${r.studentId}_${r.date}`;
-      if (deletedRecordKeys.has(id) || deletedRecordKeys.has(studentDateKey)) {
-        recordMap.delete(id);
-        changed = true;
+  const recordMap = new Map<string, AttendanceRecord>();
+  for (const r of records) {
+    if (r && r.studentId && r.date) {
+      const key = `${r.studentId}_${r.date}`;
+      if (!deletedRecordKeys.has(r.id) && !deletedRecordKeys.has(key)) {
+        recordMap.set(key, r);
       }
     }
+  }
 
+  if (Array.isArray(payload.records)) {
     for (const r of payload.records) {
-      const studentDateKey = `${r.studentId}_${r.date}`;
-      // Skip if marked as deleted
-      if (deletedRecordKeys.has(r.id) || deletedRecordKeys.has(studentDateKey)) {
+      if (!r || !r.studentId || !r.date) continue;
+      const key = `${r.studentId}_${r.date}`;
+      if (deletedRecordKeys.has(r.id) || deletedRecordKeys.has(key)) {
         continue;
       }
 
-      if (!recordMap.has(r.id)) {
-        recordMap.set(r.id, r);
+      if (!recordMap.has(key)) {
+        recordMap.set(key, r);
         changed = true;
       } else {
-        const existing = recordMap.get(r.id)!;
-        if (JSON.stringify(existing) !== JSON.stringify(r)) {
-          recordMap.set(r.id, { ...existing, ...r });
+        const existing = recordMap.get(key)!;
+        const existingTime = new Date(existing.timestamp || 0).getTime();
+        const incomingTime = new Date(r.timestamp || 0).getTime();
+        // If incoming has newer timestamp or more detailed data, update
+        if (incomingTime >= existingTime || JSON.stringify(existing) !== JSON.stringify(r)) {
+          recordMap.set(key, { ...existing, ...r });
           changed = true;
         }
       }
     }
-    const mergedRecords = Array.from(recordMap.values());
-    if (JSON.stringify(records) !== JSON.stringify(mergedRecords)) {
-      records.length = 0;
-      records.push(...mergedRecords);
-      changed = true;
-    }
+  }
+
+  const mergedRecords = Array.from(recordMap.values());
+  if (JSON.stringify(records) !== JSON.stringify(mergedRecords)) {
+    records.length = 0;
+    records.push(...mergedRecords);
+    changed = true;
   }
 
   // 4. System config & classes are server-authoritative and master-managed via /api/config & /api/classes
@@ -982,6 +1014,7 @@ export function mergeClientData(payload: SyncPayload): {
   }
 
   if (changed) {
+    notifyDataChange();
     saveDataToFile();
   }
 
