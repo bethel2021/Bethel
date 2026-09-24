@@ -13,8 +13,6 @@ import {
   LogIn,
   LogOut,
   ShieldCheck,
-  ShieldAlert,
-  Lock,
   UserCheck,
   RefreshCw,
   Smartphone,
@@ -165,17 +163,11 @@ export const Header: React.FC<HeaderProps> = ({
                 {currentUser.role === 'superadmin' ? (
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
                 ) : (
-                  <ShieldAlert className="w-3.5 h-3.5 text-sky-600" />
+                  <UserCheck className="w-3.5 h-3.5 text-sky-600" />
                 )}
                 <span className="font-semibold truncate max-w-[120px]" title={currentUser.displayName}>
                   {currentUser.displayName}
                 </span>
-                {currentUser.role !== 'superadmin' && (
-                  <span className="bg-sky-100 text-sky-900 border border-sky-300 text-[10px] font-semibold px-1.5 py-0.2 rounded flex items-center gap-0.5" title="普通同工账号：仅限管理签到，无班级/学生增删权限">
-                    <Lock className="w-2.5 h-2.5" />
-                    <span>仅签到权限</span>
-                  </span>
-                )}
                 {currentUser.role === 'superadmin' && (
                   <button
                     onClick={() => setActiveTab(activeTab === 'settings' ? 'today' : 'settings')}

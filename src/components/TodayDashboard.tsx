@@ -16,7 +16,8 @@ import {
   Church,
   Lock,
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../types';
 import { formatChineseDate, checkIsWithinSundayWindow, getSundayDisplayInfo } from '../utils/dateUtils';
@@ -88,7 +89,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | 'checked_in' | 'uncheck_in' | 'late'>('all');
   const [excuseModalStudent, setExcuseModalStudent] = useState<Student | null>(null);
   const [excuseReason, setExcuseReason] = useState<string>('');
-  const [loadingStudentId, setLoadingStudentId] = useState<string | null>(null);
+  const [loadingMap, setLoadingMap] = useState<Record<string, 'present' | 'late' | 'excused' | 'absent'>>({});
   const [noticeDialog, setNoticeDialog] = useState<{ title: string; content: string } | null>(null);
   const processingRef = useRef<Set<string>>(new Set());
   const rosterRef = useRef<HTMLDivElement>(null);
@@ -124,8 +125,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     }
   };
 
-  // Today's records
-  const todayRecords = records.filter(r => r.date === activeSunday);
+  // Today's records memoized
+  const todayRecords = useMemo(() => records.filter(r => r.date === activeSunday), [records, activeSunday]);
+  const todayRecordsMap = useMemo(() => {
+    const map = new Map<string, AttendanceRecord>();
+    for (const r of todayRecords) {
+      map.set(r.studentId, r);
+    }
+    return map;
+  }, [todayRecords]);
 
   // If selectedClassId points to a class that is invalid or hidden, automatically select first visible class
   useEffect(() => {
@@ -158,7 +166,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
       if (statusFilter === 'all') return true;
 
-      const record = todayRecords.find(r => r.studentId === student.id);
+      const record = todayRecordsMap.get(student.id);
       if (statusFilter === 'checked_in') {
         return record?.status === 'present' || record?.status === 'late';
       } else if (statusFilter === 'uncheck_in') {
@@ -168,7 +176,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       }
       return true;
     });
-  }, [students, visibleClassIdSet, selectedClassId, searchKeyword, statusFilter, todayRecords]);
+  }, [students, visibleClassIdSet, selectedClassId, searchKeyword, statusFilter, todayRecordsMap]);
 
   // Calculate statistics (scoped to the currently selected class on home page)
   const activeScopeStudents = useMemo(() => {
@@ -216,7 +224,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     }
     if (processingRef.current.has(studentId)) return;
     processingRef.current.add(studentId);
-    setLoadingStudentId(studentId);
+    setLoadingMap(prev => ({ ...prev, [studentId]: status }));
     try {
       await onManualUpdate({
         studentId,
@@ -229,7 +237,11 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       showCheckinErrorDialog(err);
     } finally {
       processingRef.current.delete(studentId);
-      setLoadingStudentId(null);
+      setLoadingMap(prev => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
     }
   };
 
@@ -252,13 +264,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       });
       return;
     }
-    const existing = todayRecords.find(r => r.studentId === student.id);
+    const existing = todayRecordsMap.get(student.id);
     setExcuseReason(existing?.notes || '主日随父母探亲外出请假');
     setExcuseModalStudent(student);
   };
 
   const handleConfirmExcuse = async () => {
     if (!excuseModalStudent) return;
+    const targetStudentId = excuseModalStudent.id;
+    if (processingRef.current.has(targetStudentId)) return;
     if (!windowStatus.isAllowed) {
       setExcuseModalStudent(null);
       setNoticeDialog({
@@ -267,10 +281,11 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       });
       return;
     }
-    setLoadingStudentId(excuseModalStudent.id);
+    processingRef.current.add(targetStudentId);
+    setLoadingMap(prev => ({ ...prev, [targetStudentId]: 'excused' }));
     try {
       await onManualUpdate({
-        studentId: excuseModalStudent.id,
+        studentId: targetStudentId,
         date: activeSunday,
         status: 'excused',
         memoryVerseCompleted: false,
@@ -281,7 +296,12 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     } catch (err: any) {
       showCheckinErrorDialog(err);
     } finally {
-      setLoadingStudentId(null);
+      processingRef.current.delete(targetStudentId);
+      setLoadingMap(prev => {
+        const next = { ...prev };
+        delete next[targetStudentId];
+        return next;
+      });
     }
   };
 
@@ -674,9 +694,14 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       {/* Students Roster Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
         {filteredStudents.map(student => {
-          const record = todayRecords.find(r => r.studentId === student.id);
+          const record = todayRecordsMap.get(student.id);
           const classGroup = classes.find(c => c.id === student.classId);
-          const isLoading = loadingStudentId === student.id;
+          const currentAction = loadingMap[student.id];
+          const isStudentLoading = !!currentAction;
+          const isPresentLoading = currentAction === 'present';
+          const isLateLoading = currentAction === 'late';
+          const isExcusedLoading = currentAction === 'excused';
+          const isAbsentLoading = currentAction === 'absent';
 
           return (
             <div
@@ -723,9 +748,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                             ? 'bg-amber-100 text-amber-800'
                             : 'bg-blue-100 text-blue-800'
                       }`}>
-                        {record.status === 'present' && <Check className="w-3 h-3" />}
-                        {record.status === 'late' && <Clock className="w-3 h-3" />}
-                        {record.status === 'excused' && <FileText className="w-3 h-3" />}
+                        {isStudentLoading ? (
+                          <Loader2 className="w-3 h-3 animate-spin shrink-0 text-current" />
+                        ) : record.status === 'present' ? (
+                          <Check className="w-3 h-3 shrink-0" />
+                        ) : record.status === 'late' ? (
+                          <Clock className="w-3 h-3 shrink-0" />
+                        ) : (
+                          <FileText className="w-3 h-3 shrink-0" />
+                        )}
                         <span>
                           {record.status === 'present' ? '已准时签到' : record.status === 'late' ? '迟到打卡' : '已请假'}
                         </span>
@@ -736,6 +767,11 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                         </div>
                       )}
                     </div>
+                  ) : isStudentLoading ? (
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 inline-flex items-center gap-1 animate-pulse">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin text-slate-500" />
+                      <span>处理中...</span>
+                    </span>
                   ) : (
                     <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
                       未打卡
@@ -753,56 +789,97 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 </div>
               )}
 
-              {/* Teacher Quick Action Buttons - Fixed 4-Column Grid to prevent layout jumping */}
+              {/* Teacher Quick Action Buttons - Fixed 4-Column Grid */}
               <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-4 gap-1.5 items-center">
                 <button
                   type="button"
+                  disabled={isStudentLoading}
                   onClick={() => handleQuickStatus(student.id, 'present')}
-                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
                     record?.status === 'present'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600'
+                  } ${
+                    isStudentLoading
+                      ? isPresentLoading ? 'opacity-90 cursor-wait' : 'opacity-40 cursor-not-allowed pointer-events-none'
+                      : 'cursor-pointer active:scale-95'
                   }`}
+                  title={isPresentLoading ? '正在同步签到...' : '标记准时到校'}
                 >
-                  <Check className="w-3 h-3 shrink-0" />
+                  {isPresentLoading ? (
+                    <Loader2 className="w-3 h-3 animate-spin shrink-0 text-white" />
+                  ) : (
+                    <Check className="w-3 h-3 shrink-0" />
+                  )}
                   <span>到校</span>
                 </button>
 
                 <button
                   type="button"
+                  disabled={isStudentLoading}
                   onClick={() => handleQuickStatus(student.id, 'late')}
-                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
                     record?.status === 'late'
                       ? 'bg-amber-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-600'
+                  } ${
+                    isStudentLoading
+                      ? isLateLoading ? 'opacity-90 cursor-wait' : 'opacity-40 cursor-not-allowed pointer-events-none'
+                      : 'cursor-pointer active:scale-95'
                   }`}
+                  title={isLateLoading ? '正在同步迟到...' : '标记迟到'}
                 >
-                  <Clock className="w-3 h-3 shrink-0" />
+                  {isLateLoading ? (
+                    <Loader2 className="w-3 h-3 animate-spin shrink-0 text-white" />
+                  ) : (
+                    <Clock className="w-3 h-3 shrink-0" />
+                  )}
                   <span>迟到</span>
                 </button>
 
                 <button
                   type="button"
+                  disabled={isStudentLoading}
                   onClick={() => handleOpenExcuseModal(student)}
-                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
                     record?.status === 'excused'
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-slate-600'
+                  } ${
+                    isStudentLoading
+                      ? isExcusedLoading ? 'opacity-90 cursor-wait' : 'opacity-40 cursor-not-allowed pointer-events-none'
+                      : 'cursor-pointer active:scale-95'
                   }`}
+                  title={isExcusedLoading ? '正在同步请假...' : '登记请假原因'}
                 >
-                  <FileText className="w-3 h-3 shrink-0" />
+                  {isExcusedLoading ? (
+                    <Loader2 className="w-3 h-3 animate-spin shrink-0 text-white" />
+                  ) : (
+                    <FileText className="w-3 h-3 shrink-0" />
+                  )}
                   <span>请假</span>
                 </button>
 
                 {record ? (
                   <button
                     type="button"
+                    disabled={isStudentLoading}
                     onClick={() => handleQuickStatus(student.id, 'absent')}
-                    className="text-[11px] font-medium px-1.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 bg-slate-100 hover:bg-red-100 hover:text-red-700 text-slate-500"
-                    title="删除/清除签到记录，恢复为未打卡状态"
+                    className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
+                      isAbsentLoading
+                        ? 'bg-red-100 text-red-700 cursor-wait'
+                        : isStudentLoading
+                          ? 'bg-slate-100 text-slate-400 opacity-40 cursor-not-allowed pointer-events-none'
+                          : 'bg-slate-100 hover:bg-red-100 hover:text-red-700 text-slate-500 cursor-pointer active:scale-95'
+                    }`}
+                    title={isAbsentLoading ? '正在清除记录...' : '删除/清除签到记录，恢复为未打卡状态'}
                     aria-label="删除考勤记录"
                   >
-                    <Trash2 className="w-3 h-3 shrink-0" />
+                    {isAbsentLoading ? (
+                      <Loader2 className="w-3 h-3 animate-spin shrink-0 text-red-600" />
+                    ) : (
+                      <Trash2 className="w-3 h-3 shrink-0" />
+                    )}
                     <span>删除</span>
                   </button>
                 ) : (
@@ -837,17 +914,26 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
+                disabled={!!loadingMap[excuseModalStudent.id]}
                 onClick={() => setExcuseModalStudent(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 取消
               </button>
               <button
                 type="button"
+                disabled={!!loadingMap[excuseModalStudent.id]}
                 onClick={handleConfirmExcuse}
-                className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white cursor-pointer shadow-xs"
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  loadingMap[excuseModalStudent.id]
+                    ? 'bg-slate-300 text-slate-600 cursor-not-allowed shadow-none'
+                    : 'bg-amber-700 hover:bg-amber-800 text-white cursor-pointer shadow-xs'
+                }`}
               >
-                确认登记请假
+                {loadingMap[excuseModalStudent.id] && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-slate-600" />
+                )}
+                <span>{loadingMap[excuseModalStudent.id] ? '正在登记...' : '确认登记请假'}</span>
               </button>
             </div>
           </div>

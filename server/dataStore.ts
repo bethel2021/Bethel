@@ -1367,7 +1367,7 @@ export async function saveAttendanceRecord(record: AttendanceRecord): Promise<At
     records.push(record);
   }
   await supabaseUpsertAttendanceRecord(record);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave(1500);
   return record;
 }
 
@@ -1389,7 +1389,7 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
   }));
 
   await supabaseDeleteAttendanceRecord(studentId, date, recId);
-  await saveDataToSupabase();
+  scheduleSupabaseSnapshotSave(1500);
   return true;
 }
 

@@ -12,7 +12,6 @@ import {
   Church,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   TrendingUp,
   Star,
   Lock,
@@ -455,7 +454,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
 
             <div className="flex flex-wrap items-center gap-2.5">
               {/* Date Selector Box */}
-              <div className="h-9 flex items-center bg-slate-50 hover:bg-white border border-slate-200 rounded-lg px-1 transition-colors shadow-2xs">
+              <div className="h-9 w-44 flex items-center justify-between bg-slate-50 hover:bg-white border border-slate-200 rounded-lg px-1 transition-colors shadow-2xs">
                 <button
                   type="button"
                   onClick={() => {
@@ -466,12 +465,12 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                       setSelectedMonth(prev => prev - 1);
                     }
                   }}
-                  className="h-7 w-7 flex items-center justify-center hover:bg-slate-200/70 rounded-md text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                  className="h-7 w-7 flex items-center justify-center hover:bg-slate-200/70 rounded-md text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
                   title="上个月"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-                <div className="flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-800 select-none whitespace-nowrap">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-800 select-none whitespace-nowrap">
                   <Calendar className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                   <span>{monthName}</span>
                 </div>
@@ -485,7 +484,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                       setSelectedMonth(prev => prev + 1);
                     }
                   }}
-                  className="h-7 w-7 flex items-center justify-center hover:bg-slate-200/70 rounded-md text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                  className="h-7 w-7 flex items-center justify-center hover:bg-slate-200/70 rounded-md text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
                   title="下个月"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -493,19 +492,16 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
               </div>
 
               {/* Class Filter */}
-              <div className="relative">
-                <select
-                  value={filterClassId}
-                  onChange={e => setFilterClassId(e.target.value)}
-                  className="h-9 pl-3 pr-8 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white focus:bg-white text-slate-700 text-xs font-semibold cursor-pointer transition-colors shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 appearance-none"
-                >
-                  <option value="all">全部班级 ({students.length}人)</option>
-                  {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
+              <select
+                value={filterClassId}
+                onChange={e => setFilterClassId(e.target.value)}
+                className="h-9 w-44 px-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white focus:bg-white text-slate-700 text-xs font-semibold text-center cursor-pointer transition-colors shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 appearance-none"
+              >
+                <option value="all">全部班级 ({students.length}人)</option>
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
 
               {/* Print Button */}
               <button
