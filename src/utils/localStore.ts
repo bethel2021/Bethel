@@ -298,6 +298,9 @@ export function getLocalData() {
   }
 }
 
+let saveTimeout: any;
+let pendingData: any = {};
+
 export function saveLocalData(data: {
   classes?: ClassGroup[];
   students?: Student[];
@@ -307,32 +310,50 @@ export function saveLocalData(data: {
   accounts?: AdminAccount[];
   teachers?: Teacher[];
   deletedRecordKeys?: string[] | Set<string>;
+  addDeletedKey?: string;
+  removeDeletedKey?: string;
 }) {
   if (typeof window === 'undefined') return;
   
-  // Defer storage operations to avoid blocking the main UI thread during state updates
-  setTimeout(() => {
+  // Merge new data into pendingData
+  pendingData = { ...pendingData, ...data };
+
+  // Custom merge for deleted keys
+  if (data.addDeletedKey || data.removeDeletedKey) {
+     const keys = new Set(pendingData.deletedRecordKeys || []);
+     if (data.addDeletedKey) keys.add(data.addDeletedKey);
+     if (data.removeDeletedKey) keys.delete(data.removeDeletedKey);
+     pendingData.deletedRecordKeys = Array.from(keys);
+  }
+  
+  // Clear the previous timeout
+  if (saveTimeout) clearTimeout(saveTimeout);
+  
+  // Debounce saving for 200ms
+  saveTimeout = setTimeout(() => {
+    const dataToSave = pendingData;
+    pendingData = {};
     try {
-      if (data.classes) {
-        localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(data.classes));
-        const hiddenIds = data.classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
+      if (dataToSave.classes) {
+        localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(dataToSave.classes));
+        const hiddenIds = dataToSave.classes.filter(c => !!c.isHiddenFromHome).map(c => c.id);
         saveLocalHiddenClassIds(hiddenIds);
       }
-      if (data.students) localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(data.students));
-      if (data.config) localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(data.config));
-      if (data.records) localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(data.records));
-      if (data.activeSunday) localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, data.activeSunday);
-      if (data.accounts) localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(data.accounts));
-      if (data.teachers) localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(data.teachers));
-      if (data.deletedRecordKeys) {
-        const arr = Array.isArray(data.deletedRecordKeys) ? data.deletedRecordKeys : Array.from(data.deletedRecordKeys);
+      if (dataToSave.students) localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(dataToSave.students));
+      if (dataToSave.config) localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(dataToSave.config));
+      if (dataToSave.records) localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(dataToSave.records));
+      if (dataToSave.activeSunday) localStorage.setItem(STORAGE_KEYS.ACTIVE_SUNDAY, dataToSave.activeSunday);
+      if (dataToSave.accounts) localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(dataToSave.accounts));
+      if (dataToSave.teachers) localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(dataToSave.teachers));
+      if (dataToSave.deletedRecordKeys) {
+        const arr = Array.isArray(dataToSave.deletedRecordKeys) ? dataToSave.deletedRecordKeys : Array.from(dataToSave.deletedRecordKeys);
         localStorage.setItem(STORAGE_KEYS.DELETED_RECORD_KEYS, JSON.stringify(arr));
       }
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     } catch (e) {
       console.warn('Failed saving to localStorage', e);
     }
-  }, 0);
+  }, 200);
 }
 
 export function resetLocalData() {

@@ -815,13 +815,12 @@ export default function App() {
 
         // If absent, cleanly remove existing record from list
         if (data.status === 'absent') {
-          addLocalDeletedRecordKey(`${data.studentId}_${data.date}`);
           const updated = existingIdx !== -1 ? prev.filter((_, i) => i !== existingIdx) : prev;
-          saveLocalData({ records: updated, deletedRecordKeys: Array.from(getLocalDeletedRecordKeys()) });
+          saveLocalData({ records: updated, addDeletedKey: `${data.studentId}_${data.date}` });
           return updated;
         }
 
-        removeLocalDeletedRecordKey(`${data.studentId}_${data.date}`);
+        saveLocalData({ removeDeletedKey: `${data.studentId}_${data.date}` });
 
         const student = students.find(s => s.id === data.studentId);
         const studentName = student ? student.name : '';

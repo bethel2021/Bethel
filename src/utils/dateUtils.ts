@@ -179,7 +179,7 @@ export function checkIsWithinSundayWindow(
   if (testMode) {
     return {
       isAllowed: true,
-      statusMsg: '主日签到开放中 (测试模式)',
+      statusMsg: '测试模式',
       isSunday: true,
     };
   }
