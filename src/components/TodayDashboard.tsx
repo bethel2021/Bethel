@@ -195,6 +195,18 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     studentId: string,
     status: 'present' | 'late' | 'excused' | 'absent'
   ) => {
+    // 权限校验：如果账号指定了班级，则只能操作该班级学员
+    if (currentUser && currentUser.role !== 'superadmin' && currentUser.assignedClassId) {
+      const student = students.find(s => s.id === studentId);
+      if (student && student.classId !== currentUser.assignedClassId) {
+        setNoticeDialog({
+          title: '权限限制',
+          content: '您仅有权对您负责的指定班级学员进行签到操作。',
+        });
+        return;
+      }
+    }
+
     if (!windowStatus.isAllowed) {
       setNoticeDialog({
         title: '温馨提醒',
@@ -222,6 +234,17 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   };
 
   const handleOpenExcuseModal = (student: Student) => {
+    // 权限校验
+    if (currentUser && currentUser.role !== 'superadmin' && currentUser.assignedClassId) {
+      if (student.classId !== currentUser.assignedClassId) {
+        setNoticeDialog({
+          title: '权限限制',
+          content: '您仅有权对您负责的指定班级学员进行签到操作。',
+        });
+        return;
+      }
+    }
+
     if (!windowStatus.isAllowed) {
       setNoticeDialog({
         title: '温馨提醒',

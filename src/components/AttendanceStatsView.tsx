@@ -293,7 +293,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
         <div class="header">
           <div class="church-title">${config.churchName} • ${config.schoolTitle}</div>
           <div class="report-subtitle">${targetClass.name} - ${classMonthName} 主日考勤月报表</div>
-          <div style="font-size: 12px; color: #64748b;">班主任/导师：${targetClass.teacher || '专职教师'} | 报表生成时间：${new Date().toLocaleDateString('zh-CN')}</div>
+          <div style="font-size: 12px; color: #64748b;">班主任：${targetClass.teacher || '专职教师'} | 报表生成时间：${new Date().toLocaleDateString('zh-CN')}</div>
         </div>
 
         <div class="stats-grid">
@@ -353,9 +353,6 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
         </table>
 
         <div class="footer">
-          <div>班级任课教师签名：__________________</div>
-          <div>负责同工/团长 签名：__________________</div>
-          <div>日期：2026年____月____日</div>
         </div>
 
         <script>
@@ -677,7 +674,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                             {cls.ageRange}
                           </span>
                           <h4 className="text-sm font-bold text-slate-900 mt-1.5">{cls.name}</h4>
-                          <p className="text-xs text-slate-500 mt-0.5">导师: {cls.teacher || '专职老师'}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">班主任: {cls.teacher || '专职老师'}</p>
                         </div>
                         <div className="text-right">
                           <span className="text-xl font-bold text-slate-900">{stats.rate}%</span>
@@ -931,8 +928,8 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
             <div className="p-4 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span>注：迟到计入出席统计，请假与旷课不计入有效出席率。</span>
               <div className="flex items-center gap-4">
-                <span>班级导师签名：______________</span>
-                <span>负责同工/团长 签名：______________</span>
+                <span>班主任签名：______________</span>
+
               </div>
             </div>
           </div>
