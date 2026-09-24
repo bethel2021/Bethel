@@ -21,7 +21,9 @@ import {
   ChevronRight,
   Filter,
   Layers,
-  Award
+  Award,
+  Download,
+  FileText
 } from 'lucide-react';
 import type { Student, ClassGroup, SystemConfig, AdminUser } from '../types';
 import {
@@ -60,8 +62,10 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
   const [blessingModalInfo, setBlessingModalInfo] = useState<StudentBirthdayInfo | null>(null);
   const [selectedVerseIndex, setSelectedVerseIndex] = useState<number>(0);
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
-  const [batchCopiedSuccess, setBatchCopiedSuccess] = useState<boolean>(false);
   const [printCardStudent, setPrintCardStudent] = useState<StudentBirthdayInfo | null>(null);
+  const [showPrintListModal, setShowPrintListModal] = useState<boolean>(false);
+  const [printTableCopied, setPrintTableCopied] = useState<boolean>(false);
+  const [printNotice, setPrintNotice] = useState<string | null>(null);
 
   // All birthdays processed and sorted by upcoming birthday (daysUntil)
   const allBirthdayInfos = useMemo(() => {
@@ -133,40 +137,148 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
     });
   };
 
-  // Handle Batch Copy Birthday List
-  const handleBatchCopyList = () => {
-    if (filteredList.length === 0) return;
+  // Open Print List Modal
+  const handlePrintList = () => {
+    setShowPrintListModal(true);
+  };
 
-    let periodLabel = '本周内 (7天)';
-    if (periodFilter === 'month') periodLabel = '本月内 (30天)';
-    if (periodFilter === 'all') {
-      periodLabel = selectedMonthFilter === 'all' ? '全体学员' : `${selectedMonthFilter}月份学员`;
+  // Safe execute print
+  const executePrint = () => {
+    try {
+      window.print();
+    } catch (err) {
+      console.error('Window print error:', err);
+      setPrintNotice('若浏览器限制了自动弹出打印，您可直接点击“导出离线打印文件”或在键盘按 Ctrl+P (Mac按 Cmd+P) 打印。');
+      setTimeout(() => setPrintNotice(null), 6000);
     }
+  };
 
-    let text = `📁【${config.churchName} • 主日学生档关怀汇总】\n`;
-    text += `视图范围：${periodLabel} | 统计日期：${currentRomeTime.dateStr} | 共计 ${filteredList.length} 位寿星\n\n`;
-
-    filteredList.forEach((info, idx) => {
-      const className = info.classGroup?.name || '主日学';
-      const daysText = info.isToday
-        ? '★ 今天生日！'
-        : info.isTomorrow
-        ? '明天生日'
-        : `还剩 ${info.daysUntil} 天 (${info.nextBirthdayDayOfWeek})`;
-      text += `${idx + 1}. ${info.student.name}（${className}）- 出生：${info.birthDate}（即将迎来 ${info.turningAge} 岁）| ${daysText} | 家长：${info.student.parentName || '未登记'} ${info.student.parentPhone || ''}\n`;
+  // Copy table TSV for Excel/Word
+  const handleCopyTableData = () => {
+    const headers = ['序号', '学生姓名', '性别', '所属班级', '公历生日', '年龄', '家长姓名', '家长电话', '牧养备注'];
+    const rows = filteredList.map((info, idx) => {
+      const birthYear = info.student.birthDate ? parseInt(info.student.birthDate.split('-')[0]) : null;
+      const ageStr = birthYear && !isNaN(birthYear) ? `${new Date().getFullYear() - birthYear}岁` : '-';
+      return [
+        (idx + 1).toString(),
+        info.student.name,
+        info.student.gender === 'male' ? '男' : info.student.gender === 'female' ? '女' : '-',
+        info.classGroup?.name || '未分配',
+        info.formattedBirthDate,
+        ageStr,
+        info.student.parentName || '-',
+        info.student.parentPhone || '-',
+        info.student.notes || '-'
+      ];
     });
-
-    text += `\n愿神赐福所有亲爱的主日学学员与家庭！🙏`;
-
-    navigator.clipboard.writeText(text).then(() => {
-      setBatchCopiedSuccess(true);
-      setTimeout(() => setBatchCopiedSuccess(false), 2500);
+    const tsv = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+    navigator.clipboard.writeText(tsv).then(() => {
+      setPrintTableCopied(true);
+      setTimeout(() => setPrintTableCopied(false), 2500);
     });
   };
 
-  // Handle Print List
-  const handlePrintList = () => {
-    window.print();
+  // Standalone HTML Printable file download
+  const handleDownloadPrintHTML = () => {
+    const churchTitle = config.churchName || '伯特利基督教会';
+    const filterDesc = periodFilter === 'week' ? '本周寿星 (7天内)' : periodFilter === 'month' ? '本月寿星 (30天内)' : selectedMonthFilter !== 'all' ? `${selectedMonthFilter}月份寿星` : '全年在册寿星花名册';
+    const classDesc = selectedClassId === 'all' ? '全部班级' : classes.find(c => c.id === selectedClassId)?.name || '指定班级';
+    const nowStr = formatChineseDate(new Date());
+
+    const rowsHtml = filteredList.map((info, idx) => {
+      const birthYear = info.student.birthDate ? parseInt(info.student.birthDate.split('-')[0]) : null;
+      const ageStr = birthYear && !isNaN(birthYear) ? `${new Date().getFullYear() - birthYear}岁` : '-';
+      const genderText = info.student.gender === 'male' ? '男' : info.student.gender === 'female' ? '女' : '-';
+      return `<tr>
+        <td style="text-align: center;">${idx + 1}</td>
+        <td style="font-weight: bold; color: #0f172a;">${info.student.name}</td>
+        <td style="text-align: center;">${genderText}</td>
+        <td>${info.classGroup?.name || '未分班'}</td>
+        <td style="text-align: center; color: #b45309; font-weight: 600;">${info.formattedBirthDate}</td>
+        <td style="text-align: center;">${ageStr}</td>
+        <td>${info.student.parentName || '-'}</td>
+        <td>${info.student.parentPhone || '-'}</td>
+        <td style="color: #64748b;">${info.student.notes || '主恩丰盛'}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${churchTitle} - 主日学生日档案打印表</title>
+  <style>
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; padding: 24px; color: #0f172a; background: #fff; }
+    .header { text-align: center; border-bottom: 2px solid #b45309; padding-bottom: 12px; margin-bottom: 16px; }
+    .church-name { font-size: 20px; font-weight: bold; color: #1e293b; }
+    .sheet-title { font-size: 16px; font-weight: 600; color: #b45309; margin-top: 4px; }
+    .meta-bar { display: flex; justify-content: space-between; font-size: 11px; color: #475569; margin-bottom: 12px; padding: 6px 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+    th { background: #f1f5f9; font-weight: 600; color: #1e293b; }
+    tr:nth-child(even) { background-color: #fafaf9; }
+    .footer { margin-top: 24px; font-size: 11px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
+    .verse { font-style: italic; color: #92400e; margin-bottom: 16px; }
+    .signatures { display: flex; justify-content: space-between; margin-top: 24px; padding: 0 20px; font-size: 12px; }
+    .sig-line { border-bottom: 1px solid #0f172a; display: inline-block; width: 120px; margin-left: 6px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="church-name">✝️ ${churchTitle}</div>
+    <div class="sheet-title">主日学学生档案与生日花名册</div>
+  </div>
+  <div class="meta-bar">
+    <div><strong>范围：</strong>${filterDesc} (${classDesc})</div>
+    <div><strong>寿星总计：</strong>${filteredList.length} 人</div>
+    <div><strong>制表日期：</strong>${nowStr}</div>
+    <div><strong>制表同工：</strong>${currentUser?.displayName || '主日学同工'}</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 35px; text-align: center;">序号</th>
+        <th style="width: 70px;">姓名</th>
+        <th style="width: 35px; text-align: center;">性别</th>
+        <th style="width: 80px;">班级</th>
+        <th style="width: 75px; text-align: center;">生日</th>
+        <th style="width: 45px; text-align: center;">年龄</th>
+        <th style="width: 75px;">家长</th>
+        <th style="width: 95px;">联系电话</th>
+        <th>备注 / 祝福寄语</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="verse">“你以恩典为年岁的冠冕；你的路径都滴下脂油。” —— 诗篇 65:11</div>
+    <div class="signatures">
+      <div>主日学带班教师签名：<span class="sig-line"></span></div>
+      <div>教牧长执签章：<span class="sig-line"></span></div>
+      <div>归档日期：<span class="sig-line"></span></div>
+    </div>
+  </div>
+  <script>
+    window.onload = function() { setTimeout(function() { window.print(); }, 350); };
+  </script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${churchTitle}_学生生日档案表_${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   if (!currentUser) {
@@ -220,15 +332,6 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
 
         {/* Global Action Tools */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            onClick={handleBatchCopyList}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-            title="一键复制当前筛选出的寿星名单文本"
-          >
-            {batchCopiedSuccess ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-            <span>{batchCopiedSuccess ? '已复制清单！' : '复制寿星清单'}</span>
-          </button>
-
           <button
             onClick={handlePrintList}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
@@ -987,6 +1090,231 @@ export const BirthdayReminderView: React.FC<BirthdayReminderViewProps> = ({
               >
                 <Printer className="w-4 h-4" />
                 <span>立即打印此贺卡</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* PRINTABLE BIRTHDAY LIST MODAL (生日花名册预览、打印与导出) */}
+      {showPrintListModal && (
+        <div className="print-modal-backdrop fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="print-modal-container bg-white w-full max-w-5xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+            
+            {/* Top Toolbar (Hidden during print) */}
+            <div className="no-print p-4 sm:p-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/80">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                    <Printer className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    学生档案与生日表打印预览
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  当前筛选：{periodFilter === 'week' ? '本周寿星 (7天内)' : periodFilter === 'month' ? '本月寿星 (30天内)' : selectedMonthFilter !== 'all' ? `${selectedMonthFilter}月份寿星` : '全年在册寿星'} · 共 {filteredList.length} 位学员
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={executePrint}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                  title="唤起浏览器系统打印窗口"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>立即打印</span>
+                </button>
+
+                <button
+                  onClick={handleCopyTableData}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                  title="复制制表符格式文本，可直接粘贴到 Excel 或 WPS 中"
+                >
+                  {printTableCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                  <span>{printTableCopied ? '已复制表格！' : '复制表格数据'}</span>
+                </button>
+
+                <button
+                  onClick={handleDownloadPrintHTML}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                  title="下载独立完整的 HTML 打印单文件，可在任意浏览器双击打开并打印"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-700" />
+                  <span>导出离线打印单</span>
+                </button>
+
+                <button
+                  onClick={() => setShowPrintListModal(false)}
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-slate-200 text-slate-500 border border-slate-200 flex items-center justify-center cursor-pointer transition-colors"
+                  title="关闭预览"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Print notice tip banner if any */}
+            {printNotice && (
+              <div className="no-print bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-xs text-amber-900 flex items-center justify-between">
+                <span>{printNotice}</span>
+                <button onClick={() => setPrintNotice(null)} className="text-amber-700 hover:text-amber-900">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Document Preview (Scrollable container on screen, prints cleanly) */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-100/60">
+              <div
+                id="printable-birthday-sheet"
+                className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-6 sm:p-10 max-w-4xl mx-auto"
+              >
+                {/* Header */}
+                <div className="text-center pb-5 border-b-2 border-amber-700 mb-5">
+                  <div className="flex items-center justify-center gap-2 text-amber-800 text-xs font-bold uppercase tracking-widest mb-1">
+                    <Church className="w-4 h-4" />
+                    <span>{config.churchName || '伯特利基督教会'} 主日学部</span>
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                    学生档案与主日学生日花名册
+                  </h2>
+                  <p className="text-xs text-amber-800 font-medium mt-1">
+                    SUNDAY SCHOOL STUDENT PROFILE & BIRTHDAY ROSTER
+                  </p>
+                </div>
+
+                {/* Meta Information Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 mb-5">
+                  <div>
+                    <span className="text-slate-400">统计周期：</span>
+                    <span className="font-semibold text-slate-800">
+                      {periodFilter === 'week' ? '本周寿星 (7天内)' : periodFilter === 'month' ? '本月寿星 (30天内)' : selectedMonthFilter !== 'all' ? `${selectedMonthFilter}月份寿星` : '全年在册寿星'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">班级范围：</span>
+                    <span className="font-semibold text-slate-800">
+                      {selectedClassId === 'all' ? '全部班级' : classes.find(c => c.id === selectedClassId)?.name || '指定班级'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">寿星总计：</span>
+                    <span className="font-bold text-amber-700">{filteredList.length} 人</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">制表同工：</span>
+                    <span className="font-medium text-slate-800">{currentUser?.displayName || '主日学同工'}</span>
+                  </div>
+                </div>
+
+                {/* Main Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 font-bold border-y border-slate-300">
+                        <th className="py-2.5 px-2 text-center w-10 border border-slate-300">序号</th>
+                        <th className="py-2.5 px-3 border border-slate-300">学员姓名</th>
+                        <th className="py-2.5 px-2 text-center w-12 border border-slate-300">性别</th>
+                        <th className="py-2.5 px-3 border border-slate-300">所属班级</th>
+                        <th className="py-2.5 px-3 text-center border border-slate-300">公历生日</th>
+                        <th className="py-2.5 px-2 text-center w-14 border border-slate-300">年龄</th>
+                        <th className="py-2.5 px-3 border border-slate-300">家长姓名</th>
+                        <th className="py-2.5 px-3 border border-slate-300">家长联系电话</th>
+                        <th className="py-2.5 px-3 border border-slate-300">备注 / 属灵祝福</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {filteredList.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="text-center py-8 text-slate-400 border border-slate-300">
+                            当前筛选条件下暂无学员生日档案记录
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredList.map((info, idx) => {
+                          const birthYear = info.student.birthDate ? parseInt(info.student.birthDate.split('-')[0]) : null;
+                          const ageStr = birthYear && !isNaN(birthYear) ? `${new Date().getFullYear() - birthYear}岁` : '-';
+                          const genderText = info.student.gender === 'male' ? '男' : info.student.gender === 'female' ? '女' : '-';
+
+                          return (
+                            <tr key={info.student.id} className={idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
+                              <td className="py-2 px-2 text-center text-slate-500 font-mono border border-slate-300">
+                                {idx + 1}
+                              </td>
+                              <td className="py-2 px-3 font-bold text-slate-900 border border-slate-300">
+                                {info.student.name}
+                                {info.isToday && (
+                                  <span className="ml-1 text-[10px] text-amber-700 font-normal">🎂今天</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-600 border border-slate-300">
+                                {genderText}
+                              </td>
+                              <td className="py-2 px-3 text-slate-700 border border-slate-300">
+                                {info.classGroup?.name || '未分配'}
+                              </td>
+                              <td className="py-2 px-3 text-center font-semibold text-amber-800 border border-slate-300">
+                                {info.formattedBirthDate}
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-600 font-medium border border-slate-300">
+                                {ageStr}
+                              </td>
+                              <td className="py-2 px-3 text-slate-700 border border-slate-300">
+                                {info.student.parentName || '-'}
+                              </td>
+                              <td className="py-2 px-3 text-slate-600 font-mono border border-slate-300">
+                                {info.student.parentPhone || '-'}
+                              </td>
+                              <td className="py-2 px-3 text-slate-500 text-[11px] border border-slate-300">
+                                {info.student.notes || '愿耶和华赐福给你，保护你'}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer Section */}
+                <div className="mt-8 pt-5 border-t border-slate-200">
+                  <div className="text-center italic text-xs text-amber-900 mb-6 bg-amber-50/60 py-2.5 px-4 rounded-lg border border-amber-200/60">
+                    “你以恩典为年岁的冠冕；你的路径都滴下脂油。” —— 诗篇 65:11
+                  </div>
+
+                  {/* Signatures */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs text-slate-700 pt-2">
+                    <div className="border-t border-slate-400 pt-2">
+                      <span className="text-slate-400">主日学带班教师签名：</span>
+                    </div>
+                    <div className="border-t border-slate-400 pt-2">
+                      <span className="text-slate-400">教牧长执审核签章：</span>
+                    </div>
+                    <div className="border-t border-slate-400 pt-2">
+                      <span className="text-slate-400">打印归档日期：</span>
+                      <span className="ml-1 text-slate-800">{formatChineseDate(new Date())}</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Bottom Tip Footer (Hidden in print) */}
+            <div className="no-print px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span>💡</span>
+                <span>提示：若浏览器直接打印受限，可使用“导出离线打印单”或直接复制表格粘贴到 Excel。</span>
+              </span>
+              <button
+                onClick={() => setShowPrintListModal(false)}
+                className="px-4 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold cursor-pointer text-xs"
+              >
+                关闭
               </button>
             </div>
 

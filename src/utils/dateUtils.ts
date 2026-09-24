@@ -107,9 +107,12 @@ export function formatDateYMD(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function formatChineseDate(dateStr: string): string {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-').map(Number);
+export function formatChineseDate(input: string | Date): string {
+  if (!input) return '';
+  if (input instanceof Date) {
+    return `${input.getFullYear()}年${input.getMonth() + 1}月${input.getDate()}日`;
+  }
+  const [y, m, d] = input.split('-').map(Number);
   return `${y}年${m}月${d}日`;
 }
 

@@ -14,20 +14,17 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 6mm;
+    margin: 8mm 6mm;
   }
 
-  /* Hide all extraneous UI elements during print */
+  /* Global element hides during print */
   header, 
   nav, 
   button, 
-  aside,
-  footer,
+  aside, 
+  footer, 
   .no-print,
-  .lg\:col-span-5,
-  .grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4,
-  .max-w-7xl > div:first-child,
-  .mb-6 {
+  .no-print * {
     display: none !important;
   }
 
@@ -37,12 +34,90 @@
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Reset outer grid wrapper for clean single page certificate printing */
+  /* Modal reset so printable documents flow naturally into page */
+  .print-modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    inset: auto !important;
+    z-index: auto !important;
+  }
+
+  .print-modal-container {
+    position: static !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+  }
+
+  /* Printable Birthday Sheet styling */
+  #printable-birthday-sheet {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 6mm 4mm !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  /* Printable Monthly Attendance Report styling */
+  #printable-monthly-report {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 6mm 4mm !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  /* Tables inside print sheets */
+  #printable-birthday-sheet table,
+  #printable-monthly-report table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #printable-birthday-sheet th,
+  #printable-birthday-sheet td,
+  #printable-monthly-report th,
+  #printable-monthly-report td {
+    border: 1px solid #94a3b8 !important;
+    color: #000000 !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  /* Reset outer grid wrapper for clean certificate printing */
   .grid.grid-cols-1.lg\:grid-cols-12 {
     display: block !important;
     margin: 0 !important;

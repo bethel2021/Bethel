@@ -12,6 +12,7 @@ import {
   Church,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   TrendingUp,
   Star,
   Lock,
@@ -20,7 +21,10 @@ import {
   User,
   Users,
   Calendar,
-  Layers
+  Layers,
+  Copy,
+  Check,
+  X
 } from 'lucide-react';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../types';
 import { getSundaysInMonth, formatShortChineseDate, getAllSundaysInYear, formatChineseDate } from '../utils/dateUtils';
@@ -49,6 +53,9 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonth, setSelectedMonth] = useState<number>(8); // 8 is September (0-indexed)
   const [filterClassId, setFilterClassId] = useState<string>('all');
+  const [showMonthlyReportModal, setShowMonthlyReportModal] = useState<boolean>(false);
+  const [reportCopied, setReportCopied] = useState<boolean>(false);
+  const [reportNotice, setReportNotice] = useState<string | null>(null);
 
   // Annual State
   const [selectedAnnualYear, setSelectedAnnualYear] = useState<number>(config.currentYear || 2026);
@@ -105,7 +112,170 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
     : 0;
 
   const handlePrint = () => {
-    window.print();
+    setShowMonthlyReportModal(true);
+  };
+
+  const executeReportPrint = () => {
+    try {
+      window.print();
+    } catch (err) {
+      console.error('Report print error:', err);
+      setReportNotice('若浏览器限制了自动弹出打印，您可直接点击“导出离线打印文件”或使用快捷键 Ctrl+P (Mac按 Cmd+P) 打印。');
+      setTimeout(() => setReportNotice(null), 6000);
+    }
+  };
+
+  const handleCopyReportData = () => {
+    const headerLine = ['序号', '学员姓名', '所属班级', ...sundaysInMonth.map(s => s.slice(5)), '出席周数', '出勤率', '综合评定'];
+    const rows = studentStats.map((s, idx) => {
+      const sundayStatuses = s.sundayRecords.map(r => {
+        if (!r.record) return '缺席';
+        if (r.record.status === 'present') return '出席';
+        if (r.record.status === 'late') return '迟到';
+        if (r.record.status === 'excused') return '请假';
+        return '缺席';
+      });
+      const rating = s.isFullAttendance ? '全勤标兵' : s.rate >= 75 ? '优良' : s.rate >= 50 ? '良好' : '需关怀';
+      const className = classes.find(c => c.id === s.student.classId)?.name || '未分配';
+      return [
+        (idx + 1).toString(),
+        s.student.name,
+        className,
+        ...sundayStatuses,
+        `${s.attendedCount}/${sundaysInMonth.length}`,
+        `${s.rate}%`,
+        rating
+      ];
+    });
+    const tsv = [headerLine.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+    navigator.clipboard.writeText(tsv).then(() => {
+      setReportCopied(true);
+      setTimeout(() => setReportCopied(false), 2500);
+    });
+  };
+
+  const handleDownloadMonthlyReportHTML = () => {
+    const churchTitle = config.churchName || '伯特利基督教会';
+    const targetClass = filterClassId === 'all' ? null : classes.find(c => c.id === filterClassId);
+    const classScopeName = targetClass ? targetClass.name : '全部班级汇总';
+    const nowStr = formatChineseDate(new Date());
+
+    const theadSundays = sundaysInMonth.map(s => `<th style="text-align: center; width: 45px;">${s.slice(5)}</th>`).join('');
+    const rowsHtml = studentStats.map((s, idx) => {
+      const sundayCols = s.sundayRecords.map(r => {
+        if (!r.record) return `<td style="text-align: center; color: #94a3b8;">✗</td>`;
+        if (r.record.status === 'present') return `<td style="text-align: center; color: #16a34a; font-weight: bold;">✓</td>`;
+        if (r.record.status === 'late') return `<td style="text-align: center; color: #d97706;">⏰</td>`;
+        if (r.record.status === 'excused') return `<td style="text-align: center; color: #2563eb;">📝</td>`;
+        return `<td style="text-align: center; color: #94a3b8;">✗</td>`;
+      }).join('');
+
+      const rating = s.isFullAttendance ? '<span style="color: #b45309; font-weight: bold;">★ 全勤标兵</span>' : s.rate >= 75 ? '优良' : s.rate >= 50 ? '良好' : '<span style="color: #e11d48;">需关怀</span>';
+      const className = classes.find(c => c.id === s.student.classId)?.name || '未分配';
+
+      return `<tr>
+        <td style="text-align: center;">${idx + 1}</td>
+        <td style="font-weight: bold;">${s.student.name}</td>
+        <td>${className}</td>
+        ${sundayCols}
+        <td style="text-align: center; font-weight: 600;">${s.attendedCount} / ${sundaysInMonth.length}</td>
+        <td style="text-align: center; font-weight: bold; color: ${s.rate >= 75 ? '#16a34a' : '#b45309'};">${s.rate}%</td>
+        <td style="text-align: center;">${rating}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${churchTitle} - ${monthName}月度考勤统计报表</title>
+  <style>
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; padding: 24px; color: #0f172a; background: #fff; }
+    .header { text-align: center; border-bottom: 2px solid #b45309; padding-bottom: 12px; margin-bottom: 16px; }
+    .church-name { font-size: 20px; font-weight: bold; color: #1e293b; }
+    .sheet-title { font-size: 16px; font-weight: 600; color: #b45309; margin-top: 4px; }
+    .meta-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 11px; color: #475569; margin-bottom: 14px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; }
+    .kpi-row { display: flex; gap: 12px; margin-bottom: 16px; }
+    .kpi-box { flex: 1; border: 1px solid #e2e8f0; background: #fffbeb; border-radius: 8px; padding: 8px 12px; text-align: center; }
+    .kpi-num { font-size: 18px; font-weight: bold; color: #92400e; }
+    .kpi-label { font-size: 11px; color: #78350f; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+    th { background: #f1f5f9; font-weight: 600; color: #1e293b; }
+    tr:nth-child(even) { background-color: #fafaf9; }
+    .legend { display: flex; gap: 16px; font-size: 11px; color: #64748b; margin-bottom: 14px; }
+    .footer { margin-top: 24px; font-size: 11px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
+    .signatures { display: flex; justify-content: space-between; margin-top: 28px; padding: 0 16px; font-size: 12px; }
+    .sig-line { border-bottom: 1px solid #0f172a; display: inline-block; width: 120px; margin-left: 6px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="church-name">✝️ ${churchTitle}</div>
+    <div class="sheet-title">主日学月度考勤统计与出勤花名册</div>
+  </div>
+  <div class="meta-bar">
+    <div><strong>统计月份：</strong>${monthName}</div>
+    <div><strong>班级范围：</strong>${classScopeName}</div>
+    <div><strong>制表日期：</strong>${nowStr}</div>
+    <div><strong>审核同工：</strong>${currentUser?.displayName || '主日学同工'}</div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi-box"><div class="kpi-num">${totalStudentsCount} 人</div><div class="kpi-label">在册学员总数</div></div>
+    <div class="kpi-box"><div class="kpi-num">${sundaysInMonth.length} 周</div><div class="kpi-label">主日聚会周次</div></div>
+    <div class="kpi-box"><div class="kpi-num">${overallMonthRate}%</div><div class="kpi-label">全月平均出勤率</div></div>
+    <div class="kpi-box"><div class="kpi-num">${fullAttendanceStudents.length} 人</div><div class="kpi-label">全勤模范学员</div></div>
+  </div>
+  <div class="legend">
+    <span>图例说明：</span>
+    <span style="color: #16a34a; font-weight: bold;">✓ 出席</span>
+    <span style="color: #d97706;">⏰ 迟到</span>
+    <span style="color: #2563eb;">📝 请假</span>
+    <span style="color: #94a3b8;">✗ 缺勤</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 35px; text-align: center;">序号</th>
+        <th style="width: 80px;">学员姓名</th>
+        <th style="width: 85px;">所属班级</th>
+        ${theadSundays}
+        <th style="width: 65px; text-align: center;">出席周数</th>
+        <th style="width: 55px; text-align: center;">出勤率</th>
+        <th style="width: 80px; text-align: center;">综合评定</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+  <div class="footer">
+    <div style="font-style: italic; color: #92400e; margin-bottom: 12px;">“人在最小的事上忠心，在大事上也忠心。” —— 路加福音 16:10</div>
+    <div class="signatures">
+      <div>带班教师签名：<span class="sig-line"></span></div>
+      <div>主日学主任/教牧签章：<span class="sig-line"></span></div>
+      <div>归档备案日期：<span class="sig-line"></span></div>
+    </div>
+  </div>
+  <script>
+    window.onload = function() { setTimeout(function() { window.print(); }, 350); };
+  </script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${churchTitle}_${monthName}_${classScopeName}_月度考勤表.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const getClassStats = (classId: string) => {
@@ -140,231 +310,8 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
   };
 
   const handleExportClassPDF = (classId: string) => {
-    const targetClass = classes.find(c => c.id === classId);
-    if (!targetClass) return;
-
-    const classStudents = students.filter(s => s.classId === classId);
-    const sundays = getSundaysInMonth(selectedYear, selectedMonth);
-    const classMonthName = `${selectedYear}年${selectedMonth + 1}月`;
-
-    const classStudentStats = classStudents.map(student => {
-      let attendedCount = 0;
-      let lateCount = 0;
-      let excusedCount = 0;
-
-      const sundayRecords = sundays.map(sunDate => {
-        const rec = records.find(r => r.studentId === student.id && r.date === sunDate);
-        if (rec) {
-          if (rec.status === 'present') attendedCount++;
-          else if (rec.status === 'late') {
-            attendedCount++;
-            lateCount++;
-          } else if (rec.status === 'excused') {
-            excusedCount++;
-          }
-        }
-        return { date: sunDate, record: rec };
-      });
-
-      const totalSessions = sundays.length;
-      const rate = totalSessions > 0 ? Math.round((attendedCount / totalSessions) * 100) : 0;
-      const isFullAttendance = totalSessions > 0 && attendedCount === totalSessions;
-
-      return {
-        student,
-        sundayRecords,
-        attendedCount,
-        rate,
-        isFullAttendance,
-      };
-    });
-
-    const totalStud = classStudents.length;
-    const fullStudCount = classStudentStats.filter(s => s.isFullAttendance).length;
-    const totalPoss = totalStud * sundays.length;
-    const totalAct = classStudentStats.reduce((sum, s) => sum + s.attendedCount, 0);
-    const classRate = totalPoss > 0 ? Math.round((totalAct / totalPoss) * 100) : 0;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('弹出窗口被浏览器拦截，请允许弹出窗口以导出 PDF。');
-      return;
-    }
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${config.churchName} - ${targetClass.name} - ${classMonthName}月度考勤明细</title>
-        <style>
-          @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          }
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Noto Serif SC";
-            color: #334155;
-            padding: 40px;
-            max-width: 1000px;
-            margin: 0 auto;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #d97706;
-            padding-bottom: 20px;
-          }
-          .church-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #1e293b;
-            margin-bottom: 5px;
-          }
-          .report-subtitle {
-            font-size: 16px;
-            color: #b45309;
-            font-weight: 600;
-            margin-bottom: 15px;
-          }
-          .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 30px;
-          }
-          .stat-card {
-            background: #fffbeb;
-            border: 1px solid #fde68a;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-          }
-          .stat-val {
-            font-size: 24px;
-            font-weight: bold;
-            color: #92400e;
-          }
-          .stat-lbl {
-            font-size: 12px;
-            color: #78350f;
-            margin-top: 4px;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 30px;
-          }
-          th, td {
-            border: 1px solid #cbd5e1;
-            padding: 10px 12px;
-            text-align: center;
-            font-size: 13px;
-          }
-          th {
-            background-color: #f1f5f9;
-            color: #1e293b;
-            font-weight: 600;
-          }
-          .text-left {
-            text-align: left;
-          }
-          .status-tag {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-          }
-          .status-present { background: #dcfce7; color: #166534; }
-          .status-late { background: #fef9c3; color: #854d0e; }
-          .status-excused { background: #e0e7ff; color: #3730a3; }
-          .status-absent { background: #fee2e2; color: #991b1b; }
-          .footer {
-            margin-top: 40px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 13px;
-            color: #64748b;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 20px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="church-title">${config.churchName} • ${config.schoolTitle}</div>
-          <div class="report-subtitle">${targetClass.name} - ${classMonthName} 主日考勤月报表</div>
-          <div style="font-size: 12px; color: #64748b;">班主任：${targetClass.teacher || '专职教师'} | 报表生成时间：${new Date().toLocaleDateString('zh-CN')}</div>
-        </div>
-
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-val">${totalStud}</div>
-            <div class="stat-lbl">班级学员总数</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-val">${sundays.length}</div>
-            <div class="stat-lbl">本月主日周次</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-val">${classRate}%</div>
-            <div class="stat-lbl">班级平均出勤率</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-val">${fullStudCount}</div>
-            <div class="stat-lbl">全勤天使人数</div>
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 50px;">序号</th>
-              <th class="text-left" style="width: 120px;">学员姓名</th>
-              ${sundays.map((s, idx) => `<th>第 ${idx + 1} 周<br/><span style="font-size:10px;font-weight:normal;">${s.slice(5)}</span></th>`).join('')}
-              <th style="width: 80px;">实到周数</th>
-              <th style="width: 80px;">出勤率</th>
-              <th style="width: 90px;">表现评价</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${classStudentStats.map((item, index) => `
-              <tr>
-                <td>${index + 1}</td>
-                <td class="text-left" style="font-weight: 600; color: #0f172a;">${item.student.name}</td>
-                ${item.sundayRecords.map(sr => {
-                  if (!sr.record) return '<td><span class="status-tag status-absent">缺勤</span></td>';
-                  if (sr.record.status === 'present') return '<td><span class="status-tag status-present">已到</span></td>';
-                  if (sr.record.status === 'late') return '<td><span class="status-tag status-late">迟到</span></td>';
-                  if (sr.record.status === 'excused') return '<td><span class="status-tag status-excused">请假</span></td>';
-                  return '<td><span class="status-tag status-absent">缺勤</span></td>';
-                }).join('')}
-                <td style="font-weight: 600;">${item.attendedCount}/${sundays.length}</td>
-                <td style="font-weight: 700; color: ${item.rate >= 80 ? '#166534' : '#b45309'};">${item.rate}%</td>
-                <td>
-                  ${item.isFullAttendance 
-                    ? '<span style="color:#b45309;font-weight:bold;">★ 全勤标兵</span>' 
-                    : item.rate >= 80 
-                      ? '<span style="color:#166534;">优秀</span>' 
-                      : '<span style="color:#64748b;">需关怀</span>'}
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-
-        <div class="footer">
-        </div>
-
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    setFilterClassId(classId);
+    setShowMonthlyReportModal(true);
   };
 
   // --- Annual Computations ---
@@ -507,21 +454,38 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              {/* Month Navigator */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/80 text-xs">
+              {/* Date Selector Box */}
+              <div className="h-9 flex items-center bg-slate-50 hover:bg-white border border-slate-200 rounded-lg px-1 transition-colors shadow-2xs">
                 <button
-                  onClick={() => setSelectedMonth(prev => (prev === 0 ? 11 : prev - 1))}
-                  className="p-1.5 hover:bg-white rounded-md text-slate-700 cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    if (selectedMonth === 0) {
+                      setSelectedMonth(11);
+                      setSelectedYear(prev => prev - 1);
+                    } else {
+                      setSelectedMonth(prev => prev - 1);
+                    }
+                  }}
+                  className="h-7 w-7 flex items-center justify-center hover:bg-slate-200/70 rounded-md text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                   title="上个月"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-                <span className="font-bold px-2 text-slate-800 font-serif">
-                  {monthName}
-                </span>
+                <div className="flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-800 select-none whitespace-nowrap">
+                  <Calendar className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                  <span>{monthName}</span>
+                </div>
                 <button
-                  onClick={() => setSelectedMonth(prev => (prev === 11 ? 0 : prev + 1))}
-                  className="p-1.5 hover:bg-white rounded-md text-slate-700 cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    if (selectedMonth === 11) {
+                      setSelectedMonth(0);
+                      setSelectedYear(prev => prev + 1);
+                    } else {
+                      setSelectedMonth(prev => prev + 1);
+                    }
+                  }}
+                  className="h-7 w-7 flex items-center justify-center hover:bg-slate-200/70 rounded-md text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                   title="下个月"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -529,21 +493,25 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
               </div>
 
               {/* Class Filter */}
-              <select
-                value={filterClassId}
-                onChange={e => setFilterClassId(e.target.value)}
-                className="text-sm px-3.5 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-700 font-medium cursor-pointer"
-              >
-                <option value="all" className="text-sm font-semibold">全部班级 ({students.length}人)</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id} className="text-sm">{c.name}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filterClassId}
+                  onChange={e => setFilterClassId(e.target.value)}
+                  className="h-9 pl-3 pr-8 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white focus:bg-white text-slate-700 text-xs font-semibold cursor-pointer transition-colors shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 appearance-none"
+                >
+                  <option value="all">全部班级 ({students.length}人)</option>
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
 
               {/* Print Button */}
               <button
+                type="button"
                 onClick={handlePrint}
-                className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                className="h-9 px-3.5 rounded-lg text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>打印月度报告</span>
@@ -1229,6 +1197,218 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
 
           </div>
 
+        </div>
+      )}
+
+      {/* Monthly Report Print & Export Preview Modal */}
+      {showMonthlyReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-slate-200 bg-amber-50/50 flex flex-wrap items-center justify-between gap-3 shrink-0 no-print">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Printer className="w-5 h-5 text-amber-700" />
+                  <span>月度考勤统计报表（打印与导出）</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  当前统计：{monthName} • {filterClassId === 'all' ? '全部在册班级' : classes.find(c => c.id === filterClassId)?.name || '指定班级'}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={executeReportPrint}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>一键系统打印</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyReportData}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="复制表格内容（可直接粘贴到 Excel）"
+                >
+                  {reportCopied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{reportCopied ? '已复制表格' : '复制Excel数据'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadMonthlyReportHTML}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="下载独立HTML文件以备随时打印或分发"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>导出离线打印文件</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMonthlyReportModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-800 transition-colors ml-1 cursor-pointer"
+                  aria-label="关闭"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* In-Modal Filter & Notice */}
+            <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 no-print shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 font-medium">筛选导出班级：</span>
+                <select
+                  value={filterClassId}
+                  onChange={(e) => setFilterClassId(e.target.value)}
+                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="all">全部班级汇总</option>
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.teacherName})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="text-slate-400">
+                提示：若点击打印无响应，可直接点击“导出离线打印文件”双击打开即可打印
+              </div>
+            </div>
+
+            {reportNotice && (
+              <div className="mx-5 mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs no-print">
+                {reportNotice}
+              </div>
+            )}
+
+            {/* Printable Preview Sheet */}
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-100/50">
+              <div
+                id="printable-monthly-report"
+                className="bg-white p-6 sm:p-8 rounded-xl shadow-xs border border-slate-200 max-w-4xl mx-auto"
+              >
+                {/* Church & Title Header */}
+                <div className="text-center pb-4 mb-4 border-b-2 border-amber-600">
+                  <div className="text-lg font-bold text-slate-900 tracking-wide">✝️ {config.churchName || '伯特利基督教会'}</div>
+                  <div className="text-sm font-semibold text-amber-800 mt-1">主日学月度考勤统计与出勤花名册</div>
+                </div>
+
+                {/* Meta info bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5 mb-4">
+                  <div><span className="font-semibold text-slate-700">统计月份：</span>{monthName}</div>
+                  <div><span className="font-semibold text-slate-700">班级范围：</span>{filterClassId === 'all' ? '全部班级汇总' : classes.find(c => c.id === filterClassId)?.name}</div>
+                  <div><span className="font-semibold text-slate-700">制表日期：</span>{formatChineseDate(new Date())}</div>
+                  <div><span className="font-semibold text-slate-700">审核同工：</span>{currentUser?.displayName || '主日学同工'}</div>
+                </div>
+
+                {/* KPI stats */}
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  <div className="border border-amber-100 bg-amber-50/60 rounded-lg p-2 text-center">
+                    <div className="text-base font-bold text-amber-900">{totalStudentsCount} 人</div>
+                    <div className="text-[11px] text-amber-700">在册学员总数</div>
+                  </div>
+                  <div className="border border-amber-100 bg-amber-50/60 rounded-lg p-2 text-center">
+                    <div className="text-base font-bold text-amber-900">{sundaysInMonth.length} 周</div>
+                    <div className="text-[11px] text-amber-700">主日聚会周次</div>
+                  </div>
+                  <div className="border border-amber-100 bg-amber-50/60 rounded-lg p-2 text-center">
+                    <div className="text-base font-bold text-amber-900">{overallMonthRate}%</div>
+                    <div className="text-[11px] text-amber-700">全月平均出勤率</div>
+                  </div>
+                  <div className="border border-amber-100 bg-amber-50/60 rounded-lg p-2 text-center">
+                    <div className="text-base font-bold text-amber-900">{fullAttendanceStudents.length} 人</div>
+                    <div className="text-[11px] text-amber-700">全勤模范学员</div>
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center gap-4 text-xs text-slate-500 mb-3">
+                  <span className="font-medium text-slate-600">考勤图例：</span>
+                  <span className="text-green-600 font-bold">✓ 出席</span>
+                  <span className="text-amber-600 font-medium">⏰ 迟到</span>
+                  <span className="text-blue-600 font-medium">📝 请假</span>
+                  <span className="text-slate-400">✗ 缺勤</span>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700">
+                        <th className="border border-slate-300 px-2 py-1.5 text-center w-10">序号</th>
+                        <th className="border border-slate-300 px-2.5 py-1.5 text-left w-24">学员姓名</th>
+                        <th className="border border-slate-300 px-2.5 py-1.5 text-left w-24">所属班级</th>
+                        {sundaysInMonth.map((sunDate) => (
+                          <th key={sunDate} className="border border-slate-300 px-1.5 py-1.5 text-center w-14">
+                            {sunDate.slice(5)}
+                          </th>
+                        ))}
+                        <th className="border border-slate-300 px-2 py-1.5 text-center w-18">出席周数</th>
+                        <th className="border border-slate-300 px-2 py-1.5 text-center w-16">出勤率</th>
+                        <th className="border border-slate-300 px-2.5 py-1.5 text-center w-20">表现评定</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {studentStats.length === 0 ? (
+                        <tr>
+                          <td colSpan={6 + sundaysInMonth.length} className="text-center py-6 text-slate-400 border border-slate-300">
+                            暂无符合条件的学员考勤数据
+                          </td>
+                        </tr>
+                      ) : (
+                        studentStats.map((item, idx) => {
+                          const rating = item.isFullAttendance ? '全勤标兵' : item.rate >= 75 ? '优良' : item.rate >= 50 ? '良好' : '需关怀';
+                          const className = classes.find(c => c.id === item.student.classId)?.name || '未分配';
+                          return (
+                            <tr key={item.student.id} className={idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
+                              <td className="border border-slate-300 px-2 py-1.5 text-center text-slate-500">{idx + 1}</td>
+                              <td className="border border-slate-300 px-2.5 py-1.5 font-semibold text-slate-800">{item.student.name}</td>
+                              <td className="border border-slate-300 px-2.5 py-1.5 text-slate-600">{className}</td>
+                              {item.sundayRecords.map(({ date, record }) => {
+                                if (!record) return <td key={date} className="border border-slate-300 px-1.5 py-1.5 text-center text-slate-300">✗</td>;
+                                if (record.status === 'present') return <td key={date} className="border border-slate-300 px-1.5 py-1.5 text-center text-green-600 font-bold">✓</td>;
+                                if (record.status === 'late') return <td key={date} className="border border-slate-300 px-1.5 py-1.5 text-center text-amber-600 font-medium">⏰</td>;
+                                if (record.status === 'excused') return <td key={date} className="border border-slate-300 px-1.5 py-1.5 text-center text-blue-600 font-medium">📝</td>;
+                                return <td key={date} className="border border-slate-300 px-1.5 py-1.5 text-center text-slate-300">✗</td>;
+                              })}
+                              <td className="border border-slate-300 px-2 py-1.5 text-center font-medium text-slate-700">
+                                {item.attendedCount} / {sundaysInMonth.length}
+                              </td>
+                              <td className={`border border-slate-300 px-2 py-1.5 text-center font-bold ${item.rate >= 75 ? 'text-green-700' : 'text-amber-700'}`}>
+                                {item.rate}%
+                              </td>
+                              <td className="border border-slate-300 px-2 py-1.5 text-center">
+                                {item.isFullAttendance ? (
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">★ 全勤标兵</span>
+                                ) : (
+                                  <span className={`text-[11px] ${item.rate >= 75 ? 'text-green-700' : item.rate >= 50 ? 'text-slate-600' : 'text-rose-600'}`}>
+                                    {rating}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Signatures & Footer */}
+                <div className="mt-8 pt-4 border-t border-dashed border-slate-300 text-xs text-slate-500">
+                  <div className="italic text-amber-800/80 mb-3">“人在最小的事上忠心，在大事上也忠心。” —— 路加福音 16:10</div>
+                  <div className="flex flex-wrap items-center justify-between gap-6 pt-2">
+                    <div>带班教师签名：<span className="inline-block w-28 border-b border-slate-800 ml-1"></span></div>
+                    <div>主日学主任/教牧签章：<span className="inline-block w-28 border-b border-slate-800 ml-1"></span></div>
+                    <div>归档备案日期：<span className="inline-block w-28 border-b border-slate-800 ml-1"></span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
