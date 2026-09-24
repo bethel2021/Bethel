@@ -25,6 +25,8 @@ import {
   generateHistoricalRecords,
   syncVersion,
   lastModifiedTimestamp,
+  getSyncVersion,
+  getLastModifiedTimestamp,
   mergeClientData,
   onDataChange,
   teachers,
@@ -54,8 +56,8 @@ export function getCurrentStatePayload(eventType: string = 'state_update', extra
 
   return {
     type: eventType,
-    syncVersion,
-    lastModified: lastModifiedTimestamp,
+    syncVersion: getSyncVersion(),
+    lastModified: getLastModifiedTimestamp(),
     config: {
       ...systemConfig,
       hiddenClassIds: hiddenIds
@@ -539,10 +541,11 @@ apiRouter.get('/realtime-stream', (req: Request, res: Response) => {
 // 1.3 High-frequency Real-time Long-Polling (Instantly resolves on mutation, or timeouts)
 apiRouter.get('/realtime-poll', async (req: Request, res: Response) => {
   const clientVersion = parseInt(req.query.version as string, 10) || 0;
-  const timeoutMs = Math.min(Math.max(parseInt(req.query.timeout as string, 10) || 20000, 1000), 30000);
+  const timeoutMs = Math.min(Math.max(parseInt(req.query.timeout as string, 10) || 15000, 1000), 30000);
+  const currentVer = getSyncVersion();
 
   // If server has newer data, respond immediately (<10ms)
-  if (clientVersion !== syncVersion && syncVersion > 0) {
+  if (clientVersion !== currentVer && currentVer > 0) {
     return res.json({
       changed: true,
       ...getCurrentStatePayload('poll_immediate')
@@ -556,8 +559,8 @@ apiRouter.get('/realtime-poll', async (req: Request, res: Response) => {
     try {
       res.json({
         changed: false,
-        syncVersion,
-        lastModified: lastModifiedTimestamp,
+        syncVersion: getSyncVersion(),
+        lastModified: getLastModifiedTimestamp(),
         serverTime: new Date().toISOString()
       });
     } catch {}

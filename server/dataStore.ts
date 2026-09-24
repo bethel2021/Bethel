@@ -50,6 +50,14 @@ export const teachers: any[] = [...initialTeachers];
 export let syncVersion = 1;
 export let lastModifiedTimestamp = new Date().toISOString();
 
+export function getSyncVersion(): number {
+  return syncVersion;
+}
+
+export function getLastModifiedTimestamp(): string {
+  return lastModifiedTimestamp;
+}
+
 export function getRomeTimeParts(date: Date = new Date()) {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Rome',

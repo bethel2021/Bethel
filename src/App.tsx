@@ -135,6 +135,7 @@ export default function App() {
   const classesRef = useRef<ClassGroup[]>(classes);
   const teachersRef = useRef<any[]>(teachers);
   const recordsRef = useRef<AttendanceRecord[]>(records);
+  const checkinLockRef = useRef<Map<string, number>>(new Map());
   const recentRecordMutationsRef = useRef<Map<string, { record: AttendanceRecord | null; timestamp: number }>>(new Map());
   const expectedEntitiesRef = useRef<Map<string, { type: 'student' | 'class' | 'teacher'; timestamp: number; name?: string }>>(new Map());
   const recentDeletionsRef = useRef<Set<string>>(new Set());
@@ -339,9 +340,9 @@ export default function App() {
     let mergedRecordsForCache: AttendanceRecord[] | undefined;
     if (Array.isArray(data.records)) {
       const now = Date.now();
-      // Clean up mutations older than 30s or already settled in incoming server data
+      // Clean up mutations older than 2.5s (sufficient for optimistic network round-trip) or already settled in incoming server data
       for (const [key, meta] of recentRecordMutationsRef.current.entries()) {
-        if (now - meta.timestamp > 30000) {
+        if (now - meta.timestamp > 2500) {
           recentRecordMutationsRef.current.delete(key);
         } else {
           const [sId, dStr] = key.split('_KEY_SPLIT_');
@@ -364,7 +365,7 @@ export default function App() {
           !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
         );
 
-        // Anti-Rollback Protection: preserve recent optimistic mutations (within 30s or in flight)
+        // Anti-Rollback Protection: preserve recent optimistic mutations (within brief window or currently in flight)
         if (recentRecordMutationsRef.current.size > 0 || pendingMutationsRef.current.size > 0) {
           const merged = [...incomingRecords];
 
@@ -656,7 +657,7 @@ export default function App() {
         try {
           pollAbortController = new AbortController();
           const res = await fetch(
-            `/api/realtime-poll?version=${syncVersionRef.current}&timeout=20000&t=${Date.now()}`,
+            `/api/realtime-poll?version=${syncVersionRef.current}&timeout=12000&t=${Date.now()}`,
             {
               signal: pollAbortController.signal,
               headers: { 'Cache-Control': 'no-cache' }
@@ -673,7 +674,7 @@ export default function App() {
         } catch (err: any) {
           if (err.name === 'AbortError' || !isMounted) break;
           // Short pause before retrying long poll on network hiccups
-          await new Promise(r => setTimeout(r, 1200));
+          await new Promise(r => setTimeout(r, 800));
         }
       }
     };
@@ -683,10 +684,10 @@ export default function App() {
     setupSSE();
     runLongPoll();
 
-    // 5. Safety Heartbeat Poll (every 15 seconds)
+    // 5. Safety Heartbeat Poll (fast 3.5s background check for maximum multi-terminal freshness)
     const fallbackInterval = setInterval(() => {
       if (isMounted) loadState(false);
-    }, 15000);
+    }, 3500);
 
     // 6. Cross-tab BroadcastChannel listener (0ms intra-browser sync)
     let bc: BroadcastChannel | null = null;
@@ -712,10 +713,20 @@ export default function App() {
     };
     window.addEventListener('storage', onStorage);
 
-    // 8. Focus & Visibility Change triggers
-    const onFocus = () => { if (isMounted) loadState(false); };
+    // 8. Focus & Visibility Change triggers (auto-reconnects websockets if dropped during sleep)
+    const onFocus = () => {
+      if (isMounted) {
+        loadState(false);
+        if (!ws || ws.readyState > 1) setupWebSocket();
+        if (!es || es.readyState === 2) setupSSE();
+      }
+    };
     const onVisibilityChange = () => {
-      if (!document.hidden && isMounted) loadState(false);
+      if (!document.hidden && isMounted) {
+        loadState(false);
+        if (!ws || ws.readyState > 1) setupWebSocket();
+        if (!es || es.readyState === 2) setupSSE();
+      }
     };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibilityChange);
@@ -851,6 +862,24 @@ export default function App() {
       throw new Error(msg);
     }
 
+    // 简易锁机制 / 防抖逻辑：限制同一学生在 2 秒内只能发起一次签到请求，避免网络延迟造成的重复触发导致状态反弹
+    const now = Date.now();
+    const lastTrigger = checkinLockRef.current.get(data.studentId) || 0;
+    if (now - lastTrigger < 2000) {
+      console.warn(`[Checkin Lock] 忽略重复触发：学生 ${data.studentId} 在 2 秒内仅允许发起一次签到请求`);
+      return;
+    }
+    checkinLockRef.current.set(data.studentId, now);
+
+    // 清理较旧的锁记录，防止内存堆积
+    if (checkinLockRef.current.size > 200) {
+      for (const [id, time] of checkinLockRef.current.entries()) {
+        if (now - time > 10000) {
+          checkinLockRef.current.delete(id);
+        }
+      }
+    }
+
     const updateLocally = () => {
       setRecords(prev => {
         const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
@@ -943,10 +972,7 @@ export default function App() {
         setIsServerAvailable(true);
         const result = await res.json();
         if (result && result.record) {
-          recentRecordMutationsRef.current.set(mutationKey, {
-            record: result.record,
-            timestamp: Date.now()
-          });
+          recentRecordMutationsRef.current.delete(mutationKey);
           setRecords(prev => {
             const existingIdx = prev.findIndex(r => r.studentId === result.record.studentId && r.date === result.record.date);
             let updated: AttendanceRecord[];
@@ -959,10 +985,7 @@ export default function App() {
             return updated;
           });
         } else if (result && result.success && data.status === 'absent') {
-          recentRecordMutationsRef.current.set(mutationKey, {
-            record: null,
-            timestamp: Date.now()
-          });
+          recentRecordMutationsRef.current.delete(mutationKey);
           setRecords(prev => {
             const updated = prev.filter(r => !(r.studentId === data.studentId && r.date === data.date));
             saveLocalData({ records: updated });
