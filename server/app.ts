@@ -809,12 +809,34 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
     }
 
     const now = getRomeTimeParts();
+    let finalStatus = status;
+    if (finalStatus === 'present') {
+      let isLate = false;
+      if (systemConfig.enableLateRule) {
+        const [lateH, lateM] = (systemConfig.lateThresholdTime || '15:00').split(':').map(Number);
+        if (now.hour > lateH || (now.hour === lateH && now.minute > lateM)) {
+          isLate = true;
+        }
+      }
+      if (systemConfig.checkinEndTime) {
+        const [endH, endM] = systemConfig.checkinEndTime.split(':').map(Number);
+        if (!isNaN(endH) && !isNaN(endM)) {
+          if (now.hour > endH || (now.hour === endH && now.minute > endM)) {
+            isLate = true;
+          }
+        }
+      }
+      if (isLate) {
+        finalStatus = 'late';
+      }
+    }
+
     let recordToSave: AttendanceRecord;
 
     if (existingIdx !== -1) {
       recordToSave = {
         ...records[existingIdx],
-        status,
+        status: finalStatus,
         timestamp: `${targetDate}T${now.fullTimeStr}.000Z`,
         timeStr: now.timeStr,
         method: 'manual_teacher',
@@ -831,7 +853,7 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
         date: targetDate,
         timestamp: `${targetDate}T${now.fullTimeStr}.000Z`,
         timeStr: now.timeStr,
-        status,
+        status: finalStatus,
         method: 'manual_teacher',
         memoryVerseCompleted: !!memoryVerseCompleted,
         offeringCompleted: offeringCompleted || false,

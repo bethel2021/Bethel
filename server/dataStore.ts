@@ -988,18 +988,10 @@ export function mergeClientData(payload: SyncPayload): {
     const teacherMap = new Map<string, any>(teachers.map(t => [t.id, t]));
     let teachersChanged = false;
     for (const t of (payload as any).teachers) {
-      if (t && t.id) {
-        if (!teacherMap.has(t.id)) {
-          teacherMap.set(t.id, t);
-          teachersChanged = true;
-          changed = true;
-        } else {
-          const current = teacherMap.get(t.id);
-          const merged = { ...current, ...t };
-          teacherMap.set(t.id, merged);
-          teachersChanged = true;
-          changed = true;
-        }
+      if (t && t.id && !teacherMap.has(t.id)) {
+        teacherMap.set(t.id, t);
+        teachersChanged = true;
+        changed = true;
       }
     }
     if (teachersChanged) {

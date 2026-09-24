@@ -889,59 +889,42 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 </div>
               )}
 
-              {/* Teacher Quick Action Buttons - Fixed 4-Column Grid */}
-              <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-4 gap-1.5 items-center">
+              {/* Teacher Quick Action Buttons - 3 Equal-Sized Columns */}
+              <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-3 gap-1.5 items-center">
+                {/* 1. 出席 (Present / Late auto-calculated) */}
                 <button
                   type="button"
                   disabled={isStudentLoading}
                   onClick={() => handleQuickStatus(student.id, 'present')}
-                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
-                    record?.status === 'present'
-                      ? 'bg-emerald-600 text-white shadow-xs'
+                  className={`text-[11px] font-medium py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1 w-full h-8 ${
+                    record?.status === 'present' || record?.status === 'late'
+                      ? record?.status === 'late'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600'
                   } ${
                     isStudentLoading
-                      ? isPresentLoading ? 'opacity-90 cursor-wait' : 'opacity-40 cursor-not-allowed pointer-events-none'
+                      ? (isPresentLoading || isLateLoading) ? 'opacity-90 cursor-wait' : 'opacity-40 cursor-not-allowed pointer-events-none'
                       : 'cursor-pointer active:scale-95'
                   }`}
-                  title={isPresentLoading ? '正在同步签到...' : '标记准时到校'}
+                  title={(isPresentLoading || isLateLoading) ? '正在同步签到...' : '标记出席（超过设定时间自动判定为迟到）'}
                 >
-                  {isPresentLoading ? (
-                    <Loader2 className="w-3 h-3 animate-spin shrink-0 text-white" />
+                  {(isPresentLoading || isLateLoading) ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-white" />
+                  ) : record?.status === 'late' ? (
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
                   ) : (
-                    <Check className="w-3 h-3 shrink-0" />
+                    <Check className="w-3.5 h-3.5 shrink-0" />
                   )}
-                  <span>到校</span>
+                  <span>出席</span>
                 </button>
 
-                <button
-                  type="button"
-                  disabled={isStudentLoading}
-                  onClick={() => handleQuickStatus(student.id, 'late')}
-                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
-                    record?.status === 'late'
-                      ? 'bg-amber-600 text-white shadow-xs'
-                      : 'bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-600'
-                  } ${
-                    isStudentLoading
-                      ? isLateLoading ? 'opacity-90 cursor-wait' : 'opacity-40 cursor-not-allowed pointer-events-none'
-                      : 'cursor-pointer active:scale-95'
-                  }`}
-                  title={isLateLoading ? '正在同步迟到...' : '标记迟到'}
-                >
-                  {isLateLoading ? (
-                    <Loader2 className="w-3 h-3 animate-spin shrink-0 text-white" />
-                  ) : (
-                    <Clock className="w-3 h-3 shrink-0" />
-                  )}
-                  <span>迟到</span>
-                </button>
-
+                {/* 2. 请假 (Excused) */}
                 <button
                   type="button"
                   disabled={isStudentLoading}
                   onClick={() => handleOpenExcuseModal(student)}
-                  className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
+                  className={`text-[11px] font-medium py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1 w-full h-8 ${
                     record?.status === 'excused'
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-slate-600'
@@ -953,19 +936,20 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                   title={isExcusedLoading ? '正在同步请假...' : '登记请假原因'}
                 >
                   {isExcusedLoading ? (
-                    <Loader2 className="w-3 h-3 animate-spin shrink-0 text-white" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-white" />
                   ) : (
-                    <FileText className="w-3 h-3 shrink-0" />
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
                   )}
                   <span>请假</span>
                 </button>
 
+                {/* 3. 未打卡 / 删除 */}
                 {record ? (
                   <button
                     type="button"
                     disabled={isStudentLoading}
                     onClick={() => handleQuickStatus(student.id, 'absent')}
-                    className={`text-[11px] font-medium px-1.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
+                    className={`text-[11px] font-medium py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1 w-full h-8 ${
                       isAbsentLoading
                         ? 'bg-red-100 text-red-700 cursor-wait'
                         : isStudentLoading
@@ -976,15 +960,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                     aria-label="删除考勤记录"
                   >
                     {isAbsentLoading ? (
-                      <Loader2 className="w-3 h-3 animate-spin shrink-0 text-red-600" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-red-600" />
                     ) : (
-                      <Trash2 className="w-3 h-3 shrink-0" />
+                      <Trash2 className="w-3.5 h-3.5 shrink-0" />
                     )}
                     <span>删除</span>
                   </button>
                 ) : (
-                  <div className="w-full text-center text-[10px] text-slate-300 py-1 font-medium select-none">
-                    未打卡
+                  <div className="text-[11px] font-medium py-1.5 px-2 rounded-md flex items-center justify-center gap-1 w-full h-8 bg-slate-50 text-slate-400 border border-dashed border-slate-200 select-none cursor-default">
+                    <span>未打卡</span>
                   </div>
                 )}
               </div>
