@@ -1426,6 +1426,9 @@ export async function saveAttendanceRecord(record: AttendanceRecord): Promise<At
   } else {
     records.push(record);
   }
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   notifyDataChange();
   await supabaseUpsertAttendanceRecord(record);
   scheduleSupabaseSnapshotSave(1500);
@@ -1449,6 +1452,9 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
     return true;
   }));
 
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   notifyDataChange();
   await supabaseDeleteAttendanceRecord(studentId, date, recId);
   scheduleSupabaseSnapshotSave(1500);

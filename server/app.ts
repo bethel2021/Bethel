@@ -780,16 +780,7 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
       status, 
       memoryVerseCompleted, 
       offeringCompleted, 
-      notes,
-      expectedVersion,
-      syncVersion: clientSyncVersion,
-      clientLastModified,
-      lastModified: clientLastModifiedAlt,
-      expectedTimestamp,
-      baseTimestamp,
-      clientRecordTimestamp,
-      versionTimestamp,
-      expectedRecordId
+      notes
     } = req.body || {};
 
     const student = students.find(s => s.id === studentId);
@@ -807,68 +798,6 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
     const targetDate = date || getActiveSundayDate();
     const studentDateKey = `${studentId}_${targetDate}`;
     const existingIdx = records.findIndex(r => r.studentId === studentId && r.date === targetDate);
-    const existingRecord = existingIdx !== -1 ? records[existingIdx] : undefined;
-
-    // =========================================================================
-    // 🔒 事务级校验逻辑 (Transaction-Level Version & Timestamp Consistency Check)
-    // 在执行签到更新前，对比内存记录与请求数据的版本时间戳，如果检测到差异则直接拒绝并触发一次强制的状态拉取
-    // =========================================================================
-    const reqRecordTimestamp = expectedTimestamp || baseTimestamp || clientRecordTimestamp || versionTimestamp;
-    const reqSystemTimestamp = clientLastModified || clientLastModifiedAlt;
-    const reqSyncVersion = expectedVersion !== undefined ? expectedVersion : clientSyncVersion;
-
-    let hasVersionDisparity = false;
-    let disparityReason = '';
-
-    // 1) 记录级时间戳校验：如果客户端指定了期望基准记录时间戳，对比内存中现有记录的 timestamp
-    if (reqRecordTimestamp && existingRecord) {
-      const clientRecordTime = new Date(reqRecordTimestamp).getTime();
-      const serverRecordTime = new Date(existingRecord.timestamp).getTime();
-      if (!isNaN(clientRecordTime) && !isNaN(serverRecordTime) && Math.abs(serverRecordTime - clientRecordTime) > 1000) {
-        hasVersionDisparity = true;
-        disparityReason = `记录版本时间戳不一致 (客户端版本: ${reqRecordTimestamp}, 内存当前版本: ${existingRecord.timestamp})`;
-      }
-    }
-
-    // 2) 记录ID版本乐观锁校验：客户端指定的记录ID与内存记录不一致
-    if (expectedRecordId && existingRecord && existingRecord.id !== expectedRecordId) {
-      hasVersionDisparity = true;
-      disparityReason = `记录ID版本冲突 (期望: ${expectedRecordId}, 内存当前: ${existingRecord.id})`;
-    }
-
-    // 3) 全局同步时间戳/版本校验：如果检测到客户端版本严重落后且内存记录已被修改
-    if (reqSystemTimestamp && typeof reqSystemTimestamp === 'string' && existingRecord) {
-      const clientSystemTime = new Date(reqSystemTimestamp).getTime();
-      const serverRecordTime = new Date(existingRecord.timestamp).getTime();
-      if (!isNaN(clientSystemTime) && !isNaN(serverRecordTime) && serverRecordTime > clientSystemTime + 2000) {
-        hasVersionDisparity = true;
-        disparityReason = `客户端时间戳已滞后于该记录的最新更新时间 (${existingRecord.timestamp})`;
-      }
-    }
-
-    // 🚨 检测到版本时间戳差异：直接拒绝更新并触发强制状态拉取
-    if (hasVersionDisparity) {
-      console.warn(`[Transaction Version Conflict] /api/manual-checkin rejected for student ${studentId}: ${disparityReason}`);
-      
-      // 触发服务端强制状态同步与全网广播拉取
-      await dataStore.initOrLoadDataAsync(true);
-      broadcastRealtimeState('conflict_resolution', {
-        studentId,
-        date: targetDate,
-        reason: disparityReason
-      });
-
-      return res.status(409).json({
-        success: false,
-        error: `检测到多设备版本时间戳冲突（${disparityReason}），已触发强制状态拉取，请核对最新记录！`,
-        code: 'TRANSACTION_VERSION_CONFLICT',
-        conflict: true,
-        disparityReason,
-        serverSyncVersion: getSyncVersion(),
-        serverLastModified: getLastModifiedTimestamp(),
-        currentState: getCurrentStatePayload('state_force_sync')
-      });
-    }
 
     if (status === 'absent') {
       let removedRecId: string | undefined;
@@ -879,65 +808,47 @@ apiRouter.post('/manual-checkin', async (req: Request, res: Response) => {
       return res.json({ success: true, deletedKey: studentDateKey, message: '已标记为缺席/未签到' });
     }
 
-    removeDeletedRecordKey(studentDateKey);
-
-    const now = new Date();
-    const romeTime = getRomeTimeParts(now);
-    const timeStr = romeTime.timeStr;
-
-    let finalStatus = status || 'present';
-    if (finalStatus === 'present') {
-      let isLate = false;
-      if (systemConfig.enableLateRule) {
-        const [lateH, lateM] = (systemConfig.lateThresholdTime || '09:30').split(':').map(Number);
-        if (romeTime.hour > lateH || (romeTime.hour === lateH && romeTime.minute > lateM)) {
-          isLate = true;
-        }
-      }
-      if (systemConfig.checkinEndTime) {
-        const [endH, endM] = systemConfig.checkinEndTime.split(':').map(Number);
-        if (!isNaN(endH) && !isNaN(endM)) {
-          if (romeTime.hour > endH || (romeTime.hour === endH && romeTime.minute > endM)) {
-            isLate = true;
-          }
-        }
-      }
-      if (isLate) {
-        finalStatus = 'late';
-      }
-    }
+    const now = getRomeTimeParts();
+    let recordToSave: AttendanceRecord;
 
     if (existingIdx !== -1) {
-      const updatedRecord = {
+      recordToSave = {
         ...records[existingIdx],
-        status: finalStatus,
+        status,
+        timestamp: `${targetDate}T${now.fullTimeStr}.000Z`,
+        timeStr: now.timeStr,
+        method: 'manual_teacher',
         memoryVerseCompleted: memoryVerseCompleted !== undefined ? memoryVerseCompleted : records[existingIdx].memoryVerseCompleted,
         offeringCompleted: offeringCompleted !== undefined ? offeringCompleted : records[existingIdx].offeringCompleted,
         notes: notes !== undefined ? notes : records[existingIdx].notes
       };
-      await dataStore.saveAttendanceRecord(updatedRecord);
-      return res.json({ success: true, record: updatedRecord, message: '考勤记录已更新' });
+    } else {
+      recordToSave = {
+        id: `rec-${targetDate}-${studentId}-${Date.now()}`,
+        studentId,
+        studentName: student.name,
+        classId: student.classId,
+        date: targetDate,
+        timestamp: `${targetDate}T${now.fullTimeStr}.000Z`,
+        timeStr: now.timeStr,
+        status,
+        method: 'manual_teacher',
+        memoryVerseCompleted: !!memoryVerseCompleted,
+        offeringCompleted: offeringCompleted || false,
+        notes
+      };
     }
 
-    const record: AttendanceRecord = {
-      id: `rec-${targetDate}-${student.id}-${Date.now()}`,
-      studentId: student.id,
-      studentName: student.name,
-      classId: student.classId,
-      date: targetDate,
-      timestamp: now.toISOString(),
-      timeStr,
-      status: finalStatus,
-      method: 'manual_teacher',
-      memoryVerseCompleted: memoryVerseCompleted !== undefined ? Boolean(memoryVerseCompleted) : systemConfig.defaultMemoryVerseChecked,
-      offeringCompleted: offeringCompleted !== undefined ? Boolean(offeringCompleted) : systemConfig.defaultOfferingChecked,
-      notes
-    };
-    await dataStore.saveAttendanceRecord(record);
+    await dataStore.saveAttendanceRecord(recordToSave);
 
-    res.json({ success: true, record, message: '老师/同工登记成功' });
+    res.json({
+      success: true,
+      record: recordToSave,
+      student,
+      message: `已成功记录 ${student.name} 的考勤状态`
+    });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || '操作失败' });
+    res.status(500).json({ error: err.message || '更新签到记录失败' });
   }
 });
 

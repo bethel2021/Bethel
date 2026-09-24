@@ -363,21 +363,21 @@ export default function App() {
     let mergedRecordsForCache: AttendanceRecord[] | undefined;
     if (Array.isArray(data.records)) {
       const now = Date.now();
-      // Clean up mutations older than 2.5s (sufficient for optimistic network round-trip) or already settled in incoming server data
+      // Clean up mutations older than 8s or that have already settled in incoming server data
       for (const [key, meta] of recentRecordMutationsRef.current.entries()) {
-        if (now - meta.timestamp > 2500) {
-          recentRecordMutationsRef.current.delete(key);
+        const [sId, dStr] = key.split('_KEY_SPLIT_');
+        const serverRec = data.records.find((r: any) => r.studentId === sId && r.date === dStr);
+        if (meta.record) {
+          if (serverRec && serverRec.status === meta.record.status) {
+            recentRecordMutationsRef.current.delete(key);
+          } else if (now - meta.timestamp > 8000) {
+            recentRecordMutationsRef.current.delete(key);
+          }
         } else {
-          const [sId, dStr] = key.split('_KEY_SPLIT_');
-          const serverRec = data.records.find((r: any) => r.studentId === sId && r.date === dStr);
-          if (meta.record) {
-            if (serverRec && serverRec.status === meta.record.status) {
-              recentRecordMutationsRef.current.delete(key);
-            }
-          } else {
-            if (!serverRec) {
-              recentRecordMutationsRef.current.delete(key);
-            }
+          if (!serverRec) {
+            recentRecordMutationsRef.current.delete(key);
+          } else if (now - meta.timestamp > 8000) {
+            recentRecordMutationsRef.current.delete(key);
           }
         }
       }
@@ -388,11 +388,12 @@ export default function App() {
           !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
         );
 
-        // Anti-Rollback Protection: preserve recent optimistic mutations (within brief window or currently in flight)
+        // Anti-Rollback & Anti-Bounce Protection:
+        // Merge recent optimistic mutations (within 8s window or currently in flight)
         if (recentRecordMutationsRef.current.size > 0 || pendingMutationsRef.current.size > 0) {
           const merged = [...incomingRecords];
 
-          // 1. Apply recent local mutations
+          // 1. Apply recent local mutations (highest priority against stale server snapshots)
           recentRecordMutationsRef.current.forEach((meta, key) => {
             const [sId, dStr] = key.split('_KEY_SPLIT_');
             const idx = merged.findIndex(r => r.studentId === sId && r.date === dStr);
@@ -885,14 +886,14 @@ export default function App() {
       throw new Error(msg);
     }
 
-    // 简易锁机制 / 防抖逻辑：限制同一学生在 2 秒内只能发起一次签到请求，避免网络延迟造成的重复触发导致状态反弹
+    // 防重复误触锁：仅对同一学员的完全相同状态在 300ms 内做防抖，允许老师即时切换不同状态（如从到校切换为迟到或请假）
     const now = Date.now();
-    const lastTrigger = checkinLockRef.current.get(data.studentId) || 0;
-    if (now - lastTrigger < 2000) {
-      console.warn(`[Checkin Lock] 忽略重复触发：学生 ${data.studentId} 在 2 秒内仅允许发起一次签到请求`);
+    const actionKey = `${data.studentId}_${data.status}`;
+    const lastTrigger = checkinLockRef.current.get(actionKey) || 0;
+    if (now - lastTrigger < 300) {
       return;
     }
-    checkinLockRef.current.set(data.studentId, now);
+    checkinLockRef.current.set(actionKey, now);
 
     // 清理较旧的锁记录，防止内存堆积
     if (checkinLockRef.current.size > 200) {
@@ -903,18 +904,32 @@ export default function App() {
       }
     }
 
+    const studentDateKey = `${data.studentId}_${data.date}`;
+    const mutationKey = `${data.studentId}_KEY_SPLIT_${data.date}`;
+    pendingMutationsRef.current.add(mutationKey);
+
+    let optRecordCreated: AttendanceRecord | null = null;
+
     const updateLocally = () => {
       setRecords(prev => {
         const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
 
         // If absent, cleanly remove existing record from list
         if (data.status === 'absent') {
+          addLocalDeletedRecordKey(studentDateKey);
+          if (existingIdx !== -1) {
+            addLocalDeletedRecordKey(prev[existingIdx].id);
+          }
           const updated = existingIdx !== -1 ? prev.filter((_, i) => i !== existingIdx) : prev;
-          saveLocalData({ records: updated, addDeletedKey: `${data.studentId}_${data.date}` });
+          saveLocalData({ records: updated });
           return updated;
         }
 
-        saveLocalData({ removeDeletedKey: `${data.studentId}_${data.date}` });
+        removeLocalDeletedRecordKey(studentDateKey);
+        removeLocalDeletedRecordKey(data.studentId);
+        if (existingIdx !== -1) {
+          removeLocalDeletedRecordKey(prev[existingIdx].id);
+        }
 
         const student = students.find(s => s.id === data.studentId);
         const studentName = student ? student.name : '';
@@ -971,13 +986,6 @@ export default function App() {
       });
     };
 
-    let optRecordCreated: AttendanceRecord | null = null;
-    const mutationKey = `${data.studentId}_KEY_SPLIT_${data.date}`;
-    pendingMutationsRef.current.add(mutationKey);
-
-    // Get current in-memory record before optimistic update to use as version baseline
-    const baseExistingRec = recordsRef.current.find(r => r.studentId === data.studentId && r.date === data.date);
-
     // 1. Optimistically update local state for instantaneous UI response
     updateLocally();
 
@@ -986,39 +994,23 @@ export default function App() {
       timestamp: Date.now()
     });
 
-    // 2. Always persist to serverless / cloud backend with transaction timestamp
-    try {
-      const payloadWithVersion = {
-        ...data,
-        expectedTimestamp: baseExistingRec?.timestamp,
-        expectedRecordId: baseExistingRec?.id,
-        syncVersion: syncVersionRef.current,
-        clientLastModified: lastSyncTime
-      };
+    notifyCrossTabSync();
 
+    // 2. Persist to serverless / cloud backend
+    try {
       const res = await fetch('/api/manual-checkin', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(payloadWithVersion),
+        body: JSON.stringify(data),
       });
       const contentType = res.headers.get('content-type') || '';
-      
-      if (res.status === 409) {
-        // Multi-device transaction version disparity detected
-        recentRecordMutationsRef.current.delete(mutationKey);
-        const conflictData = await res.json();
-        if (conflictData && conflictData.currentState) {
-          applyServerState(conflictData.currentState);
-        }
-        showSyncNotification('⚠️ 检测到其他设备正在更新考勤，已触发状态强同步！');
-        return;
-      }
 
       if (res.ok && contentType.includes('application/json')) {
         setIsServerAvailable(true);
         const result = await res.json();
         if (result && result.record) {
-          recentRecordMutationsRef.current.delete(mutationKey);
+          removeLocalDeletedRecordKey(result.record.id);
+          removeLocalDeletedRecordKey(`${result.record.studentId}_${result.record.date}`);
           setRecords(prev => {
             const existingIdx = prev.findIndex(r => r.studentId === result.record.studentId && r.date === result.record.date);
             let updated: AttendanceRecord[];
@@ -1031,7 +1023,6 @@ export default function App() {
             return updated;
           });
         } else if (result && result.success && data.status === 'absent') {
-          recentRecordMutationsRef.current.delete(mutationKey);
           setRecords(prev => {
             const updated = prev.filter(r => !(r.studentId === data.studentId && r.date === data.date));
             saveLocalData({ records: updated });
