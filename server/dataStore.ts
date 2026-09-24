@@ -185,6 +185,29 @@ export function onDataChange(listener: DataChangeListener): () => void {
   return () => changeListeners.delete(listener);
 }
 
+export function notifyDataChange() {
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  for (const listener of changeListeners) {
+    try {
+      listener({
+        classes,
+        students,
+        records,
+        deletedRecordKeys: Array.from(deletedRecordKeys),
+        config: systemConfig,
+        adminAccounts,
+        activeSunday,
+        syncVersion,
+        lastModifiedTimestamp,
+        teachers
+      });
+    } catch (err) {
+      console.warn('[Realtime Sync Error] Listener callback failed:', err);
+    }
+  }
+}
+
 export let lastSupabaseFetchTime = 0;
 
 export async function saveDataToSupabase(): Promise<boolean> {
@@ -244,24 +267,7 @@ export async function saveDataToSupabase(): Promise<boolean> {
   }
 
   // 3. Notify all real-time listeners (WebSocket, SSE, Long-polling)
-  for (const listener of changeListeners) {
-    try {
-      listener({
-        classes,
-        students,
-        records,
-        deletedRecordKeys: Array.from(deletedRecordKeys),
-        config: systemConfig,
-        adminAccounts,
-        activeSunday,
-        syncVersion,
-        lastModifiedTimestamp,
-        teachers
-      });
-    } catch (err) {
-      console.warn('[Realtime Sync Error] Listener callback failed:', err);
-    }
-  }
+  notifyDataChange();
 
   return dbSuccess;
 }
@@ -588,8 +594,21 @@ export async function initOrLoadDataAsync(force = false) {
           students.push(...cloudData.students);
         }
         if (Array.isArray(cloudData.records)) {
+          const cloudRecordMap = new Map<string, AttendanceRecord>();
+          for (const cr of cloudData.records) {
+            cloudRecordMap.set(`${cr.studentId}_${cr.date}`, cr);
+          }
+          // Preserve any in-memory records that are active and not deleted
+          for (const mr of records) {
+            const key = `${mr.studentId}_${mr.date}`;
+            if (!deletedRecordKeys.has(mr.id) && !deletedRecordKeys.has(key)) {
+              if (!cloudRecordMap.has(key)) {
+                cloudRecordMap.set(key, mr);
+              }
+            }
+          }
           records.length = 0;
-          records.push(...cloudData.records);
+          records.push(...Array.from(cloudRecordMap.values()));
         }
         if (Array.isArray(cloudData.deletedRecordKeys)) {
           deletedRecordKeys.clear();
@@ -1366,6 +1385,7 @@ export async function saveAttendanceRecord(record: AttendanceRecord): Promise<At
   } else {
     records.push(record);
   }
+  notifyDataChange();
   await supabaseUpsertAttendanceRecord(record);
   scheduleSupabaseSnapshotSave(1500);
   return record;
@@ -1388,6 +1408,7 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
     return true;
   }));
 
+  notifyDataChange();
   await supabaseDeleteAttendanceRecord(studentId, date, recId);
   scheduleSupabaseSnapshotSave(1500);
   return true;

@@ -308,7 +308,7 @@ apiRouter.post('/ai/generate', async (req: Request, res: Response) => {
 
 // 1. Get entire app state
 apiRouter.get('/state', async (req: Request, res: Response) => {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const auth = getAuthContext(req);
   const assignedClassId = !auth.isSuperAdmin ? auth.assignedClassId : undefined;
 

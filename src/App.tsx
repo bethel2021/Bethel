@@ -134,6 +134,8 @@ export default function App() {
   const studentsRef = useRef<Student[]>(students);
   const classesRef = useRef<ClassGroup[]>(classes);
   const teachersRef = useRef<any[]>(teachers);
+  const recordsRef = useRef<AttendanceRecord[]>(records);
+  const recentRecordMutationsRef = useRef<Map<string, { record: AttendanceRecord | null; timestamp: number }>>(new Map());
   const expectedEntitiesRef = useRef<Map<string, { type: 'student' | 'class' | 'teacher'; timestamp: number; name?: string }>>(new Map());
   const recentDeletionsRef = useRef<Set<string>>(new Set());
   const lastToastTimerRef = useRef<any>(null);
@@ -150,6 +152,10 @@ export default function App() {
   useEffect(() => {
     teachersRef.current = teachers;
   }, [teachers]);
+
+  useEffect(() => {
+    recordsRef.current = records;
+  }, [records]);
 
   // Unified Notification Toast Helper with automatic clearing
   const showSyncNotification = (message: string, duration = 3500) => {
@@ -330,37 +336,68 @@ export default function App() {
       });
     }
 
+    let mergedRecordsForCache: AttendanceRecord[] | undefined;
     if (Array.isArray(data.records)) {
+      const now = Date.now();
+      // Clean up mutations older than 30s or already settled in incoming server data
+      for (const [key, meta] of recentRecordMutationsRef.current.entries()) {
+        if (now - meta.timestamp > 30000) {
+          recentRecordMutationsRef.current.delete(key);
+        } else {
+          const [sId, dStr] = key.split('_KEY_SPLIT_');
+          const serverRec = data.records.find((r: any) => r.studentId === sId && r.date === dStr);
+          if (meta.record) {
+            if (serverRec && serverRec.status === meta.record.status) {
+              recentRecordMutationsRef.current.delete(key);
+            }
+          } else {
+            if (!serverRec) {
+              recentRecordMutationsRef.current.delete(key);
+            }
+          }
+        }
+      }
+
       setRecords(prev => {
         const deletedSet = getLocalDeletedRecordKeys();
         let incomingRecords: AttendanceRecord[] = data.records.filter((r: any) => 
           !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
         );
 
-        // Preserve optimistic local updates if mutations are currently in flight
-        if (pendingMutationsRef.current.size > 0) {
-          const preservedMap = new Map<string, AttendanceRecord | null>();
-          pendingMutationsRef.current.forEach(key => {
-            const [sId, dStr] = key.split('_KEY_SPLIT_');
-            const optRec = prev.find(r => r.studentId === sId && r.date === dStr);
-            preservedMap.set(key, optRec || null);
-          });
-
+        // Anti-Rollback Protection: preserve recent optimistic mutations (within 30s or in flight)
+        if (recentRecordMutationsRef.current.size > 0 || pendingMutationsRef.current.size > 0) {
           const merged = [...incomingRecords];
-          preservedMap.forEach((optRec, key) => {
+
+          // 1. Apply recent local mutations
+          recentRecordMutationsRef.current.forEach((meta, key) => {
             const [sId, dStr] = key.split('_KEY_SPLIT_');
             const idx = merged.findIndex(r => r.studentId === sId && r.date === dStr);
-            if (optRec) {
-              if (idx !== -1) merged[idx] = optRec;
-              else merged.push(optRec);
+            if (meta.record) {
+              if (idx !== -1) merged[idx] = meta.record;
+              else merged.push(meta.record);
             } else {
               if (idx !== -1) merged.splice(idx, 1);
             }
           });
+
+          // 2. Apply in-flight mutations in prev
+          pendingMutationsRef.current.forEach(key => {
+            const [sId, dStr] = key.split('_KEY_SPLIT_');
+            const optRec = prev.find(r => r.studentId === sId && r.date === dStr);
+            const idx = merged.findIndex(r => r.studentId === sId && r.date === dStr);
+            if (optRec) {
+              if (idx !== -1) merged[idx] = optRec;
+              else merged.push(optRec);
+            }
+          });
+
           incomingRecords = merged.filter((r: any) => 
             !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
           );
         }
+
+        mergedRecordsForCache = incomingRecords;
+        saveLocalData({ records: incomingRecords });
 
         if (isDataEqual(prev, incomingRecords)) {
           return prev;
@@ -395,7 +432,7 @@ export default function App() {
       classes: mergedClassesForCache || data.classes || classes,
       students: data.students || students,
       config: data.config || config,
-      records: data.records || records,
+      records: mergedRecordsForCache || recordsRef.current || data.records || records,
       activeSunday: data.activeSunday || activeSunday,
       accounts: data.accounts || accounts,
       teachers: data.teachers || teachers
@@ -751,8 +788,13 @@ export default function App() {
       setIsLoginModalOpen(true);
       return;
     }
+    const mutationKey = `${newRecord.studentId}_KEY_SPLIT_${newRecord.date}`;
+    recentRecordMutationsRef.current.set(mutationKey, {
+      record: newRecord,
+      timestamp: Date.now()
+    });
     setRecords(prev => {
-      const existing = prev.findIndex(r => r.id === newRecord.id);
+      const existing = prev.findIndex(r => r.id === newRecord.id || (r.studentId === newRecord.studentId && r.date === newRecord.date));
       let updated: AttendanceRecord[];
       if (existing !== -1) {
         updated = [...prev];
@@ -867,6 +909,7 @@ export default function App() {
           notes: data.notes
         };
 
+        optRecordCreated = newRecord;
         const updated = existingIdx !== -1 
           ? prev.map((r, i) => i === existingIdx ? newRecord : r)
           : [...prev, newRecord];
@@ -876,11 +919,17 @@ export default function App() {
       });
     };
 
+    let optRecordCreated: AttendanceRecord | null = null;
     const mutationKey = `${data.studentId}_KEY_SPLIT_${data.date}`;
     pendingMutationsRef.current.add(mutationKey);
 
     // 1. Optimistically update local state for instantaneous UI response
     updateLocally();
+
+    recentRecordMutationsRef.current.set(mutationKey, {
+      record: data.status === 'absent' ? null : optRecordCreated,
+      timestamp: Date.now()
+    });
 
     // 2. Always persist to serverless / cloud backend
     try {
@@ -894,6 +943,10 @@ export default function App() {
         setIsServerAvailable(true);
         const result = await res.json();
         if (result && result.record) {
+          recentRecordMutationsRef.current.set(mutationKey, {
+            record: result.record,
+            timestamp: Date.now()
+          });
           setRecords(prev => {
             const existingIdx = prev.findIndex(r => r.studentId === result.record.studentId && r.date === result.record.date);
             let updated: AttendanceRecord[];
@@ -906,6 +959,10 @@ export default function App() {
             return updated;
           });
         } else if (result && result.success && data.status === 'absent') {
+          recentRecordMutationsRef.current.set(mutationKey, {
+            record: null,
+            timestamp: Date.now()
+          });
           setRecords(prev => {
             const updated = prev.filter(r => !(r.studentId === data.studentId && r.date === data.date));
             saveLocalData({ records: updated });
