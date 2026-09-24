@@ -69,6 +69,7 @@ export function getCurrentStatePayload(eventType: string = 'state_update', extra
     })),
     students,
     records,
+    deletedRecordKeys: Array.from(deletedRecordKeys),
     teachers,
     accounts: adminAccounts.map(a => ({
       id: a.id,

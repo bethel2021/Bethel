@@ -332,8 +332,31 @@ export default function App() {
     }
 
     if (Array.isArray(data.deletedRecordKeys)) {
-      data.deletedRecordKeys.forEach((k: string) => {
-        if (typeof k === 'string' && k) addLocalDeletedRecordKey(k);
+      const serverDeletedKeys = new Set(data.deletedRecordKeys.filter((k: any) => typeof k === 'string' && k));
+      // Remove any keys of active incoming records from deleted keys
+      if (Array.isArray(data.records)) {
+        data.records.forEach((r: any) => {
+          if (r) {
+            if (r.id) {
+              serverDeletedKeys.delete(r.id);
+              removeLocalDeletedRecordKey(r.id);
+            }
+            if (r.studentId && r.date) {
+              serverDeletedKeys.delete(`${r.studentId}_${r.date}`);
+              removeLocalDeletedRecordKey(`${r.studentId}_${r.date}`);
+            }
+          }
+        });
+      }
+      try {
+        localStorage.setItem('bethel_deleted_record_keys', JSON.stringify(Array.from(serverDeletedKeys)));
+      } catch {}
+    } else if (Array.isArray(data.records)) {
+      data.records.forEach((r: any) => {
+        if (r) {
+          if (r.id) removeLocalDeletedRecordKey(r.id);
+          if (r.studentId && r.date) removeLocalDeletedRecordKey(`${r.studentId}_${r.date}`);
+        }
       });
     }
 
