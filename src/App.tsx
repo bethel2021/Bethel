@@ -629,7 +629,7 @@ export default function App() {
           clearInterval(wsPingInterval);
           if (!isMounted) return;
           clearTimeout(wsReconnectTimer);
-          wsReconnectTimer = setTimeout(setupWebSocket, 2500);
+          wsReconnectTimer = setTimeout(setupWebSocket, 800);
         };
 
         ws.onerror = () => {
@@ -637,7 +637,7 @@ export default function App() {
         };
       } catch {
         clearTimeout(wsReconnectTimer);
-        wsReconnectTimer = setTimeout(setupWebSocket, 3000);
+        wsReconnectTimer = setTimeout(setupWebSocket, 1000);
       }
     };
 
@@ -667,11 +667,11 @@ export default function App() {
           if (!isMounted) return;
           es?.close();
           clearTimeout(esReconnectTimer);
-          esReconnectTimer = setTimeout(setupSSE, 3000);
+          esReconnectTimer = setTimeout(setupSSE, 1000);
         };
       } catch {
         clearTimeout(esReconnectTimer);
-        esReconnectTimer = setTimeout(setupSSE, 4000);
+        esReconnectTimer = setTimeout(setupSSE, 1500);
       }
     };
 
@@ -681,7 +681,7 @@ export default function App() {
         try {
           pollAbortController = new AbortController();
           const res = await fetch(
-            `/api/realtime-poll?version=${syncVersionRef.current}&timeout=12000&t=${Date.now()}`,
+            `/api/realtime-poll?version=${syncVersionRef.current}&timeout=10000&t=${Date.now()}`,
             {
               signal: pollAbortController.signal,
               headers: { 'Cache-Control': 'no-cache' }
@@ -698,7 +698,7 @@ export default function App() {
         } catch (err: any) {
           if (err.name === 'AbortError' || !isMounted) break;
           // Short pause before retrying long poll on network hiccups
-          await new Promise(r => setTimeout(r, 800));
+          await new Promise(r => setTimeout(r, 400));
         }
       }
     };
@@ -708,10 +708,16 @@ export default function App() {
     setupSSE();
     runLongPoll();
 
-    // 5. Safety Heartbeat Poll (fast 3.5s background check for maximum multi-terminal freshness)
+    // 5. Safety Heartbeat Poll
     const fallbackInterval = setInterval(() => {
-      if (isMounted) loadState(false);
-    }, 3500);
+      if (!isMounted) return;
+      const isWsConnected = ws && ws.readyState === WebSocket.OPEN;
+      const isEsConnected = es && es.readyState === EventSource.OPEN;
+      // If real-time stream is healthy, poll less frequently (10s); if disconnected, poll every 3s
+      if (!isWsConnected && !isEsConnected) {
+        loadState(false);
+      }
+    }, 3000);
 
     // 6. Cross-tab BroadcastChannel listener (0ms intra-browser sync)
     let bc: BroadcastChannel | null = null;

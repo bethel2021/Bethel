@@ -1106,8 +1106,9 @@ export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertClass(saved);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseUpsertClass(saved).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return saved;
 }
@@ -1129,8 +1130,9 @@ export async function updateClass(id: string, updates: Partial<ClassGroup>): Pro
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertClass(updated);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseUpsertClass(updated).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return updated;
 }
@@ -1161,14 +1163,15 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
   setSystemConfig({ ...systemConfig, hiddenClassIds: hiddenIds });
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
 
   const changedClasses = classes.filter(c => c.id === classId || (Array.isArray(clientHiddenIds) && clientHiddenIds.includes(c.id)));
   
-  await Promise.all([
+  Promise.all([
     ...changedClasses.map(c => supabaseUpsertClass(c)),
     supabaseUpsertSystemConfig(systemConfig)
-  ]);
+  ]).catch(() => {});
 
   scheduleSupabaseSnapshotSave();
 }
@@ -1193,9 +1196,10 @@ export async function deleteClass(id: string): Promise<boolean> {
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
 
-  await supabaseDeleteClass(clsId);
+  supabaseDeleteClass(clsId).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return true;
 }
@@ -1230,8 +1234,9 @@ export async function saveStudent(student: Student): Promise<Student> {
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertStudent(saved);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseUpsertStudent(saved).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return saved;
 }
@@ -1253,8 +1258,9 @@ export async function saveStudentsBatch(newStudents: Student[]): Promise<Student
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertStudentsBatch(newStudents);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseUpsertStudentsBatch(newStudents).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return newStudents;
 }
@@ -1273,8 +1279,9 @@ export async function updateStudent(id: string, updates: Partial<Student>): Prom
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertStudent(updated);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseUpsertStudent(updated).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return updated;
 }
@@ -1287,8 +1294,9 @@ export async function deleteStudent(id: string): Promise<Student | null> {
   setRecords(records.filter(r => r.studentId !== removed.id && r.studentName !== removed.name));
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseDeleteStudent(removed.id);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseDeleteStudent(removed.id).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return removed;
 }
@@ -1373,8 +1381,9 @@ export async function saveTeacher(teacher: any): Promise<any> {
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertTeacher(savedTeacher);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseUpsertTeacher(savedTeacher).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return savedTeacher;
 }
@@ -1385,8 +1394,9 @@ export async function updateTeacher(id: string, updates: any): Promise<any | nul
   teachers[existingIdx] = { ...teachers[existingIdx], ...updates };
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertTeacher(teachers[existingIdx]);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseUpsertTeacher(teachers[existingIdx]).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return teachers[existingIdx];
 }
@@ -1397,8 +1407,9 @@ export async function deleteTeacher(id: string): Promise<any | null> {
   const removed = teachers.splice(existingIdx, 1)[0];
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseDeleteTeacher(removed.id);
+  notifyDataChange();
+  saveDataToFile().catch(() => {});
+  supabaseDeleteTeacher(removed.id).catch(() => {});
   scheduleSupabaseSnapshotSave();
   return removed;
 }
@@ -1428,9 +1439,9 @@ export async function saveAttendanceRecord(record: AttendanceRecord): Promise<At
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
   notifyDataChange();
-  await supabaseUpsertAttendanceRecord(record);
+  saveDataToFile().catch(() => {});
+  supabaseUpsertAttendanceRecord(record).catch(() => {});
   scheduleSupabaseSnapshotSave(1500);
   return record;
 }
@@ -1454,9 +1465,9 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
   notifyDataChange();
-  await supabaseDeleteAttendanceRecord(studentId, date, recId);
+  saveDataToFile().catch(() => {});
+  supabaseDeleteAttendanceRecord(studentId, date, recId).catch(() => {});
   scheduleSupabaseSnapshotSave(1500);
   return true;
 }
