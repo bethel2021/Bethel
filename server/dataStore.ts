@@ -583,7 +583,7 @@ export async function initOrLoadDataAsync(force = false) {
       lastSupabaseFetchTime = Date.now();
       if (cloudData && typeof cloudData.syncVersion === 'number') {
         // Anti-Rollback State Protection: Never overwrite local in-memory data with an older/stale DB snapshot
-        if (!force && cloudData.syncVersion < syncVersion) {
+        if (cloudData.syncVersion < syncVersion) {
           console.log(`[Supabase DB] Stale database snapshot ignored (DB Version: ${cloudData.syncVersion}, Memory Version: ${syncVersion}) to prevent race condition rollbacks.`);
           return;
         }

@@ -10,7 +10,8 @@ import {
   removeDeletedRecordKey,
   notifyDataChange,
   scheduleSupabaseSnapshotSave,
-  getSyncVersion
+  getSyncVersion,
+  saveDataToFile
 } from '../dataStore.js';
 import { getAuthContext } from '../authHelper.js';
 
