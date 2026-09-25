@@ -1492,6 +1492,8 @@ export async function getAttendanceRecords(filter?: { date?: string; studentId?:
 export async function saveAttendanceRecord(record: AttendanceRecord, extra?: any): Promise<AttendanceRecord> {
   removeDeletedRecordKey(record.id);
   removeDeletedRecordKey(`${record.studentId}_${record.date}`);
+  deletedRecordKeys.delete(record.id);
+  deletedRecordKeys.delete(`${record.studentId}_${record.date}`);
 
   const existingIdx = records.findIndex(r => r.id === record.id || (r.studentId === record.studentId && r.date === record.date));
   if (existingIdx >= 0) {
@@ -1501,6 +1503,7 @@ export async function saveAttendanceRecord(record: AttendanceRecord, extra?: any
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   notifyDataChange(extra || {
     action: 'checkin',
     record,
@@ -1510,7 +1513,7 @@ export async function saveAttendanceRecord(record: AttendanceRecord, extra?: any
     status: record.status
   });
   supabaseUpsertAttendanceRecord(record).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  scheduleSupabaseSnapshotSave(500);
   return record;
 }
 
@@ -1527,14 +1530,17 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
 
   const existingRecord = records.find(r => r.id === recId || (r.studentId === studentId && r.date === date));
 
-  setRecords(records.filter(r => {
+  const remaining = records.filter(r => {
     if (r.id === recId) return false;
     if (r.studentId === studentId && r.date === date) return false;
     return true;
-  }));
+  });
+  records.length = 0;
+  records.push(...remaining);
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
+  saveDataToFile();
   notifyDataChange(extra || {
     action: 'absent',
     studentId,
@@ -1544,7 +1550,7 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
     date
   });
   supabaseDeleteAttendanceRecord(studentId, date, recId).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  scheduleSupabaseSnapshotSave(500);
   return true;
 }
 
