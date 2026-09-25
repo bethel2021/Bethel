@@ -461,7 +461,7 @@ apiRouter.get('/config', async (req: Request, res: Response) => {
 // 1.1 Cloud Multi-Device Sync endpoints
 apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
   await initOrLoadDataAsync(true);
-  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true').map(c => c.id);
   systemConfig.hiddenClassIds = hiddenIds;
   res.json({
     status: 'ok',
@@ -473,7 +473,7 @@ apiRouter.get('/cloud-sync', async (req: Request, res: Response) => {
     isOfficialDatabase: isSupabaseConfigured(),
     classes: classes.map(c => ({
       ...c,
-      isHiddenFromHome: hiddenIds.includes(c.id)
+      isHiddenFromHome: c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || hiddenIds.includes(c.id)
     })),
     students,
     records,

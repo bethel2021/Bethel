@@ -11,9 +11,15 @@ import { Header } from './components/Header';
 import { TodayDashboard } from './components/TodayDashboard';
 import { AttendanceStatsView } from './components/AttendanceStatsView';
 import { BirthdayReminderView } from './components/BirthdayReminderView';
-import { SettingsModal } from './components/SettingsModal';
 import { LoginModal } from './components/LoginModal';
 import { MultiDeviceSyncModal } from './components/MultiDeviceSyncModal';
+import { useStudentActions } from './hooks/useStudentActions';
+import { useClassActions } from './hooks/useClassActions';
+import { useAttendanceActions } from './hooks/useAttendanceActions';
+
+const SettingsModal = React.lazy(() =>
+  import('./components/SettingsModal').then(m => ({ default: m.SettingsModal }))
+);
 import { 
   getLocalData, 
   saveLocalData, 
@@ -271,6 +277,7 @@ export default function App() {
       const serverHiddenIds = new Set<string>([
         ...(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []),
         ...(Array.isArray(data.config?.hiddenClassIds) ? data.config.hiddenClassIds : []),
+        ...Array.from(getLocalHiddenClassIds())
       ]);
 
       const mergedClasses = data.classes.map((c: any) => {
@@ -282,15 +289,12 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : (typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : serverHiddenIds.has(c.id))
+              : (c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || serverHiddenIds.has(c.id))
           };
         }
 
         // 2. Class hidden status:
-        // When connected, the explicit boolean property on the class is authoritative
-        const isHidden = typeof c.isHiddenFromHome === 'boolean' 
-          ? c.isHiddenFromHome 
-          : serverHiddenIds.has(c.id);
+        const isHidden = c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || serverHiddenIds.has(c.id);
 
         return {
           ...c,
@@ -299,7 +303,7 @@ export default function App() {
       });
 
       // Synchronize persistent hidden class IDs with authoritative merged result
-      const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => c.isHiddenFromHome === true).map((c: any) => c.id as string));
+      const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true').map((c: any) => c.id as string));
       saveLocalHiddenClassIds(newHiddenSet);
 
       const filteredClasses = mergedClasses.filter((c: any) => !recentDeletionsRef.current.has(c.id));
@@ -868,183 +872,60 @@ export default function App() {
     return headers;
   };
 
-  // Handle manual update from teacher (签到 / 迟到 / 请假 / 缺席清除)
-  const handleManualUpdate = async (data: {
-    studentId: string;
-    date: string;
-    status: 'present' | 'late' | 'excused' | 'absent';
-    memoryVerseCompleted?: boolean;
-    offeringCompleted?: boolean;
-    notes?: string;
-  }) => {
-    if (!currentUser) {
-      setIsLoginModalOpen(true);
-      throw new Error('请先登录教师或管理员账号后再进行签到打卡操作');
-    }
+  // Custom Action Hooks (Extracted for clean separation and bundle size optimization)
+  const {
+    handleAddStudent,
+    handleBatchAddStudents,
+    handleDeleteStudent,
+  } = useStudentActions({
+    currentUser,
+    setStudents,
+    setRecords,
+    syncVersionRef,
+    recentDeletionsRef,
+    expectedEntitiesRef,
+    setIsServerAvailable,
+    showSyncNotification,
+    notifyCrossTabSync,
+  });
 
-    const windowStatus = checkIsWithinSundayWindow(
-      new Date(),
-      config.checkinStartTime,
-      config.checkinEndTime,
-      config.testMode
-    );
+  const {
+    handleSaveClass,
+    handleToggleClassVisibility,
+    handleDeleteClass,
+  } = useClassActions({
+    currentUser,
+    classes,
+    students,
+    records,
+    config,
+    setConfig,
+    setClasses,
+    setStudents,
+    setRecords,
+    syncVersionRef,
+    recentDeletionsRef,
+    pendingClassMutationsRef,
+    expectedEntitiesRef,
+    setIsServerAvailable,
+    showSyncNotification,
+    notifyCrossTabSync,
+  });
 
-    if (!windowStatus.isAllowed) {
-      const msg = '非主日签到开放时段，请等待下一个主日！';
-      throw new Error(msg);
-    }
-
-    // 防重复误触锁：仅对同一学员的完全相同状态在 300ms 内做防抖，允许老师即时切换不同状态（如从到校切换为迟到或请假）
-    const now = Date.now();
-    const actionKey = `${data.studentId}_${data.status}`;
-    const lastTrigger = checkinLockRef.current.get(actionKey) || 0;
-    if (now - lastTrigger < 300) {
-      return;
-    }
-    checkinLockRef.current.set(actionKey, now);
-
-    // 清理较旧的锁记录，防止内存堆积
-    if (checkinLockRef.current.size > 200) {
-      for (const [id, time] of checkinLockRef.current.entries()) {
-        if (now - time > 10000) {
-          checkinLockRef.current.delete(id);
-        }
-      }
-    }
-
-    const studentDateKey = `${data.studentId}_${data.date}`;
-    const mutationKey = `${data.studentId}_KEY_SPLIT_${data.date}`;
-    pendingMutationsRef.current.add(mutationKey);
-
-    let optRecordCreated: AttendanceRecord | null = null;
-
-    const updateLocally = () => {
-      setRecords(prev => {
-        const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
-
-        // If absent, cleanly remove existing record from list
-        if (data.status === 'absent') {
-          addLocalDeletedRecordKey(studentDateKey);
-          if (existingIdx !== -1) {
-            addLocalDeletedRecordKey(prev[existingIdx].id);
-          }
-          const updated = existingIdx !== -1 ? prev.filter((_, i) => i !== existingIdx) : prev;
-          saveLocalData({ records: updated });
-          return updated;
-        }
-
-        removeLocalDeletedRecordKey(studentDateKey);
-        removeLocalDeletedRecordKey(data.studentId);
-        if (existingIdx !== -1) {
-          removeLocalDeletedRecordKey(prev[existingIdx].id);
-        }
-
-        const student = students.find(s => s.id === data.studentId);
-        const studentName = student ? student.name : '';
-        const studentClassId = student ? student.classId : '';
-        const nowTimeParts = getRomeTimeParts();
-        const nowTimeStr = nowTimeParts.timeStr;
-
-        let finalStatus = data.status;
-        if (finalStatus === 'present') {
-          let isLate = false;
-          // 1. Check if late rule is enabled and exceeds late threshold (e.g. 15:00)
-          if (config.enableLateRule) {
-            const [lateH, lateM] = (config.lateThresholdTime || '15:00').split(':').map(Number);
-            if (nowTimeParts.hour > lateH || (nowTimeParts.hour === lateH && nowTimeParts.minute > lateM)) {
-              isLate = true;
-            }
-          }
-          // 2. Check if checkin time exceeds the background check-in end deadline (e.g. 12:30), still mark as late
-          if (config.checkinEndTime) {
-            const [endH, endM] = config.checkinEndTime.split(':').map(Number);
-            if (!isNaN(endH) && !isNaN(endM)) {
-              if (nowTimeParts.hour > endH || (nowTimeParts.hour === endH && nowTimeParts.minute > endM)) {
-                isLate = true;
-              }
-            }
-          }
-          if (isLate) {
-            finalStatus = 'late';
-          }
-        }
-
-        const newRecord: AttendanceRecord = {
-          id: existingIdx !== -1 ? prev[existingIdx].id : `rec-${data.date}-${data.studentId}-${Date.now()}`,
-          studentId: data.studentId,
-          studentName,
-          classId: studentClassId,
-          date: data.date,
-          timestamp: new Date().toISOString(),
-          timeStr: nowTimeStr,
-          status: finalStatus,
-          method: 'manual_teacher',
-          memoryVerseCompleted: !!data.memoryVerseCompleted,
-          offeringCompleted: data.offeringCompleted,
-          notes: data.notes
-        };
-
-        optRecordCreated = newRecord;
-        const updated = existingIdx !== -1 
-          ? prev.map((r, i) => i === existingIdx ? newRecord : r)
-          : [...prev, newRecord];
-        
-        saveLocalData({ records: updated });
-        return updated;
-      });
-    };
-
-    // 1. Optimistically update local state for instantaneous UI response
-    updateLocally();
-
-    recentRecordMutationsRef.current.set(mutationKey, {
-      record: data.status === 'absent' ? null : optRecordCreated,
-      timestamp: Date.now()
-    });
-
-    notifyCrossTabSync();
-
-    // 2. Persist to serverless / cloud backend
-    try {
-      const res = await fetch('/api/manual-checkin', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      const contentType = res.headers.get('content-type') || '';
-
-      if (res.ok && contentType.includes('application/json')) {
-        setIsServerAvailable(true);
-        const result = await res.json();
-        if (result && result.record) {
-          removeLocalDeletedRecordKey(result.record.id);
-          removeLocalDeletedRecordKey(`${result.record.studentId}_${result.record.date}`);
-          setRecords(prev => {
-            const existingIdx = prev.findIndex(r => r.studentId === result.record.studentId && r.date === result.record.date);
-            let updated: AttendanceRecord[];
-            if (existingIdx !== -1) {
-              updated = prev.map((r, i) => i === existingIdx ? result.record : r);
-            } else {
-              updated = [...prev, result.record];
-            }
-            saveLocalData({ records: updated });
-            return updated;
-          });
-        } else if (result && result.success && data.status === 'absent') {
-          setRecords(prev => {
-            const updated = prev.filter(r => !(r.studentId === data.studentId && r.date === data.date));
-            saveLocalData({ records: updated });
-            return updated;
-          });
-        }
-      }
-    } catch {
-      // Offline fallback: already updated locally in step 1
-    } finally {
-      pendingMutationsRef.current.delete(mutationKey);
-      notifyCrossTabSync();
-    }
-  };
+  const {
+    handleManualUpdate,
+  } = useAttendanceActions({
+    currentUser,
+    config,
+    students,
+    setRecords,
+    checkinLockRef,
+    pendingMutationsRef,
+    recentRecordMutationsRef,
+    setIsLoginModalOpen,
+    setIsServerAvailable,
+    notifyCrossTabSync,
+  });
 
   // Handle save config & toggles
   const handleSaveConfig = async (updated: Partial<SystemConfig>) => {
@@ -1083,441 +964,6 @@ export default function App() {
       }
     } catch {
       // Offline fallback: already preserved locally in step 1
-    }
-  };
-
-  // Handle save class (添加或编辑班级)
-  const handleSaveClass = async (classData: Partial<ClassGroup>) => {
-    if (currentUser?.role !== 'superadmin') {
-      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加或修改班级的权限！');
-    }
-
-    const classId = classData.id || `class-${Date.now()}`;
-    const mutationPayload: Partial<ClassGroup> = { ...classData, id: classId };
-    pendingClassMutationsRef.current.set(classId, mutationPayload);
-    expectedEntitiesRef.current.set(classId, { type: 'class', timestamp: Date.now(), name: classData.name });
-    syncVersionRef.current = (syncVersionRef.current || 0) + 1;
-
-    const saveLocally = () => {
-      if (classData.isHiddenFromHome !== undefined) {
-        const hiddenSet = getLocalHiddenClassIds();
-        if (classData.isHiddenFromHome) {
-          hiddenSet.add(classId);
-        } else {
-          hiddenSet.delete(classId);
-        }
-        saveLocalHiddenClassIds(hiddenSet);
-      }
-
-      setClasses(prev => {
-        let updated: ClassGroup[];
-        if (classData.id) {
-          updated = prev.map(c => c.id === classData.id ? { ...c, ...classData } as ClassGroup : c);
-        } else {
-          const newClass: ClassGroup = {
-            id: classId,
-            name: classData.name || '新班级',
-            ageRange: classData.ageRange || '3-12岁',
-            teacher: classData.teacher || '班级负责人',
-            subjectTeacher: classData.subjectTeacher || '上课老师',
-            classroom: classData.classroom || '主堂教室',
-            color: classData.color || 'bg-amber-500',
-            groupType: classData.groupType || 'sunday_school',
-            description: classData.description || '',
-            isHiddenFromHome: !!classData.isHiddenFromHome
-          };
-          updated = [...prev, newClass];
-        }
-        saveLocalData({ classes: updated });
-        return updated;
-      });
-    };
-
-    saveLocally();
-
-    try {
-      const res = await fetch('/api/classes', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(mutationPayload),
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        setIsServerAvailable(true);
-        if (typeof data.syncVersion === 'number') {
-          syncVersionRef.current = data.syncVersion;
-        }
-        if (data.class && data.class.id) {
-          const authoritativeClasses: ClassGroup[] = Array.isArray(data.classes) ? data.classes : [];
-          setClasses(prev => {
-            const updated = authoritativeClasses.length > 0
-              ? authoritativeClasses
-              : (prev.some(c => c.id === data.class.id)
-                  ? prev.map(c => c.id === data.class.id ? data.class : c)
-                  : [...prev, data.class]);
-            saveLocalData({ classes: updated });
-            return updated;
-          });
-        }
-        pendingClassMutationsRef.current.delete(classId);
-        showSyncNotification(`✅ 班级【${classData.name || '信息'}】已保存并同步！`);
-      }
-    } catch {
-      // Offline fallback
-    } finally {
-      pendingClassMutationsRef.current.delete(classId);
-      notifyCrossTabSync();
-    }
-  };
-
-  // Handle quick toggle class home visibility
-  const handleToggleClassVisibility = async (classId: string, isHiddenFromHome: boolean) => {
-    if (currentUser?.role !== 'superadmin') {
-      throw new Error('权限不足：除了总管理员之外，其他账号没有修改班级首页展示状态的权限！');
-    }
-    const currentClass = classes.find(c => c.id === classId);
-    if (!currentClass) return;
-
-    // 1. Immediately update persistent local hidden set
-    const hiddenSet = getLocalHiddenClassIds();
-    if (isHiddenFromHome) {
-      hiddenSet.add(classId);
-    } else {
-      hiddenSet.delete(classId);
-    }
-    saveLocalHiddenClassIds(hiddenSet);
-
-    // 2. Protect with in-flight mutation ref with timestamp to prevent trailing race-condition poll overwrites
-    const mutationTimestamp = Date.now();
-    pendingClassMutationsRef.current.set(classId, { 
-      ...currentClass, 
-      isHiddenFromHome,
-      _ts: mutationTimestamp 
-    } as any);
-    syncVersionRef.current = (syncVersionRef.current || 0) + 1;
-
-    // 3. Memory state consistency check for hiddenClassIds & classes to prevent cross-device state rollback
-    const nextHiddenArray = Array.from(hiddenSet);
-    
-    setConfig(prev => {
-      const mergedHiddenIds = Array.from(new Set([
-        ...(Array.isArray(prev?.hiddenClassIds) ? prev.hiddenClassIds : []),
-        ...nextHiddenArray
-      ])).filter(id => isHiddenFromHome ? true : id !== classId);
-      return {
-        ...prev,
-        hiddenClassIds: mergedHiddenIds
-      };
-    });
-
-    setClasses(prev => {
-      const updated = prev.map(c => {
-        if (c.id === classId) {
-          return { ...c, isHiddenFromHome };
-        }
-        return c;
-      });
-
-      // Recalculate validated hidden IDs array from memory state to guarantee consistency
-      const validatedHiddenIds = updated.filter(c => c.isHiddenFromHome === true).map(c => c.id);
-
-      saveLocalData({ 
-        classes: updated,
-        config: {
-          ...config,
-          hiddenClassIds: validatedHiddenIds
-        }
-      });
-      return updated;
-    });
-
-    const safeDeletePending = () => {
-      // Defer deleting the pending mutation by 3.5 seconds to fully absorb any trailing in-flight server updates
-      setTimeout(() => {
-        const currentPending = pendingClassMutationsRef.current.get(classId) as any;
-        if (currentPending && currentPending._ts === mutationTimestamp) {
-          pendingClassMutationsRef.current.delete(classId);
-        }
-      }, 3500);
-    };
-
-    try {
-      const res = await fetch(`/api/classes/${classId}/visibility`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ isHiddenFromHome, hiddenClassIds: nextHiddenArray }),
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        setIsServerAvailable(true);
-        if (typeof data.syncVersion === 'number') {
-          syncVersionRef.current = data.syncVersion;
-        }
-        if (data.config) {
-          setConfig(data.config);
-        }
-        const authoritativeClasses: ClassGroup[] = Array.isArray(data.classes) ? data.classes : [];
-        if (authoritativeClasses.length > 0) {
-          setClasses(authoritativeClasses);
-          saveLocalData({ classes: authoritativeClasses, config: data.config });
-        } else if (data.class) {
-          setClasses(prev => {
-            const updated = prev.map(c => c.id === classId ? { ...c, ...data.class, isHiddenFromHome } : c);
-            saveLocalData({ classes: updated, config: data.config });
-            return updated;
-          });
-        }
-        showSyncNotification(isHiddenFromHome ? '✅ 班级已设置为不在首页展示' : '✅ 班级已恢复在首页正常展示');
-      } else {
-        // Fallback to /api/classes
-        const fallbackRes = await fetch('/api/classes', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ ...currentClass, isHiddenFromHome }),
-        });
-        if (fallbackRes.ok) {
-          const fallbackData = await fallbackRes.json();
-          if (typeof fallbackData.syncVersion === 'number') {
-            syncVersionRef.current = fallbackData.syncVersion;
-          }
-          showSyncNotification('✅ 班级展示状态已同步保存');
-        }
-      }
-    } catch {
-      // Offline fallback
-    } finally {
-      safeDeletePending();
-      notifyCrossTabSync();
-    }
-  };
-
-  // Handle delete class (删除班级)
-  const handleDeleteClass = async (classId: string) => {
-    if (currentUser?.role !== 'superadmin') {
-      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有删除班级的权限！');
-    }
-
-    recentDeletionsRef.current.add(classId);
-
-    const deleteLocally = () => {
-      const enrolledStudents = students.filter(s => s.classId === classId);
-      const studentIdsToDelete = new Set(enrolledStudents.map(s => s.id));
-      const updatedClasses = classes.filter(c => c.id !== classId);
-      const updatedStudents = students.filter(s => s.classId !== classId);
-      const updatedRecords = records.filter(r => !studentIdsToDelete.has(r.studentId));
-
-      setClasses(updatedClasses);
-      setStudents(updatedStudents);
-      setRecords(updatedRecords);
-      saveLocalData({ classes: updatedClasses, students: updatedStudents, records: updatedRecords });
-      notifyCrossTabSync();
-    };
-
-    deleteLocally();
-
-    try {
-      const res = await fetch(`/api/classes/${classId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        setIsServerAvailable(true);
-        showSyncNotification('✅ 班级及关联数据已成功删除并同步！');
-      }
-    } catch {
-      // Offline fallback
-    }
-  };
-
-  // Handle add or update student (录入或编辑学员)
-  const handleAddStudent = async (studentData: any) => {
-    if (currentUser?.role !== 'superadmin') {
-      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加或编辑学员的权限！');
-    }
-
-    const assignedId = studentData.id || `s-${Date.now()}`;
-    const payload = { ...studentData, id: assignedId };
-    expectedEntitiesRef.current.set(assignedId, { type: 'student', timestamp: Date.now(), name: payload.name });
-
-    const saveLocally = () => {
-      setStudents(prev => {
-        let updated: Student[];
-        const exists = prev.some(s => s.id === payload.id);
-        if (exists) {
-          updated = prev.map(s => s.id === payload.id ? { ...s, ...payload } : s);
-        } else {
-          updated = [...prev, payload];
-        }
-        saveLocalData({ students: updated });
-        return updated;
-      });
-
-      // If updating student, also sync attendance record names
-      if (payload.id && payload.name) {
-        setRecords(prev => {
-          const updated = prev.map(r => r.studentId === payload.id ? { 
-            ...r, 
-            studentName: payload.name, 
-            classId: payload.classId || r.classId 
-          } : r);
-          saveLocalData({ records: updated });
-          return updated;
-        });
-      }
-      notifyCrossTabSync();
-    };
-
-    saveLocally();
-
-    try {
-      const res = await fetch('/api/students', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        setIsServerAvailable(true);
-        if (typeof data.syncVersion === 'number' && data.syncVersion < syncVersionRef.current) {
-          return;
-        }
-        if (typeof data.syncVersion === 'number') {
-          syncVersionRef.current = data.syncVersion;
-        }
-        if (Array.isArray(data.students) && data.students.length > 0) {
-          const filtered = data.students.filter((s: any) => !recentDeletionsRef.current.has(s.id));
-          setStudents(filtered);
-          saveLocalData({ students: filtered });
-        } else if (data.student && !recentDeletionsRef.current.has(data.student.id)) {
-          setStudents(prev => {
-            const exists = prev.some(s => s.id === data.student.id);
-            const updated = exists ? prev.map(s => s.id === data.student.id ? data.student : s) : [...prev, data.student];
-            saveLocalData({ students: updated });
-            return updated;
-          });
-        }
-        expectedEntitiesRef.current.delete(assignedId);
-        showSyncNotification(`✅ 学员【${payload.name}】档案已保存并同步！`);
-      }
-    } catch {
-      // Offline fallback
-    }
-  };
-
-  // Handle batch add students (批量录入学员)
-  const handleBatchAddStudents = async (classId: string, namesText: string, defaultAge?: number, defaultBirthDate?: string) => {
-    if (currentUser?.role !== 'superadmin') {
-      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有批量添加学员的权限！');
-    }
-
-    const addLocally = () => {
-      const lines = namesText.split(/[\n,，]+/).map(s => s.trim()).filter(Boolean);
-      const newItems: Student[] = lines.map((name, i) => {
-        const id = `s-${Date.now()}-${i}`;
-        expectedEntitiesRef.current.set(id, { type: 'student', timestamp: Date.now(), name });
-        return {
-          id,
-          name,
-          gender: (i % 2 === 0 ? 'boy' : 'girl') as 'boy' | 'girl',
-          age: defaultAge || 7,
-          birthDate: defaultBirthDate || '2019-06-01',
-          classId,
-          parentName: '家长/本人',
-          parentPhone: '未填写',
-          memberCode: `BTL-${Math.floor(100 + Math.random() * 900)}`,
-          joinDate: new Date().toISOString().split('T')[0]
-        };
-      });
-      setStudents(prev => {
-        const updated = [...prev, ...newItems];
-        saveLocalData({ students: updated });
-        return updated;
-      });
-      notifyCrossTabSync();
-    };
-
-    addLocally();
-
-    try {
-      const res = await fetch('/api/students/batch', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ classId, namesText, defaultAge, defaultBirthDate }),
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        setIsServerAvailable(true);
-        if (typeof data.syncVersion === 'number' && data.syncVersion < syncVersionRef.current) {
-          return;
-        }
-        if (typeof data.syncVersion === 'number') {
-          syncVersionRef.current = data.syncVersion;
-        }
-        if (Array.isArray(data.students) && data.students.length > 0) {
-          const filtered = data.students.filter((s: any) => !recentDeletionsRef.current.has(s.id));
-          setStudents(filtered);
-          saveLocalData({ students: filtered });
-        }
-        showSyncNotification(`✅ 批量录入学员成功并同步！`);
-      }
-    } catch {
-      // Offline fallback
-    }
-  };
-
-  // Handle delete student (删除学员)
-  const handleDeleteStudent = async (studentId: string) => {
-    if (currentUser?.role !== 'superadmin') {
-      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有删除学员的权限！');
-    }
-
-    recentDeletionsRef.current.add(studentId);
-
-    const deleteLocally = () => {
-      setStudents(prev => {
-        const updated = prev.filter(s => s.id !== studentId);
-        saveLocalData({ students: updated });
-        return updated;
-      });
-      setRecords(prev => {
-        const updated = prev.filter(r => r.studentId !== studentId);
-        saveLocalData({ records: updated });
-        return updated;
-      });
-      notifyCrossTabSync();
-    };
-
-    deleteLocally();
-
-    try {
-      const res = await fetch(`/api/students/${studentId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        setIsServerAvailable(true);
-        if (typeof data.syncVersion === 'number' && data.syncVersion < syncVersionRef.current) {
-          return;
-        }
-        if (typeof data.syncVersion === 'number') {
-          syncVersionRef.current = data.syncVersion;
-        }
-        if (Array.isArray(data.students)) {
-          const filtered = data.students.filter((s: any) => !recentDeletionsRef.current.has(s.id));
-          setStudents(filtered);
-          saveLocalData({ students: filtered });
-        }
-        showSyncNotification('✅ 学员档案已成功删除并同步！');
-      }
-    } catch {
-      // Offline fallback
     }
   };
 
@@ -1941,33 +1387,40 @@ export default function App() {
         )}
 
         {activeTab === 'settings' && (
-          <SettingsModal
-            config={config}
-            classes={classes}
-            students={students}
-            accounts={accounts}
-            teachers={teachers}
-            currentUser={currentUser}
-            onSaveConfig={handleSaveConfig}
-            onSaveClass={handleSaveClass}
-            onToggleClassVisibility={handleToggleClassVisibility}
-            onDeleteClass={handleDeleteClass}
-            onAddStudent={handleAddStudent}
-            onBatchAddStudents={handleBatchAddStudents}
-            onDeleteStudent={handleDeleteStudent}
-            onSaveTeacher={handleSaveTeacher}
-            onDeleteTeacher={handleDeleteTeacher}
-            onResetData={handleResetData}
-            onOpenLogin={() => setIsLoginModalOpen(true)}
-            onSaveAccount={handleSaveAccount}
-            onDeleteAccount={handleDeleteAccount}
-            onChangeAccountPassword={handleChangeAccountPassword}
-            onManualSync={handleManualSync}
-            isSyncing={isSyncing}
-            lastSyncTime={lastSyncTime}
-            onExportData={handleExportData}
-            onImportData={handleImportData}
-          />
+          <React.Suspense fallback={
+            <div className="flex items-center justify-center p-12 text-amber-700 bg-white/80 rounded-2xl border border-amber-200/60 shadow-sm my-8">
+              <Loader2 className="w-6 h-6 animate-spin mr-2.5 text-amber-600" />
+              <span className="font-medium text-slate-700">正在加载后台设置模块...</span>
+            </div>
+          }>
+            <SettingsModal
+              config={config}
+              classes={classes}
+              students={students}
+              accounts={accounts}
+              teachers={teachers}
+              currentUser={currentUser}
+              onSaveConfig={handleSaveConfig}
+              onSaveClass={handleSaveClass}
+              onToggleClassVisibility={handleToggleClassVisibility}
+              onDeleteClass={handleDeleteClass}
+              onAddStudent={handleAddStudent}
+              onBatchAddStudents={handleBatchAddStudents}
+              onDeleteStudent={handleDeleteStudent}
+              onSaveTeacher={handleSaveTeacher}
+              onDeleteTeacher={handleDeleteTeacher}
+              onResetData={handleResetData}
+              onOpenLogin={() => setIsLoginModalOpen(true)}
+              onSaveAccount={handleSaveAccount}
+              onDeleteAccount={handleDeleteAccount}
+              onChangeAccountPassword={handleChangeAccountPassword}
+              onManualSync={handleManualSync}
+              isSyncing={isSyncing}
+              lastSyncTime={lastSyncTime}
+              onExportData={handleExportData}
+              onImportData={handleImportData}
+            />
+          </React.Suspense>
         )}
       </main>
 

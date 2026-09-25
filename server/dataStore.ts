@@ -452,14 +452,14 @@ export function loadFromDisk(): boolean {
       if (Array.isArray(data.classes) && data.classes.length > 0) {
         const mappedClasses = data.classes.map((c: any) => ({
           ...c,
-          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
+          isHiddenFromHome: c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || hiddenSet.has(c.id)
         }));
         classes.length = 0;
         classes.push(...mappedClasses);
       } else {
         const mappedClasses = classes.map(c => ({
           ...c,
-          isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : hiddenSet.has(c.id)
+          isHiddenFromHome: c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || hiddenSet.has(c.id)
         }));
         classes.length = 0;
         classes.push(...mappedClasses);
@@ -603,7 +603,7 @@ export async function initOrLoadDataAsync(force = false) {
 
           const mappedClasses = cloudData.classes.map((c: any) => ({
             ...c,
-            isHiddenFromHome: typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : cloudHiddenSet.has(c.id)
+            isHiddenFromHome: c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || cloudHiddenSet.has(c.id)
           }));
           classes.length = 0;
           classes.push(...mappedClasses);
@@ -1156,11 +1156,11 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
       reconciledSet.delete(classId);
     }
     classes.forEach(c => {
-      c.isHiddenFromHome = reconciledSet.has(c.id);
+      c.isHiddenFromHome = reconciledSet.has(c.id) || (c.id === classId ? isHidden : (c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true'));
     });
   }
 
-  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
+  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true').map(c => c.id);
   setSystemConfig({ ...systemConfig, hiddenClassIds: hiddenIds });
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
