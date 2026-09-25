@@ -54,12 +54,6 @@ export function getSyncVersion(): number {
   return syncVersion;
 }
 
-export function bumpSyncVersion(): number {
-  syncVersion++;
-  lastModifiedTimestamp = new Date().toISOString();
-  return syncVersion;
-}
-
 export function getLastModifiedTimestamp(): string {
   return lastModifiedTimestamp;
 }
@@ -1426,10 +1420,6 @@ export async function getAttendanceRecords(filter?: { date?: string; studentId?:
 }
 
 export async function saveAttendanceRecord(record: AttendanceRecord): Promise<AttendanceRecord> {
-  if (systemConfig.testMode && record.isTestMode === undefined) {
-    record.isTestMode = true;
-  }
-
   removeDeletedRecordKey(record.id);
   removeDeletedRecordKey(`${record.studentId}_${record.date}`);
 
@@ -1446,28 +1436,6 @@ export async function saveAttendanceRecord(record: AttendanceRecord): Promise<At
   supabaseUpsertAttendanceRecord(record).catch(() => {});
   scheduleSupabaseSnapshotSave(1500);
   return record;
-}
-
-export async function purgeTestModeRecords(): Promise<number> {
-  await initOrLoadDataAsync(false);
-  const testRecords = records.filter(r => r.isTestMode === true);
-  const count = testRecords.length;
-  if (count > 0) {
-    const keptRecords = records.filter(r => r.isTestMode !== true);
-    records.length = 0;
-    records.push(...keptRecords);
-    
-    syncVersion++;
-    lastModifiedTimestamp = new Date().toISOString();
-    notifyDataChange();
-    saveDataToFile().catch(() => {});
-    
-    for (const tr of testRecords) {
-      supabaseDeleteAttendanceRecord(tr.studentId, tr.date, tr.id).catch(() => {});
-    }
-    scheduleSupabaseSnapshotSave(1500);
-  }
-  return count;
 }
 
 export async function updateAttendanceRecord(record: AttendanceRecord): Promise<AttendanceRecord> {
@@ -1506,9 +1474,8 @@ export async function getSystemConfig(): Promise<SystemConfig> {
   };
 }
 
-export async function saveSystemConfig(updates: Partial<SystemConfig>): Promise<{ config: SystemConfig; purgedTestRecordsCount: number }> {
+export async function saveSystemConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
   await initOrLoadDataAsync(false);
-  const isExitingTestMode = systemConfig.testMode === true && updates.testMode === false;
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
   const nextConfig = {
     ...systemConfig,
@@ -1516,15 +1483,9 @@ export async function saveSystemConfig(updates: Partial<SystemConfig>): Promise<
     hiddenClassIds: Array.isArray(updates.hiddenClassIds) ? updates.hiddenClassIds : (systemConfig.hiddenClassIds || hiddenIds)
   };
   setSystemConfig(nextConfig);
-
-  let purgedTestRecordsCount = 0;
-  if (isExitingTestMode || updates.testMode === false) {
-    purgedTestRecordsCount = await purgeTestModeRecords();
-  }
-
   await supabaseUpsertSystemConfig(systemConfig);
   await saveDataToSupabase();
-  return { config: systemConfig, purgedTestRecordsCount };
+  return systemConfig;
 }
 
 // --- Admin Accounts ---
@@ -1645,12 +1606,10 @@ export const dataStore = {
   sortTeachersList,
 
   // Attendance Records
-  records,
   getAttendanceRecords,
   saveAttendanceRecord,
   updateAttendanceRecord,
   deleteAttendanceRecord,
-  purgeTestModeRecords,
 
   // System Config
   getSystemConfig,
@@ -1664,9 +1623,6 @@ export const dataStore = {
   deleteAdminAccount,
 
   // State & Sync
-  bumpSyncVersion,
-  notifyDataChange,
-  scheduleSupabaseSnapshotSave,
   resetAllData,
   getFullState: getFullStatePayload,
   initOrLoadDataAsync,

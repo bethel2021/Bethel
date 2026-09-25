@@ -794,7 +794,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       await onSaveConfig({ [key]: val });
       if (key === 'testMode') {
-        showNotice('success', val ? '已开启全天候测试模式！当前允许在任意时间进行打卡与点名测试。' : '已成功退出测试模式！系统已自动重置清理测试模式下产生的签到数据，保留正常模式下的所有正式记录。');
+        showNotice('success', val ? '已开启全天候测试模式！当前允许在任意时间进行打卡与点名测试。' : '已关闭测试模式！系统恢复为仅星期天指定时间段开放签到。');
       } else {
         showNotice('success', '默认选项与功能设置已即时更新生效！');
       }
@@ -2212,7 +2212,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
                     <strong>开启测试模式：</strong>突破【仅限星期天限定时间段】限制，允许总管理员与教师在任意星期、任意时间自由执行打卡与点名测试；<br />
-                    <strong>退出测试模式：</strong>恢复正常主日签到模式（仅限星期天指定时段开放），并<strong>自动重置清理测试模式下产生的签到数据</strong>，保留正常模式下的所有正式签到记录。
+                    <strong>关闭测试模式：</strong>恢复正常模式，仅在<strong>星期天指定时段（{config.checkinStartTime || '11:00'} ~ {config.checkinEndTime || '16:00'}）</strong>开放签到。非主日时间段首页显示“请等待下一个主日”并拦截点名操作。
                   </p>
                 </div>
                 <button

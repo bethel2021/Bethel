@@ -226,40 +226,39 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     if (processingRef.current.has(studentId)) return;
     processingRef.current.add(studentId);
     setLoadingMap(prev => ({ ...prev, [studentId]: status }));
-
-    // Instant optimistic feedback
-    if (status !== 'absent') {
-      const feedbackId = Date.now();
-      setSuccessFeedbackMap(prev => ({ ...prev, [studentId]: { type: status, id: feedbackId } }));
-      setTimeout(() => {
-        setSuccessFeedbackMap(prev => {
-          if (prev[studentId]?.id === feedbackId) {
-            const next = { ...prev };
-            delete next[studentId];
-            return next;
-          }
-          return prev;
-        });
-      }, 1500);
-    }
-
-    // Trigger local optimistic update and background network persistence asynchronously
-    onManualUpdate({
-      studentId,
-      date: activeSunday,
-      status,
-      memoryVerseCompleted: false,
-      offeringCompleted: false,
-    }).catch((err: any) => {
+    try {
+      await onManualUpdate({
+        studentId,
+        date: activeSunday,
+        status,
+        memoryVerseCompleted: false,
+        offeringCompleted: false,
+      });
+      // 成功即时反馈动画（仅到校、迟到等签到操作触发，删除记录不触发弹窗）
+      if (status !== 'absent') {
+        const feedbackId = Date.now();
+        setSuccessFeedbackMap(prev => ({ ...prev, [studentId]: { type: status, id: feedbackId } }));
+        setTimeout(() => {
+          setSuccessFeedbackMap(prev => {
+            if (prev[studentId]?.id === feedbackId) {
+              const next = { ...prev };
+              delete next[studentId];
+              return next;
+            }
+            return prev;
+          });
+        }, 1800);
+      }
+    } catch (err: any) {
       showCheckinErrorDialog(err);
-    }).finally(() => {
+    } finally {
       processingRef.current.delete(studentId);
       setLoadingMap(prev => {
         const next = { ...prev };
         delete next[studentId];
         return next;
       });
-    });
+    }
   };
 
   const handleOpenExcuseModal = (student: Student) => {
