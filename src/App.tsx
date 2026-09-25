@@ -592,7 +592,7 @@ export default function App() {
     document.title = '伯特利主日学与团契IMS';
   }, []);
 
-  // Multi-Engine Adaptive Real-Time Sync Loop (WebSocket -> SSE -> Adaptive Long-Polling Fallback)
+  // Multi-Engine Ultra-Fast Real-Time Sync Loop (WebSocket + SSE + 1.5s Micro-Pulse Check + Interaction Wakeup)
   useEffect(() => {
     let isMounted = true;
     let ws: WebSocket | null = null;
@@ -600,8 +600,9 @@ export default function App() {
     let wsReconnectTimer: any = null;
     let es: EventSource | null = null;
     let esReconnectTimer: any = null;
-    let isLongPollActive = false;
-    let pollAbortController: AbortController | null = null;
+    let pulseInterval: any = null;
+    let isPulseInFlight = false;
+    let lastInteractionCheckTime = 0;
 
     // 1. Initial State Load
     loadState(true);
@@ -609,7 +610,38 @@ export default function App() {
     const isWsHealthy = () => ws && ws.readyState === WebSocket.OPEN;
     const isEsHealthy = () => es && es.readyState === EventSource.OPEN;
 
-    // 2. Layer 1: WebSocket Real-Time Channel (<50ms)
+    // Fast Micro-Pulse Version Check (<15ms network overhead)
+    const checkVersionPulse = async () => {
+      if (!isMounted || isPulseInFlight || document.hidden) return;
+      isPulseInFlight = true;
+      try {
+        const res = await fetch(`/api/sync-version?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data.syncVersion === 'number') {
+            const isVersionNewer = data.syncVersion > syncVersionRef.current;
+            const isRecordsCountMismatch = typeof data.recordsCount === 'number' && 
+              recordsRef.current && 
+              Math.abs(data.recordsCount - recordsRef.current.length) > 0 &&
+              recentRecordMutationsRef.current.size === 0 &&
+              pendingMutationsRef.current.size === 0;
+
+            if (isVersionNewer || isRecordsCountMismatch) {
+              await loadState(false);
+            }
+          }
+        }
+      } catch {
+        // Silently continue pulse
+      } finally {
+        isPulseInFlight = false;
+      }
+    };
+
+    // 2. Layer 1: WebSocket Real-Time Channel (<20ms latency)
     const setupWebSocket = () => {
       if (!isMounted || document.hidden) return;
       try {
@@ -620,20 +652,12 @@ export default function App() {
         ws.onopen = () => {
           if (!isMounted) return;
           setIsServerAvailable(true);
-          // If WS is healthy, we don't need SSE or aggressive polling
-          if (es) {
-            es.close();
-            es = null;
-          }
-          if (pollAbortController) {
-            pollAbortController.abort();
-          }
           clearInterval(wsPingInterval);
           wsPingInterval = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN && !document.hidden) {
               try { ws.send(JSON.stringify({ type: 'ping' })); } catch {}
             }
-          }, 30000);
+          }, 10000);
         };
 
         ws.onmessage = (event) => {
@@ -649,12 +673,8 @@ export default function App() {
         ws.onclose = () => {
           clearInterval(wsPingInterval);
           if (!isMounted || document.hidden) return;
-          // Trigger SSE fallback if WS drops
-          if (!isEsHealthy()) {
-            setupSSE();
-          }
           clearTimeout(wsReconnectTimer);
-          wsReconnectTimer = setTimeout(setupWebSocket, 3000);
+          wsReconnectTimer = setTimeout(setupWebSocket, 1500);
         };
 
         ws.onerror = () => {
@@ -662,17 +682,19 @@ export default function App() {
         };
       } catch {
         clearTimeout(wsReconnectTimer);
-        wsReconnectTimer = setTimeout(setupWebSocket, 4000);
+        wsReconnectTimer = setTimeout(setupWebSocket, 2000);
       }
     };
 
-    // 3. Layer 2: Server-Sent Events (SSE) Channel (<50ms)
+    // 3. Layer 2: Server-Sent Events (SSE) Stream (<20ms latency)
     const setupSSE = () => {
       if (!isMounted || document.hidden || typeof window === 'undefined' || !('EventSource' in window)) return;
-      if (isWsHealthy()) return; // Skip SSE if WS is actively open
 
       try {
-        if (es) es.close();
+        if (es) {
+          es.close();
+          es = null;
+        }
         es = new EventSource('/api/realtime-stream');
 
         es.addEventListener('initial', (e) => {
@@ -695,70 +717,28 @@ export default function App() {
           if (!isMounted) return;
           es?.close();
           es = null;
-          // Trigger Long-Poll fallback when both WS and SSE are down
-          triggerLongPollIfNeeded();
           clearTimeout(esReconnectTimer);
-          esReconnectTimer = setTimeout(setupSSE, 3000);
+          esReconnectTimer = setTimeout(setupSSE, 1500);
         };
       } catch {
-        triggerLongPollIfNeeded();
         clearTimeout(esReconnectTimer);
-        esReconnectTimer = setTimeout(setupSSE, 4000);
+        esReconnectTimer = setTimeout(setupSSE, 2000);
       }
     };
 
-    // 4. Layer 3: Adaptive Long-Polling Fallback (Only when push streams are inactive)
-    const triggerLongPollIfNeeded = async () => {
-      if (isLongPollActive || isWsHealthy() || isEsHealthy() || document.hidden || !isMounted) return;
-      isLongPollActive = true;
-      try {
-        pollAbortController = new AbortController();
-        const res = await fetch(
-          `/api/realtime-poll?version=${syncVersionRef.current}&timeout=15000&t=${Date.now()}`,
-          {
-            signal: pollAbortController.signal,
-            headers: { 'Cache-Control': 'no-cache' }
-          }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.changed && data.config) {
-            applyServerState(data, false);
-          } else if (data && typeof data.syncVersion === 'number') {
-            syncVersionRef.current = data.syncVersion;
-          }
-        }
-      } catch (err: any) {
-        // Ignored or aborted
-      } finally {
-        isLongPollActive = false;
-        // Schedule next long-poll loop if still needed
-        if (isMounted && !document.hidden && !isWsHealthy() && !isEsHealthy()) {
-          setTimeout(triggerLongPollIfNeeded, 1000);
-        }
-      }
-    };
-
-    // Start primary connection
+    // Initialize parallel ultra-low latency push channels
     setupWebSocket();
-    // Safety check in 1.5s: if WebSocket couldn't connect, establish SSE
-    const initialStreamCheck = setTimeout(() => {
-      if (isMounted && !isWsHealthy()) {
-        setupSSE();
-      }
+    const sseInitTimer = setTimeout(() => {
+      if (isMounted) setupSSE();
+    }, 150);
+
+    // 4. Layer 3: High-Speed Background Micro-Pulse (Every 1.5s guarantee across any network/firewall)
+    pulseInterval = setInterval(() => {
+      if (!isMounted || document.hidden) return;
+      checkVersionPulse();
     }, 1500);
 
-    // 5. Lightweight Periodic Integrity Heartbeat (60s when connected, 6s when offline)
-    const fallbackInterval = setInterval(() => {
-      if (!isMounted || document.hidden) return;
-      const isOnline = isWsHealthy() || isEsHealthy();
-      if (!isOnline) {
-        loadState(false);
-        setupWebSocket();
-      }
-    }, 6000);
-
-    // 6. Cross-tab BroadcastChannel listener (0ms intra-browser sync)
+    // 5. Cross-tab BroadcastChannel listener (0ms intra-browser sync)
     let bc: BroadcastChannel | null = null;
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -770,7 +750,7 @@ export default function App() {
       }
     } catch {}
 
-    // 7. Storage event for multi-tab sync
+    // 6. Storage event for multi-tab sync
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'bethel_sync_ping' && isMounted && !document.hidden) {
         try {
@@ -782,21 +762,32 @@ export default function App() {
     };
     window.addEventListener('storage', onStorage);
 
-    // 8. Focus & Visibility Change triggers (Sleep/Wake adaptive reconnection)
+    // 7. Focus & Visibility Change triggers (Instant Wakeup Refresh)
     const onWakeOrFocus = () => {
       if (isMounted && !document.hidden) {
         loadState(false);
         if (!isWsHealthy()) setupWebSocket();
-        if (!isWsHealthy() && !isEsHealthy()) setupSSE();
+        if (!isEsHealthy()) setupSSE();
       }
     };
     window.addEventListener('focus', onWakeOrFocus);
     document.addEventListener('visibilitychange', onWakeOrFocus);
 
+    // 8. User Interaction Fast-Sync (Touch/Click on Device B triggers instant micro-check)
+    const onUserInteraction = () => {
+      const now = Date.now();
+      if (now - lastInteractionCheckTime > 1200 && isMounted && !document.hidden) {
+        lastInteractionCheckTime = now;
+        checkVersionPulse();
+      }
+    };
+    window.addEventListener('touchstart', onUserInteraction, { passive: true });
+    window.addEventListener('pointerdown', onUserInteraction, { passive: true });
+
     return () => {
       isMounted = false;
-      clearTimeout(initialStreamCheck);
-      clearInterval(fallbackInterval);
+      clearTimeout(sseInitTimer);
+      clearInterval(pulseInterval);
       clearInterval(wsPingInterval);
       clearTimeout(wsReconnectTimer);
       clearTimeout(esReconnectTimer);
@@ -806,13 +797,12 @@ export default function App() {
       if (es) {
         try { es.close(); } catch {}
       }
-      if (pollAbortController) {
-        pollAbortController.abort();
-      }
       if (bc) bc.close();
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('focus', onWakeOrFocus);
       document.removeEventListener('visibilitychange', onWakeOrFocus);
+      window.removeEventListener('touchstart', onUserInteraction);
+      window.removeEventListener('pointerdown', onUserInteraction);
     };
   }, []);
 

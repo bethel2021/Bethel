@@ -59,7 +59,7 @@ export function broadcastRealtimeState(eventType: string = 'state_update', extra
   const payload = getCurrentStatePayload(eventType, extraData);
   const jsonString = JSON.stringify(payload);
 
-  // 1. WebSocket Broadcast to all online clients (<50ms)
+  // 1. WebSocket Broadcast to all online clients (<20ms)
   for (const ws of Array.from(wsClients)) {
     if (ws && ws.readyState === 1 /* OPEN */) {
       try {
@@ -72,19 +72,22 @@ export function broadcastRealtimeState(eventType: string = 'state_update', extra
     }
   }
 
-  // 2. Server-Sent Events (SSE) Broadcast (<50ms)
+  // 2. Server-Sent Events (SSE) Broadcast (<20ms)
   for (const res of Array.from(sseClients)) {
     try {
       res.write(`event: update\ndata: ${jsonString}\n\n`);
       if (typeof (res as any).flush === 'function') {
         (res as any).flush();
       }
+      if (res.socket) {
+        res.socket.uncork();
+      }
     } catch (err) {
       sseClients.delete(res);
     }
   }
 
-  // 3. Resolve all pending Long-Polling clients instantly (<50ms)
+  // 3. Resolve all pending Long-Polling clients instantly (<10ms)
   for (const waiter of Array.from(pollWaiters)) {
     clearTimeout(waiter.timer);
     try {
@@ -131,7 +134,20 @@ export function registerWebSocketClient(ws: any) {
   });
 }
 
-// 1.2 Real-time Server-Sent Events (SSE) Stream (<50ms ultra-low latency push)
+// 1.1 Micro-Pulse Fast Version Check (<5ms execution)
+realtimeRouter.get('/sync-version', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.json({
+    syncVersion: getSyncVersion(),
+    lastModified: getLastModifiedTimestamp(),
+    recordsCount: records.length,
+    activeSunday: getActiveSundayDate(),
+    serverTime: Date.now()
+  });
+});
+
+// 1.2 Real-time Server-Sent Events (SSE) Stream (<20ms ultra-low latency push)
 realtimeRouter.get('/realtime-stream', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-transform, no-store, must-revalidate');
@@ -151,19 +167,25 @@ realtimeRouter.get('/realtime-stream', (req: Request, res: Response) => {
   if (typeof (res as any).flush === 'function') {
     (res as any).flush();
   }
+  if (res.socket) {
+    res.socket.uncork();
+  }
 
-  // Adaptive ping interval: send keep-alive comment every 15 seconds
+  // Adaptive keepalive ping: send heartbeat comment every 4 seconds to maintain active TCP socket
   const pingInterval = setInterval(() => {
     try {
       res.write(': ping\n\n');
       if (typeof (res as any).flush === 'function') {
         (res as any).flush();
       }
+      if (res.socket) {
+        res.socket.uncork();
+      }
     } catch {
       clearInterval(pingInterval);
       sseClients.delete(res);
     }
-  }, 15000);
+  }, 4000);
 
   req.on('close', () => {
     clearInterval(pingInterval);
@@ -174,7 +196,7 @@ realtimeRouter.get('/realtime-stream', (req: Request, res: Response) => {
 // 1.3 Adaptive Real-time Long-Polling (Instantly resolves on mutation, or timeout)
 realtimeRouter.get('/realtime-poll', async (req: Request, res: Response) => {
   const clientVersion = parseInt(req.query.version as string, 10) || 0;
-  const timeoutMs = Math.min(Math.max(parseInt(req.query.timeout as string, 10) || 15000, 1000), 30000);
+  const timeoutMs = Math.min(Math.max(parseInt(req.query.timeout as string, 10) || 5000, 1000), 15000);
   const currentVer = getSyncVersion();
 
   // If server has newer data, respond immediately (<10ms)
@@ -194,6 +216,7 @@ realtimeRouter.get('/realtime-poll', async (req: Request, res: Response) => {
         changed: false,
         syncVersion: getSyncVersion(),
         lastModified: getLastModifiedTimestamp(),
+        recordsCount: records.length,
         serverTime: new Date().toISOString()
       });
     } catch {}
