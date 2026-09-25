@@ -26,11 +26,11 @@ import {
   syncVersion,
   lastModifiedTimestamp,
   getSyncVersion,
+  bumpSyncVersion,
   getLastModifiedTimestamp,
   mergeClientData,
   onDataChange,
   notifyDataChange,
-  bumpSyncVersion,
   scheduleSupabaseSnapshotSave,
   teachers,
   deletedRecordKeys,
@@ -41,7 +41,6 @@ import {
   comparePassword,
   dataStore
 } from './dataStore.js';
-import { supabaseUpsertAttendanceRecord } from './supabaseDb.js';
 import { isGeminiConfigured, generateDevotionalOrSummary } from './geminiService.js';
 
 const app = express();
@@ -492,13 +491,15 @@ apiRouter.post('/cloud-sync', async (req: Request, res: Response) => {
     if (!payload || typeof payload !== 'object') {
       return res.status(400).json({ error: '无效的同步数据格式' });
     }
-    await dataStore.initOrLoadDataAsync(true);
+    await dataStore.initOrLoadDataAsync(false);
     const merged = mergeClientData(payload);
-    await saveDataToSupabase();
+    notifyDataChange();
+    scheduleSupabaseSnapshotSave(2000);
     res.json({
       success: true,
       message: '多设备终端云端数据已成功双向同步！',
       ...merged,
+      syncVersion: getSyncVersion(),
       supabaseConnected: isSupabaseConfigured(),
       database: isSupabaseConfigured() ? 'supabase-postgresql' : 'local-cache-migration',
       storageEngine: isSupabaseConfigured() ? 'Supabase PostgreSQL (Official Persistent Database)' : 'Local File (Migration & Offline Fallback)',
@@ -930,40 +931,36 @@ apiRouter.post('/batch-checkin', async (req: Request, res: Response) => {
     targetStudents.forEach(stu => {
       removeDeletedRecordKey(`${stu.id}_${targetDate}`);
       const existingIdx = records.findIndex(r => r.studentId === stu.id && r.date === targetDate);
-      const recId = existingIdx !== -1 ? records[existingIdx].id : `rec-${targetDate}-${stu.id}-${Date.now()}`;
-      removeDeletedRecordKey(recId);
-
-      const recordItem: AttendanceRecord = {
-        id: recId,
-        studentId: stu.id,
-        studentName: stu.name,
-        classId: stu.classId,
-        date: targetDate,
-        timestamp: now.toISOString(),
-        timeStr,
-        status: finalStatus,
-        method: 'manual_teacher',
-        memoryVerseCompleted: systemConfig.defaultMemoryVerseChecked,
-        offeringCompleted: systemConfig.defaultOfferingChecked,
-        isTestMode: systemConfig.testMode ? true : undefined
-      };
-
       if (existingIdx !== -1) {
-        records[existingIdx] = recordItem;
+        records[existingIdx].status = finalStatus;
       } else {
-        records.push(recordItem);
+        records.push({
+          id: `rec-${targetDate}-${stu.id}-${Date.now()}`,
+          studentId: stu.id,
+          studentName: stu.name,
+          classId: stu.classId,
+          date: targetDate,
+          timestamp: now.toISOString(),
+          timeStr,
+          status: finalStatus,
+          method: 'manual_teacher',
+          memoryVerseCompleted: systemConfig.defaultMemoryVerseChecked,
+          offeringCompleted: systemConfig.defaultOfferingChecked
+        });
       }
-      supabaseUpsertAttendanceRecord(recordItem).catch(() => {});
       updatedCount++;
     });
 
-    bumpSyncVersion();
     notifyDataChange();
-    saveDataToFile().catch(() => {});
-    scheduleSupabaseSnapshotSave(1500);
-    broadcastRealtimeState('records_updated');
+    scheduleSupabaseSnapshotSave(2000);
 
-    res.json({ success: true, updatedCount, records, message: `已成功为 ${updatedCount} 位学员登记到校！` });
+    res.json({
+      success: true,
+      count: updatedCount,
+      syncVersion: getSyncVersion(),
+      records,
+      message: `已成功为 ${updatedCount} 位学员登记到校！`
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1306,53 +1303,8 @@ apiRouter.post('/config', async (req: Request, res: Response) => {
     }
 
     const updates = req.body;
-    const { config, purgedTestRecordsCount } = await dataStore.saveSystemConfig(updates);
-    
-    if (purgedTestRecordsCount > 0) {
-      broadcastRealtimeState('records_updated');
-    }
-    broadcastRealtimeState('config_updated');
-
-    let msg = '系统设置与默认选项已成功保存！';
-    if (updates.testMode === false) {
-      msg = `已退出测试模式并恢复正常模式！已自动清理测试期间产生的 ${purgedTestRecordsCount} 条测试签到数据，保留正常模式下的所有正式签到记录。`;
-    } else if (purgedTestRecordsCount > 0) {
-      msg = `设置已保存，已重置清理 ${purgedTestRecordsCount} 条测试模式下的签到数据。`;
-    }
-
-    res.json({ 
-      success: true, 
-      config, 
-      records: dataStore.records,
-      purgedTestRecordsCount,
-      message: msg 
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Purge test mode records manually - 仅限总管理员
-apiRouter.post('/purge-test-records', async (req: Request, res: Response) => {
-  try {
-    const auth = verifySuperAdminPermission(req);
-    if (!auth.allowed) {
-      return res.status(403).json({ error: auth.message });
-    }
-
-    const count = await dataStore.purgeTestModeRecords();
-    if (count > 0) {
-      broadcastRealtimeState('records_updated');
-    }
-
-    res.json({
-      success: true,
-      purgedCount: count,
-      records: dataStore.records,
-      message: count > 0 
-        ? `已成功清理重置 ${count} 条在测试模式下产生的测试签到数据！保留所有正常模式下的正式记录。`
-        : '当前没有需要在测试模式下清理的数据。'
-    });
+    await dataStore.saveSystemConfig(updates);
+    res.json({ success: true, config: systemConfig, message: '系统设置与默认选项已成功保存！' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1644,7 +1596,7 @@ app.use('/api', (req: Request, res: Response) => {
     error: 'Endpoint not found',
     path: req.url,
     method: req.method,
-    validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/teachers', '/api/config', '/api/purge-test-records', '/api/ai/status', '/api/ai/generate']
+    validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/teachers', '/api/config', '/api/ai/status', '/api/ai/generate']
   });
 });
 

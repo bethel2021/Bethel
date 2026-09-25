@@ -216,6 +216,12 @@ export function notifyDataChange() {
   }
 }
 
+export function bumpSyncVersion(): number {
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  return syncVersion;
+}
+
 export let lastSupabaseFetchTime = 0;
 
 export async function saveDataToSupabase(): Promise<boolean> {
@@ -1171,15 +1177,26 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
 }
 
 export async function deleteClass(id: string): Promise<boolean> {
-  const cls = classes.find(c => c.id === id || c.name === id);
-  if (!cls) return false;
-  const clsId = cls.id;
-  const clsName = cls.name;
+  await initOrLoadDataAsync(false);
+  const clsIdx = classes.findIndex(c => c.id === id || c.name === id);
+  if (clsIdx === -1) return false;
 
-  const enrolledStudentIds = students.filter(s => s.classId === clsId).map(s => s.id);
-  setStudents(students.filter(s => s.classId !== clsId));
-  setRecords(records.filter(r => r.classId !== clsId && !enrolledStudentIds.includes(r.studentId)));
-  setClasses(classes.filter(c => c.id !== clsId && c.name !== clsName));
+  const [cls] = classes.splice(clsIdx, 1);
+  const clsId = cls.id;
+
+  const enrolledStudentIds = new Set(students.filter(s => s.classId === clsId).map(s => s.id));
+  const remainingStudents = students.filter(s => s.classId !== clsId);
+  students.length = 0;
+  students.push(...remainingStudents);
+
+  const classRecords = records.filter(r => r.classId === clsId || enrolledStudentIds.has(r.studentId));
+  for (const r of classRecords) {
+    if (r.id) deletedRecordKeys.add(r.id);
+    deletedRecordKeys.add(`${r.studentId}_${r.date}`);
+  }
+  const remainingRecords = records.filter(r => r.classId !== clsId && !enrolledStudentIds.has(r.studentId));
+  records.length = 0;
+  records.push(...remainingRecords);
 
   // Clear classId from any teachers associated with the deleted class
   teachers.forEach(t => {
@@ -1257,16 +1274,18 @@ export async function saveStudentsBatch(newStudents: Student[]): Promise<Student
 }
 
 export async function updateStudent(id: string, updates: Partial<Student>): Promise<Student | null> {
+  await initOrLoadDataAsync(false);
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
   const updated: Student = { ...students[existingIdx], ...updates };
   students[existingIdx] = updated;
   if (updates.name || updates.classId) {
-    setRecords(records.map(r => r.studentId === updated.id ? {
-      ...r,
-      studentName: updates.name || r.studentName,
-      classId: updates.classId || r.classId
-    } : r));
+    records.forEach(r => {
+      if (r.studentId === updated.id) {
+        if (updates.name) r.studentName = updates.name;
+        if (updates.classId) r.classId = updates.classId;
+      }
+    });
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
@@ -1277,14 +1296,25 @@ export async function updateStudent(id: string, updates: Partial<Student>): Prom
 }
 
 export async function deleteStudent(id: string): Promise<Student | null> {
+  await initOrLoadDataAsync(false);
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
-  const removed = students[existingIdx];
-  setStudents(students.filter(s => s.id !== removed.id && s.memberCode !== removed.memberCode));
-  setRecords(records.filter(r => r.studentId !== removed.id && r.studentName !== removed.name));
+  const [removed] = students.splice(existingIdx, 1);
+  
+  // Clean up all attendance records for this student and track deleted keys
+  const studentRecords = records.filter(r => r.studentId === removed.id || r.studentName === removed.name);
+  for (const r of studentRecords) {
+    if (r.id) deletedRecordKeys.add(r.id);
+    deletedRecordKeys.add(`${r.studentId}_${r.date}`);
+  }
+  const remainingRecords = records.filter(r => r.studentId !== removed.id && r.studentName !== removed.name);
+  records.length = 0;
+  records.push(...remainingRecords);
+
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
+
   supabaseDeleteStudent(removed.id).catch(() => {});
   scheduleSupabaseSnapshotSave(2000);
   return removed;
@@ -1620,6 +1650,7 @@ export const dataStore = {
   initOrLoadDataAsync,
   saveDataToSupabase,
   mergeClientData,
+  bumpSyncVersion,
   getLastSupabaseFetchTime
 };
 

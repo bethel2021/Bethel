@@ -302,12 +302,14 @@ export default function App() {
       const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => c.isHiddenFromHome === true).map((c: any) => c.id as string));
       saveLocalHiddenClassIds(newHiddenSet);
 
-      mergedClassesForCache = mergedClasses;
-      setClasses(prev => isDataEqual(prev, mergedClasses) ? prev : mergedClasses);
+      const filteredClasses = mergedClasses.filter((c: any) => !recentDeletionsRef.current.has(c.id));
+      mergedClassesForCache = filteredClasses;
+      setClasses(prev => isDataEqual(prev, filteredClasses) ? prev : filteredClasses);
     }
 
     if (Array.isArray(data.students)) {
-      setStudents(prev => isDataEqual(prev, data.students) ? prev : data.students);
+      const filteredStudents = data.students.filter((s: any) => !recentDeletionsRef.current.has(s.id));
+      setStudents(prev => isDataEqual(prev, filteredStudents) ? prev : filteredStudents);
     }
 
     if (Array.isArray(data.teachers)) {
@@ -331,62 +333,69 @@ export default function App() {
       setActiveSunday(prev => prev === data.activeSunday ? prev : data.activeSunday);
     }
 
-    // Build active deletedSet reconciled against incoming server data
-    let activeDeletedSet = getLocalDeletedRecordKeys();
     if (Array.isArray(data.deletedRecordKeys)) {
-      activeDeletedSet = new Set(data.deletedRecordKeys.filter((k: any) => typeof k === 'string' && k));
-    }
-
-    if (Array.isArray(data.records)) {
+      const serverDeletedKeys = new Set(data.deletedRecordKeys.filter((k: any) => typeof k === 'string' && k));
+      // Remove any keys of active incoming records from deleted keys
+      if (Array.isArray(data.records)) {
+        data.records.forEach((r: any) => {
+          if (r) {
+            if (r.id) {
+              serverDeletedKeys.delete(r.id);
+              removeLocalDeletedRecordKey(r.id);
+            }
+            if (r.studentId && r.date) {
+              serverDeletedKeys.delete(`${r.studentId}_${r.date}`);
+              removeLocalDeletedRecordKey(`${r.studentId}_${r.date}`);
+            }
+          }
+        });
+      }
+      try {
+        localStorage.setItem('bethel_deleted_record_keys', JSON.stringify(Array.from(serverDeletedKeys)));
+      } catch {}
+    } else if (Array.isArray(data.records)) {
       data.records.forEach((r: any) => {
         if (r) {
-          if (r.id) {
-            activeDeletedSet.delete(r.id);
-            removeLocalDeletedRecordKey(r.id);
-          }
-          if (r.studentId && r.date) {
-            activeDeletedSet.delete(`${r.studentId}_${r.date}`);
-            removeLocalDeletedRecordKey(`${r.studentId}_${r.date}`);
-          }
+          if (r.id) removeLocalDeletedRecordKey(r.id);
+          if (r.studentId && r.date) removeLocalDeletedRecordKey(`${r.studentId}_${r.date}`);
         }
       });
-      try {
-        localStorage.setItem('bethel_deleted_record_keys', JSON.stringify(Array.from(activeDeletedSet)));
-      } catch {}
     }
 
     let mergedRecordsForCache: AttendanceRecord[] | undefined;
     if (Array.isArray(data.records)) {
       const now = Date.now();
-      // Clean up mutations older than 3s or that have already settled in incoming server data
+      // Clean up mutations older than 8s or that have already settled in incoming server data
       for (const [key, meta] of recentRecordMutationsRef.current.entries()) {
         const [sId, dStr] = key.split('_KEY_SPLIT_');
         const serverRec = data.records.find((r: any) => r.studentId === sId && r.date === dStr);
         if (meta.record) {
           if (serverRec && serverRec.status === meta.record.status) {
             recentRecordMutationsRef.current.delete(key);
-          } else if (now - meta.timestamp > 3000) {
+          } else if (now - meta.timestamp > 8000) {
             recentRecordMutationsRef.current.delete(key);
           }
         } else {
           if (!serverRec) {
             recentRecordMutationsRef.current.delete(key);
-          } else if (now - meta.timestamp > 3000) {
+          } else if (now - meta.timestamp > 8000) {
             recentRecordMutationsRef.current.delete(key);
           }
         }
       }
 
       setRecords(prev => {
+        const deletedSet = getLocalDeletedRecordKeys();
         let incomingRecords: AttendanceRecord[] = data.records.filter((r: any) => 
-          !activeDeletedSet.has(r.id) && !activeDeletedSet.has(`${r.studentId}_${r.date}`)
+          !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
         );
 
-        // Anti-Rollback & Anti-Bounce Protection for active in-flight local mutations
+        // Anti-Rollback & Anti-Bounce Protection:
+        // Merge recent optimistic mutations (within 8s window or currently in flight)
         if (recentRecordMutationsRef.current.size > 0 || pendingMutationsRef.current.size > 0) {
           const merged = [...incomingRecords];
 
-          // 1. Apply recent local mutations
+          // 1. Apply recent local mutations (highest priority against stale server snapshots)
           recentRecordMutationsRef.current.forEach((meta, key) => {
             const [sId, dStr] = key.split('_KEY_SPLIT_');
             const idx = merged.findIndex(r => r.studentId === sId && r.date === dStr);
@@ -409,7 +418,9 @@ export default function App() {
             }
           });
 
-          incomingRecords = merged;
+          incomingRecords = merged.filter((r: any) => 
+            !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
+          );
         }
 
         mergedRecordsForCache = incomingRecords;
@@ -905,88 +916,90 @@ export default function App() {
     const mutationKey = `${data.studentId}_KEY_SPLIT_${data.date}`;
     pendingMutationsRef.current.add(mutationKey);
 
-    const student = students.find(s => s.id === data.studentId);
-    const studentName = student ? student.name : '';
-    const studentClassId = student ? student.classId : '';
-    const nowTimeParts = getRomeTimeParts();
-    const nowTimeStr = nowTimeParts.timeStr;
+    let optRecordCreated: AttendanceRecord | null = null;
 
-    let finalStatus = data.status;
-    if (finalStatus === 'present') {
-      let isLate = false;
-      // 1. Check if late rule is enabled and exceeds late threshold (e.g. 15:00)
-      if (config.enableLateRule) {
-        const [lateH, lateM] = (config.lateThresholdTime || '15:00').split(':').map(Number);
-        if (nowTimeParts.hour > lateH || (nowTimeParts.hour === lateH && nowTimeParts.minute > lateM)) {
-          isLate = true;
+    const updateLocally = () => {
+      setRecords(prev => {
+        const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
+
+        // If absent, cleanly remove existing record from list
+        if (data.status === 'absent') {
+          addLocalDeletedRecordKey(studentDateKey);
+          if (existingIdx !== -1) {
+            addLocalDeletedRecordKey(prev[existingIdx].id);
+          }
+          const updated = existingIdx !== -1 ? prev.filter((_, i) => i !== existingIdx) : prev;
+          saveLocalData({ records: updated });
+          return updated;
         }
-      }
-      // 2. Check if checkin time exceeds the background check-in end deadline (e.g. 12:30), still mark as late
-      if (config.checkinEndTime) {
-        const [endH, endM] = config.checkinEndTime.split(':').map(Number);
-        if (!isNaN(endH) && !isNaN(endM)) {
-          if (nowTimeParts.hour > endH || (nowTimeParts.hour === endH && nowTimeParts.minute > endM)) {
-            isLate = true;
+
+        removeLocalDeletedRecordKey(studentDateKey);
+        removeLocalDeletedRecordKey(data.studentId);
+        if (existingIdx !== -1) {
+          removeLocalDeletedRecordKey(prev[existingIdx].id);
+        }
+
+        const student = students.find(s => s.id === data.studentId);
+        const studentName = student ? student.name : '';
+        const studentClassId = student ? student.classId : '';
+        const nowTimeParts = getRomeTimeParts();
+        const nowTimeStr = nowTimeParts.timeStr;
+
+        let finalStatus = data.status;
+        if (finalStatus === 'present') {
+          let isLate = false;
+          // 1. Check if late rule is enabled and exceeds late threshold (e.g. 15:00)
+          if (config.enableLateRule) {
+            const [lateH, lateM] = (config.lateThresholdTime || '15:00').split(':').map(Number);
+            if (nowTimeParts.hour > lateH || (nowTimeParts.hour === lateH && nowTimeParts.minute > lateM)) {
+              isLate = true;
+            }
+          }
+          // 2. Check if checkin time exceeds the background check-in end deadline (e.g. 12:30), still mark as late
+          if (config.checkinEndTime) {
+            const [endH, endM] = config.checkinEndTime.split(':').map(Number);
+            if (!isNaN(endH) && !isNaN(endM)) {
+              if (nowTimeParts.hour > endH || (nowTimeParts.hour === endH && nowTimeParts.minute > endM)) {
+                isLate = true;
+              }
+            }
+          }
+          if (isLate) {
+            finalStatus = 'late';
           }
         }
-      }
-      if (isLate) {
-        finalStatus = 'late';
-      }
-    }
 
-    const existingRec = records.find(r => r.studentId === data.studentId && r.date === data.date);
-    const optRecordCreated: AttendanceRecord | null = data.status === 'absent' ? null : {
-      id: existingRec ? existingRec.id : `rec-${data.date}-${data.studentId}-${Date.now()}`,
-      studentId: data.studentId,
-      studentName,
-      classId: studentClassId,
-      date: data.date,
-      timestamp: new Date().toISOString(),
-      timeStr: nowTimeStr,
-      status: finalStatus,
-      method: 'manual_teacher',
-      memoryVerseCompleted: !!data.memoryVerseCompleted,
-      offeringCompleted: data.offeringCompleted,
-      notes: data.notes,
-      isTestMode: config.testMode ? true : undefined
-    };
+        const newRecord: AttendanceRecord = {
+          id: existingIdx !== -1 ? prev[existingIdx].id : `rec-${data.date}-${data.studentId}-${Date.now()}`,
+          studentId: data.studentId,
+          studentName,
+          classId: studentClassId,
+          date: data.date,
+          timestamp: new Date().toISOString(),
+          timeStr: nowTimeStr,
+          status: finalStatus,
+          method: 'manual_teacher',
+          memoryVerseCompleted: !!data.memoryVerseCompleted,
+          offeringCompleted: data.offeringCompleted,
+          notes: data.notes
+        };
 
-    // 1. Optimistically register mutation ref synchronously BEFORE setRecords
-    recentRecordMutationsRef.current.set(mutationKey, {
-      record: optRecordCreated,
-      timestamp: Date.now()
-    });
-
-    if (data.status === 'absent') {
-      addLocalDeletedRecordKey(studentDateKey);
-      if (existingRec) {
-        addLocalDeletedRecordKey(existingRec.id);
-      }
-    } else {
-      removeLocalDeletedRecordKey(studentDateKey);
-      removeLocalDeletedRecordKey(data.studentId);
-      if (existingRec) {
-        removeLocalDeletedRecordKey(existingRec.id);
-      }
-    }
-
-    // 2. Optimistically update React state
-    setRecords(prev => {
-      const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
-      if (data.status === 'absent') {
-        const updated = existingIdx !== -1 ? prev.filter((_, i) => i !== existingIdx) : prev;
+        optRecordCreated = newRecord;
+        const updated = existingIdx !== -1 
+          ? prev.map((r, i) => i === existingIdx ? newRecord : r)
+          : [...prev, newRecord];
+        
         saveLocalData({ records: updated });
         return updated;
-      }
+      });
+    };
 
-      const updatedRecord = optRecordCreated!;
-      const updated = existingIdx !== -1 
-        ? prev.map((r, i) => i === existingIdx ? updatedRecord : r)
-        : [...prev, updatedRecord];
-      
-      saveLocalData({ records: updated });
-      return updated;
+    // 1. Optimistically update local state for instantaneous UI response
+    updateLocally();
+
+    recentRecordMutationsRef.current.set(mutationKey, {
+      record: data.status === 'absent' ? null : optRecordCreated,
+      timestamp: Date.now()
     });
 
     notifyCrossTabSync();
@@ -1045,13 +1058,6 @@ export default function App() {
         saveLocalData({ config: merged });
         return merged;
       });
-      if (updated.testMode === false) {
-        setRecords(prev => {
-          const kept = prev.filter(r => !r.isTestMode);
-          saveLocalData({ records: kept });
-          return kept;
-        });
-      }
       notifyCrossTabSync();
     };
 
@@ -1073,15 +1079,7 @@ export default function App() {
           setConfig(data.config);
           saveLocalData({ config: data.config });
         }
-        if (Array.isArray(data.records)) {
-          setRecords(data.records);
-          saveLocalData({ records: data.records });
-        }
-        if (data.message) {
-          showSyncNotification(`✅ ${data.message}`);
-        } else {
-          showSyncNotification('✅ 系统设置已通过双向状态校验并成功保存！');
-        }
+        showSyncNotification('✅ 系统设置已通过双向状态校验并成功保存！');
       }
     } catch {
       // Offline fallback: already preserved locally in step 1
@@ -1384,13 +1382,17 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number' && data.syncVersion < syncVersionRef.current) {
+          return;
+        }
         if (typeof data.syncVersion === 'number') {
           syncVersionRef.current = data.syncVersion;
         }
         if (Array.isArray(data.students) && data.students.length > 0) {
-          setStudents(data.students);
-          saveLocalData({ students: data.students });
-        } else if (data.student) {
+          const filtered = data.students.filter((s: any) => !recentDeletionsRef.current.has(s.id));
+          setStudents(filtered);
+          saveLocalData({ students: filtered });
+        } else if (data.student && !recentDeletionsRef.current.has(data.student.id)) {
           setStudents(prev => {
             const exists = prev.some(s => s.id === data.student.id);
             const updated = exists ? prev.map(s => s.id === data.student.id ? data.student : s) : [...prev, data.student];
@@ -1450,12 +1452,16 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number' && data.syncVersion < syncVersionRef.current) {
+          return;
+        }
         if (typeof data.syncVersion === 'number') {
           syncVersionRef.current = data.syncVersion;
         }
         if (Array.isArray(data.students) && data.students.length > 0) {
-          setStudents(data.students);
-          saveLocalData({ students: data.students });
+          const filtered = data.students.filter((s: any) => !recentDeletionsRef.current.has(s.id));
+          setStudents(filtered);
+          saveLocalData({ students: filtered });
         }
         showSyncNotification(`✅ 批量录入学员成功并同步！`);
       }
@@ -1497,12 +1503,16 @@ export default function App() {
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setIsServerAvailable(true);
+        if (typeof data.syncVersion === 'number' && data.syncVersion < syncVersionRef.current) {
+          return;
+        }
         if (typeof data.syncVersion === 'number') {
           syncVersionRef.current = data.syncVersion;
         }
         if (Array.isArray(data.students)) {
-          setStudents(data.students);
-          saveLocalData({ students: data.students });
+          const filtered = data.students.filter((s: any) => !recentDeletionsRef.current.has(s.id));
+          setStudents(filtered);
+          saveLocalData({ students: filtered });
         }
         showSyncNotification('✅ 学员档案已成功删除并同步！');
       }
