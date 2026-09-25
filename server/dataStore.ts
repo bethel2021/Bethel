@@ -488,21 +488,12 @@ export function loadFromDisk(): boolean {
         adminAccounts.length = 0;
         adminAccounts.push(...data.adminAccounts);
       }
-      if (Array.isArray(data.teachers)) {
+      if (Array.isArray(data.teachers) && data.teachers.length >= 27) {
         teachers.length = 0;
         teachers.push(...data.teachers);
       } else {
-        const defaultTeachers = [
-          { id: 't-1', name: '春来', gender: 'girl', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-2', name: '秋娟', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-3', name: '若雪', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-4', name: '上好', gender: 'girl', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-5', name: '雪成', gender: 'girl', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-6', name: '任志安', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '班主任', joinDate: '2026-01-01' },
-          { id: 't-7', name: '毛东丽', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '班主任', joinDate: '2026-01-01' }
-        ];
         teachers.length = 0;
-        teachers.push(...defaultTeachers);
+        teachers.push(...initialTeachers);
       }
       if (data.systemConfig) {
         const mergedConfig = { ...initialSystemConfig, ...data.systemConfig, hiddenClassIds: Array.from(hiddenSet) };
@@ -527,17 +518,8 @@ export function loadFromDisk(): boolean {
     }
 
     if (!fs.existsSync(filePath)) {
-      const defaultTeachers = [
-        { id: 't-1', name: '春来', gender: 'girl', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
-        { id: 't-2', name: '秋娟', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '班主任', joinDate: '2026-01-01' },
-        { id: 't-3', name: '若雪', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '班主任', joinDate: '2026-01-01' },
-        { id: 't-4', name: '上好', gender: 'girl', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '班主任', joinDate: '2026-01-01' },
-        { id: 't-5', name: '雪成', gender: 'girl', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '班主任', joinDate: '2026-01-01' },
-        { id: 't-6', name: '任志安', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '班主任', joinDate: '2026-01-01' },
-        { id: 't-7', name: '毛东丽', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '班主任', joinDate: '2026-01-01' }
-      ];
       teachers.length = 0;
-      teachers.push(...defaultTeachers);
+      teachers.push(...initialTeachers);
     }
   } catch (err) {
     console.warn('[Storage Notice] Could not read disk cache:', err);
@@ -553,22 +535,20 @@ export async function initOrLoadData() {
   isInitialized = true;
 
   const loaded = loadFromDisk();
-  if (loaded) {
-    sanitizeYageData();
-    await initOrLoadDataAsync().catch(() => {});
-    return;
-  }
+  sanitizeYageData();
 
-  // If Supabase is configured, fetch authoritative cloud data BEFORE generating fallback mock data
+  // If Supabase is configured, fetch authoritative cloud data with force=true on server startup
   if (isSupabaseConfigured()) {
     console.log('[Supabase DB] Supabase is configured. Pre-loading cloud database before accepting requests...');
-    sanitizeYageData();
-    await initOrLoadDataAsync().catch(() => {});
+    await initOrLoadDataAsync(true).catch((err) => {
+      console.warn('[Supabase DB] Pre-loading cloud database failed, using local fallback:', err);
+    });
   } else {
     // If no file exists and no Supabase is configured, initialize default records in memory
-    console.log('[Storage DB] Supabase not configured. Initializing local in-memory records...');
-    sanitizeYageData();
-    generateHistoricalRecords();
+    if (!loaded) {
+      console.log('[Storage DB] Supabase not configured. Initializing local in-memory records...');
+      generateHistoricalRecords();
+    }
   }
 }
 
@@ -578,8 +558,9 @@ export async function initOrLoadDataAsync(force = false) {
     isInitialized = true;
   }
 
-  // Fast-path: If memory state is already hot and valid, do not block API calls on network DB reads unless forced
-  if (!force && isInitialized && (students.length > 0 || classes.length > 0)) {
+  // Fast-path: Only skip if Supabase was already fetched recently (within 15 seconds)
+  const now = Date.now();
+  if (!force && lastSupabaseFetchTime > 0 && (now - lastSupabaseFetchTime < 15000)) {
     return;
   }
 
@@ -669,9 +650,13 @@ export async function initOrLoadDataAsync(force = false) {
             }
           }
         }
-        if (Array.isArray(cloudData.teachers) && cloudData.teachers.length > 0) {
+        if (Array.isArray(cloudData.teachers) && cloudData.teachers.length >= 27) {
           teachers.length = 0;
           teachers.push(...cloudData.teachers);
+        } else {
+          teachers.length = 0;
+          teachers.push(...initialTeachers);
+          scheduleSupabaseSnapshotSave(2000);
         }
         const authoritativeHiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
         if (cloudData.systemConfig) {

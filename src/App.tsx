@@ -316,7 +316,18 @@ export default function App() {
     }
 
     if (Array.isArray(data.teachers)) {
-      setTeachers(prev => isDataEqual(prev, data.teachers) ? prev : data.teachers);
+      if (data.teachers.length >= 27) {
+        setTeachers(prev => isDataEqual(prev, data.teachers) ? prev : data.teachers);
+      } else if (data.teachers.length > 0) {
+        const existingMap = new Map(data.teachers.map((t: any) => [t.id || t.name, t]));
+        const merged = [...data.teachers];
+        for (const t of initialTeachers) {
+          if (!existingMap.has(t.id) && !existingMap.has(t.name)) {
+            merged.push(t);
+          }
+        }
+        setTeachers(prev => isDataEqual(prev, merged) ? prev : merged);
+      }
     }
 
     if (data.config && typeof data.config === 'object') {
@@ -533,8 +544,10 @@ export default function App() {
     setStudents(local.students);
     setActiveSunday(local.activeSunday);
     setRecords(local.records);
-    if (local.teachers && Array.isArray(local.teachers) && local.teachers.length > 0) {
+    if (local.teachers && Array.isArray(local.teachers) && local.teachers.length >= 27) {
       setTeachers(local.teachers);
+    } else {
+      setTeachers(initialTeachers);
     }
     const localAccounts = getLocalAccounts();
     setAccounts(localAccounts);
@@ -591,6 +604,18 @@ export default function App() {
       const rawHidden = localStorage.getItem('bethel_hidden_class_ids');
       if (rawHidden && (rawHidden.includes('class-1') || rawHidden.includes('class-2') || rawHidden.includes('class-5'))) {
         localStorage.removeItem('bethel_hidden_class_ids');
+      }
+    } catch {}
+
+    // One-time self-healing check: upgrade legacy 7-teacher cache to full 27 teachers
+    try {
+      const rawTeachers = localStorage.getItem('bethel_teachers');
+      if (rawTeachers) {
+        const parsed = JSON.parse(rawTeachers);
+        if (Array.isArray(parsed) && parsed.length < 27) {
+          localStorage.setItem('bethel_teachers', JSON.stringify(initialTeachers));
+          setTeachers(initialTeachers);
+        }
       }
     } catch {}
   }, []);

@@ -279,8 +279,14 @@ export function getLocalData() {
     if (rawTeachers) {
       try {
         const parsed = JSON.parse(rawTeachers);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed) && parsed.length >= 27) {
           teachers = parsed;
+        } else {
+          // Auto-upgrade legacy cache with fewer than 27 teachers to full 27 authoritative teachers
+          teachers = initialTeachers;
+          try {
+            localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(initialTeachers));
+          } catch {}
         }
       } catch {}
     }

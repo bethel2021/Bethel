@@ -8,7 +8,7 @@ import { createServer as createViteServer } from 'vite';
 import app, { registerWebSocketClient } from './server/app';
 import { initOrLoadData } from './server/dataStore';
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 async function startServer() {
   console.log('[Server Startup] Initializing data store...');
