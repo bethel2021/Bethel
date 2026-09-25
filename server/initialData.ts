@@ -16,7 +16,7 @@ export const initialClasses: ClassGroup[] = [
     id: 'class-1', 
     name: '小小班', 
     ageRange: '1-6岁', 
-    teacher: '春来', 
+    teacher: '黄春来', 
     subjectTeacher: '洁如,彩霞',
     classroom: '7号教室', 
     color: 'bg-emerald-500',
@@ -189,7 +189,7 @@ export const initialAdminAccounts: ServerAdminAccount[] = [
 
 // Initial Teachers for Bethel Church
 export const initialTeachers: any[] = [
-  { id: 't-1', name: '胡春来', gender: 'girl', phone: '13888889999', wechat: '', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
+  { id: 't-1', name: '黄春来', gender: 'girl', phone: '13888889999', wechat: '', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
   { id: 't-997860', name: '戴洁如', gender: 'girl', phone: '', wechat: '', classId: 'class-1', roleTitle: '上课', joinDate: '2026-09-23' },
   { id: 't-030776', name: '梅彩霞', gender: 'girl', phone: '', wechat: '', classId: 'class-1', roleTitle: '上课', joinDate: '2026-09-23' },
   { id: 't-2', name: '戴秋娟', gender: 'girl', phone: '13812345672', wechat: '', classId: 'class-2', roleTitle: '班主任', joinDate: '2026-01-01' },

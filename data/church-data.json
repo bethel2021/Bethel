@@ -3,9 +3,9 @@
     "churchName": "伯特利教会",
     "schoolTitle": "主日学与团契IMS",
     "allowedDayOfWeek": 0,
-    "checkinStartTime": "11:30",
-    "checkinEndTime": "16:30",
-    "testMode": true,
+    "checkinStartTime": "08:30",
+    "checkinEndTime": "12:30",
+    "testMode": false,
     "currentYear": 2026,
     "currentSemester": "2026年秋季学期",
     "weeklyMemoryVerse": "雅各就给那地方起名叫伯特利。他说：这地方何等可畏！这不是别的，乃是神的殿，也是天的门。",
@@ -16,21 +16,19 @@
     "enableOfferingOption": false,
     "defaultOfferingChecked": false,
     "enableLateRule": true,
-    "lateThresholdTime": "15:30",
+    "lateThresholdTime": "09:30",
     "enableExcusedNote": true,
     "enableCheckinPopup": true,
-    "adminPassword": "$2b$10$D1YdbjVxQwxuIUDylyOSqu5fMGi0QySpIIckxqGFdtX/49MgaAX46",
-    "hiddenClassIds": [
-      "class-7"
-    ]
+    "adminPassword": "$2b$10$nsIWryOwy/qTiSlC4uX0Ze.2Zq5grPtPZBuLTvY/n5if6A8SyEd.O",
+    "hiddenClassIds": []
   },
   "classes": [
     {
       "id": "class-1",
       "name": "小小班",
       "ageRange": "1-6岁",
-      "teacher": "胡春来",
-      "subjectTeacher": "戴洁如、梅彩霞",
+      "teacher": "黄春来",
+      "subjectTeacher": "洁如,彩霞",
       "classroom": "7号教室",
       "color": "bg-emerald-500",
       "groupType": "sunday_school",
@@ -41,8 +39,8 @@
       "id": "class-2",
       "name": "小班",
       "ageRange": "7-8岁",
-      "teacher": "戴秋娟",
-      "subjectTeacher": "林雪峰、戴贴柔、姜勤洁",
+      "teacher": "秋娟",
+      "subjectTeacher": "雪峰,勤洁,贴柔",
       "classroom": "5号教室",
       "color": "bg-teal-500",
       "groupType": "sunday_school",
@@ -53,8 +51,8 @@
       "id": "class-3",
       "name": "中班",
       "ageRange": "9-10岁",
-      "teacher": "翁若雪",
-      "subjectTeacher": "徐约斯、陈怡欣、陈佩帆",
+      "teacher": "若雪",
+      "subjectTeacher": "约斯,怡欣,佩帆",
       "classroom": "6号教室",
       "color": "bg-amber-500",
       "groupType": "sunday_school",
@@ -65,8 +63,8 @@
       "id": "class-4",
       "name": "大班",
       "ageRange": "11-12岁",
-      "teacher": "陈上好",
-      "subjectTeacher": "李琴玲、徐依蕾、陈恩溢",
+      "teacher": "上好",
+      "subjectTeacher": "琴玲,依蕾,恩溢",
       "classroom": "3号教室",
       "color": "bg-orange-500",
       "groupType": "sunday_school",
@@ -77,8 +75,8 @@
       "id": "class-5",
       "name": "初中班",
       "ageRange": "13-14岁",
-      "teacher": "林雪成",
-      "subjectTeacher": "金若、陈洋洋、朱督军",
+      "teacher": "雪成",
+      "subjectTeacher": "金若,洋洋,督军",
       "classroom": "1号教室",
       "color": "bg-blue-500",
       "groupType": "sunday_school",
@@ -90,7 +88,7 @@
       "name": "高中班",
       "ageRange": "15-16岁",
       "teacher": "任志安",
-      "subjectTeacher": "傅丽敏、王显美、周妹",
+      "subjectTeacher": "陈师母,显美,周妹",
       "classroom": "2号教室",
       "color": "bg-indigo-500",
       "groupType": "sunday_school",
@@ -102,12 +100,12 @@
       "name": "以斯拉团契",
       "ageRange": "16-20岁",
       "teacher": "毛东丽",
-      "subjectTeacher": "陈海伟牧师、叶来俊、张国",
+      "subjectTeacher": "陈海伟牧师,来俊,张国",
       "classroom": "大堂",
       "color": "bg-purple-500",
       "groupType": "fellowship",
       "description": "「定志考究神道，立志行道教导」效法以斯拉专心考究遵行神律法的心志，在校园与职场中作得胜见证，同心服侍教会、传承信仰使命。",
-      "isHiddenFromHome": true
+      "isHiddenFromHome": false
     }
   ],
   "students": [
@@ -142,7 +140,7 @@
       "birthDate": "2012-03-04",
       "age": 14,
       "classId": "class-6",
-      "parentName": "固定家长测试_1790331234619",
+      "parentName": "柯献利",
       "parentPhone": "3778364308",
       "memberCode": "BTL-14",
       "joinDate": "2026-09-01"
@@ -784,46 +782,33 @@
   ],
   "adminAccounts": [
     {
+      "id": "acc-admin",
+      "username": "admin",
+      "displayName": "总管理员",
+      "role": "superadmin",
+      "password": "$2b$10$dEqBfCsYxoqCWst9CTSQYOJ0cA5P2.xht0oUZpuMWPf7q5RlCTNYG",
+      "createdAt": "2026-01-01T00:00:00+00:00"
+    },
+    {
+      "id": "acc-teacher",
+      "username": "teacher",
+      "displayName": "主日学上课老师",
+      "role": "teacher",
+      "password": "$2b$10$DuqliLP6pqgcH2SQsapGUes8c3/RekvDVMLbnIujMA9bkgSaguyoa",
+      "createdAt": "2026-01-01T00:00:00+00:00"
+    },
+    {
       "id": "acc-fellowship",
       "username": "fellowship",
       "displayName": "团契带领同工",
       "role": "fellowship_leader",
-      "password": "$2b$10$vYYdUoaK80zhv9NVx7Utte4GT7rxHxbYMR6ejg.0fKL7H4OsbCav6",
-      "createdAt": "2026-01-01T00:00:00+00:00",
-      "assignedClassId": "class-7"
-    },
-    {
-      "id": "acc-1790181054811-04sp",
-      "username": "btlczbls",
-      "displayName": "初中班老师",
-      "role": "teacher",
-      "password": "$2b$10$6B5SaZY4OO5tOYlBdDnkQeOl/ocvfxoFSwejI.wAsvYt4YKAXh6B.",
-      "createdAt": "2026-09-23T00:00:00+00:00",
-      "assignedClassId": "class-5"
-    },
-    {
-      "id": "acc-admin",
-      "username": "admin",
-      "displayName": "伯特利教会 • 总管理员",
-      "role": "superadmin",
-      "password": "$2b$10$bRWcPwYhjHDNZfxZV5Tp2.jraaUWpSz8Qh5X/3PZlavpAhAqPS1mq",
+      "password": "$2b$10$xCT2T3AGwvQW3RuEr4uPNOfab6KiQCLtKGXZ46lh0N5rTQiADCvVC",
       "createdAt": "2026-01-01T00:00:00+00:00"
-    },
-    {
-      "id": "acc-1790178050181-uh03",
-      "username": "btlgzbls",
-      "displayName": "高中班老师",
-      "role": "teacher",
-      "password": "$2b$10$kXrZrCI9sPs.rlpsZYTkgOmMVeyuRqvutumqQBYnVELu2Xs.Z1HoS",
-      "createdAt": "2026-09-23T00:00:00+00:00",
-      "assignedClassId": "class-6"
     }
   ],
   "activeSunday": "2026-09-27",
-  "syncVersion": 662,
-  "hiddenClassIds": [
-    "class-7"
-  ],
+  "syncVersion": 2,
+  "hiddenClassIds": [],
   "teachers": [
     {
       "id": "t-019975",
@@ -872,9 +857,8 @@
       "phone": "13888889999",
       "wechat": "",
       "classId": "class-1",
-      "roleTitle": "班级负责",
-      "joinDate": "2026-01-01",
-      "notes": "固定锁存测试_1790331234538"
+      "roleTitle": "班主任",
+      "joinDate": "2026-01-01"
     },
     {
       "id": "t-2",
@@ -1097,5 +1081,5 @@
       "joinDate": "2026-09-23"
     }
   ],
-  "updatedAt": "2026-09-25T10:13:55.242+00:00"
+  "updatedAt": "2026-09-25T10:23:41.931+00:00"
 }
