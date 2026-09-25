@@ -905,91 +905,88 @@ export default function App() {
     const mutationKey = `${data.studentId}_KEY_SPLIT_${data.date}`;
     pendingMutationsRef.current.add(mutationKey);
 
-    let optRecordCreated: AttendanceRecord | null = null;
+    const student = students.find(s => s.id === data.studentId);
+    const studentName = student ? student.name : '';
+    const studentClassId = student ? student.classId : '';
+    const nowTimeParts = getRomeTimeParts();
+    const nowTimeStr = nowTimeParts.timeStr;
 
-    const updateLocally = () => {
-      setRecords(prev => {
-        const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
-
-        // If absent, cleanly remove existing record from list
-        if (data.status === 'absent') {
-          addLocalDeletedRecordKey(studentDateKey);
-          if (existingIdx !== -1) {
-            addLocalDeletedRecordKey(prev[existingIdx].id);
-          }
-          const updated = existingIdx !== -1 ? prev.filter((_, i) => i !== existingIdx) : prev;
-          saveLocalData({ records: updated });
-          return updated;
+    let finalStatus = data.status;
+    if (finalStatus === 'present') {
+      let isLate = false;
+      // 1. Check if late rule is enabled and exceeds late threshold (e.g. 15:00)
+      if (config.enableLateRule) {
+        const [lateH, lateM] = (config.lateThresholdTime || '15:00').split(':').map(Number);
+        if (nowTimeParts.hour > lateH || (nowTimeParts.hour === lateH && nowTimeParts.minute > lateM)) {
+          isLate = true;
         }
-
-        removeLocalDeletedRecordKey(studentDateKey);
-        removeLocalDeletedRecordKey(data.studentId);
-        if (existingIdx !== -1) {
-          removeLocalDeletedRecordKey(prev[existingIdx].id);
-        }
-
-        const student = students.find(s => s.id === data.studentId);
-        const studentName = student ? student.name : '';
-        const studentClassId = student ? student.classId : '';
-        const nowTimeParts = getRomeTimeParts();
-        const nowTimeStr = nowTimeParts.timeStr;
-
-        let finalStatus = data.status;
-        if (finalStatus === 'present') {
-          let isLate = false;
-          // 1. Check if late rule is enabled and exceeds late threshold (e.g. 15:00)
-          if (config.enableLateRule) {
-            const [lateH, lateM] = (config.lateThresholdTime || '15:00').split(':').map(Number);
-            if (nowTimeParts.hour > lateH || (nowTimeParts.hour === lateH && nowTimeParts.minute > lateM)) {
-              isLate = true;
-            }
-          }
-          // 2. Check if checkin time exceeds the background check-in end deadline (e.g. 12:30), still mark as late
-          if (config.checkinEndTime) {
-            const [endH, endM] = config.checkinEndTime.split(':').map(Number);
-            if (!isNaN(endH) && !isNaN(endM)) {
-              if (nowTimeParts.hour > endH || (nowTimeParts.hour === endH && nowTimeParts.minute > endM)) {
-                isLate = true;
-              }
-            }
-          }
-          if (isLate) {
-            finalStatus = 'late';
+      }
+      // 2. Check if checkin time exceeds the background check-in end deadline (e.g. 12:30), still mark as late
+      if (config.checkinEndTime) {
+        const [endH, endM] = config.checkinEndTime.split(':').map(Number);
+        if (!isNaN(endH) && !isNaN(endM)) {
+          if (nowTimeParts.hour > endH || (nowTimeParts.hour === endH && nowTimeParts.minute > endM)) {
+            isLate = true;
           }
         }
+      }
+      if (isLate) {
+        finalStatus = 'late';
+      }
+    }
 
-        const newRecord: AttendanceRecord = {
-          id: existingIdx !== -1 ? prev[existingIdx].id : `rec-${data.date}-${data.studentId}-${Date.now()}`,
-          studentId: data.studentId,
-          studentName,
-          classId: studentClassId,
-          date: data.date,
-          timestamp: new Date().toISOString(),
-          timeStr: nowTimeStr,
-          status: finalStatus,
-          method: 'manual_teacher',
-          memoryVerseCompleted: !!data.memoryVerseCompleted,
-          offeringCompleted: data.offeringCompleted,
-          notes: data.notes,
-          isTestMode: config.testMode ? true : undefined
-        };
-
-        optRecordCreated = newRecord;
-        const updated = existingIdx !== -1 
-          ? prev.map((r, i) => i === existingIdx ? newRecord : r)
-          : [...prev, newRecord];
-        
-        saveLocalData({ records: updated });
-        return updated;
-      });
+    const existingRec = records.find(r => r.studentId === data.studentId && r.date === data.date);
+    const optRecordCreated: AttendanceRecord | null = data.status === 'absent' ? null : {
+      id: existingRec ? existingRec.id : `rec-${data.date}-${data.studentId}-${Date.now()}`,
+      studentId: data.studentId,
+      studentName,
+      classId: studentClassId,
+      date: data.date,
+      timestamp: new Date().toISOString(),
+      timeStr: nowTimeStr,
+      status: finalStatus,
+      method: 'manual_teacher',
+      memoryVerseCompleted: !!data.memoryVerseCompleted,
+      offeringCompleted: data.offeringCompleted,
+      notes: data.notes,
+      isTestMode: config.testMode ? true : undefined
     };
 
-    // 1. Optimistically update local state for instantaneous UI response
-    updateLocally();
-
+    // 1. Optimistically register mutation ref synchronously BEFORE setRecords
     recentRecordMutationsRef.current.set(mutationKey, {
-      record: data.status === 'absent' ? null : optRecordCreated,
+      record: optRecordCreated,
       timestamp: Date.now()
+    });
+
+    if (data.status === 'absent') {
+      addLocalDeletedRecordKey(studentDateKey);
+      if (existingRec) {
+        addLocalDeletedRecordKey(existingRec.id);
+      }
+    } else {
+      removeLocalDeletedRecordKey(studentDateKey);
+      removeLocalDeletedRecordKey(data.studentId);
+      if (existingRec) {
+        removeLocalDeletedRecordKey(existingRec.id);
+      }
+    }
+
+    // 2. Optimistically update React state
+    setRecords(prev => {
+      const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
+      if (data.status === 'absent') {
+        const updated = existingIdx !== -1 ? prev.filter((_, i) => i !== existingIdx) : prev;
+        saveLocalData({ records: updated });
+        return updated;
+      }
+
+      const updatedRecord = optRecordCreated!;
+      const updated = existingIdx !== -1 
+        ? prev.map((r, i) => i === existingIdx ? updatedRecord : r)
+        : [...prev, updatedRecord];
+      
+      saveLocalData({ records: updated });
+      return updated;
     });
 
     notifyCrossTabSync();
