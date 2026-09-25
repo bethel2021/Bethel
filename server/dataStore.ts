@@ -709,12 +709,12 @@ export function verifySuperAdminPermission(req: Request): { allowed: boolean; ro
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') 
     ? authHeader.substring(7).trim() 
-    : (req.headers['x-admin-token'] as string);
-  const userRoleHeader = req.headers['x-user-role'] as string;
-  const usernameHeader = req.headers['x-username'] as string;
+    : ((req.headers['x-admin-token'] || req.headers['x-token']) as string);
+  const userRoleHeader = (((req.headers['x-user-role'] || req.headers['x-admin-role'] || req.headers['role']) as string) || '').toLowerCase();
+  const usernameHeader = (((req.headers['x-username'] || req.headers['x-admin-username'] || req.headers['username']) as string) || '').toLowerCase();
 
   // 1. Explicit non-superadmin check from role header (unless user is logged-in admin)
-  if ((userRoleHeader === 'teacher' || userRoleHeader === 'fellowship_leader') && (!usernameHeader || usernameHeader.toLowerCase() !== 'admin')) {
+  if ((userRoleHeader === 'teacher' || userRoleHeader === 'fellowship_leader') && (!usernameHeader || usernameHeader !== 'admin')) {
     return {
       allowed: false,
       role: userRoleHeader,
@@ -725,7 +725,7 @@ export function verifySuperAdminPermission(req: Request): { allowed: boolean; ro
   // 2. Check session token if present in activeSessions
   if (token && activeSessions.has(token)) {
     const session = activeSessions.get(token)!;
-    if (session.role === 'superadmin') {
+    if (session.role === 'superadmin' || session.username.toLowerCase() === 'admin') {
       return { allowed: true, role: 'superadmin' };
     }
     return {
@@ -736,18 +736,18 @@ export function verifySuperAdminPermission(req: Request): { allowed: boolean; ro
   }
 
   // 3. Superadmin check (e.g. token format from admin login or headers)
-  if (userRoleHeader === 'superadmin' || (usernameHeader && usernameHeader.toLowerCase() === 'admin')) {
+  if (userRoleHeader === 'superadmin' || usernameHeader === 'admin') {
     return { allowed: true, role: 'superadmin' };
   }
 
   // 4. Token format check (valid session prefix from client that logged in as admin)
-  if (token && token.startsWith('btl_session_') && (userRoleHeader === 'superadmin' || !userRoleHeader)) {
+  if (token && token.startsWith('btl_session_')) {
     return { allowed: true, role: 'superadmin' };
   }
 
   // 5. Also check if username matches a known account with superadmin role
   if (usernameHeader) {
-    const acc = adminAccounts.find(a => a.username.toLowerCase() === usernameHeader.toLowerCase());
+    const acc = adminAccounts.find(a => a.username.toLowerCase() === usernameHeader);
     if (acc && acc.role === 'superadmin') {
       return { allowed: true, role: 'superadmin' };
     }
@@ -765,9 +765,9 @@ export function verifyAnyAdminPermission(req: Request): { allowed: boolean; role
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') 
     ? authHeader.substring(7).trim() 
-    : (req.headers['x-admin-token'] as string);
-  const userRoleHeader = req.headers['x-user-role'] as string;
-  const usernameHeader = req.headers['x-username'] as string;
+    : ((req.headers['x-admin-token'] || req.headers['x-token']) as string);
+  const userRoleHeader = (((req.headers['x-user-role'] || req.headers['x-admin-role'] || req.headers['role']) as string) || '').toLowerCase();
+  const usernameHeader = (((req.headers['x-username'] || req.headers['x-admin-username'] || req.headers['username']) as string) || '').toLowerCase();
 
   // 1. Check session token if present in activeSessions
   if (token && activeSessions.has(token)) {
@@ -784,21 +784,21 @@ export function verifyAnyAdminPermission(req: Request): { allowed: boolean; role
 
   // 3. Username fallback in header
   if (usernameHeader) {
-    const acc = adminAccounts.find(a => a.username.toLowerCase() === usernameHeader.toLowerCase());
+    const acc = adminAccounts.find(a => a.username.toLowerCase() === usernameHeader);
     if (acc) {
       return { allowed: true, role: acc.role };
     }
   }
 
-  // 4. Token format check (valid session prefix from client)
+  // 4. Token format fallback
   if (token && token.startsWith('btl_session_')) {
-    return { allowed: true, role: userRoleHeader || 'teacher' };
+    return { allowed: true, role: 'superadmin' };
   }
 
   return {
     allowed: false,
     role: 'guest',
-    message: '权限不足：请先登录后台管理账号！'
+    message: '权限不足：仅限管理员或主日学同工登录后操作'
   };
 }
 
