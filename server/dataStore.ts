@@ -1081,8 +1081,13 @@ export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  supabaseUpsertClass(saved).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  saveDataToFile();
+  try {
+    await supabaseUpsertClass(saved);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseUpsertClass failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return saved;
 }
 
@@ -1104,8 +1109,13 @@ export async function updateClass(id: string, updates: Partial<ClassGroup>): Pro
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  supabaseUpsertClass(updated).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  saveDataToFile();
+  try {
+    await supabaseUpsertClass(updated);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseUpsertClass failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return updated;
 }
 
@@ -1127,7 +1137,11 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
       reconciledSet.delete(classId);
     }
     classes.forEach(c => {
-      c.isHiddenFromHome = reconciledSet.has(c.id) || (c.id === classId ? isHidden : (c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true'));
+      if (c.id === classId) {
+        c.isHiddenFromHome = isHidden;
+      } else {
+        c.isHiddenFromHome = reconciledSet.has(c.id);
+      }
     });
   }
 
@@ -1136,15 +1150,18 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
+  saveDataToFile();
 
-  const changedClasses = classes.filter(c => c.id === classId || (Array.isArray(clientHiddenIds) && clientHiddenIds.includes(c.id)));
-  
-  Promise.all([
-    ...changedClasses.map(c => supabaseUpsertClass(c)),
-    supabaseUpsertSystemConfig(systemConfig)
-  ]).catch(() => {});
+  try {
+    await Promise.all([
+      ...classes.map(c => supabaseUpsertClass(c)),
+      supabaseUpsertSystemConfig(systemConfig)
+    ]);
+  } catch (err) {
+    console.warn('[Storage Error] saveClassVisibility Supabase upsert failed:', err);
+  }
 
-  scheduleSupabaseSnapshotSave(2000);
+  scheduleSupabaseSnapshotSave(500);
 }
 
 export async function deleteClass(id: string): Promise<boolean> {

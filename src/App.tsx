@@ -589,13 +589,6 @@ export default function App() {
 
   useEffect(() => {
     document.title = '伯特利主日学与团契IMS';
-    // One-time self-healing check: purge legacy poisoned hidden class storage
-    try {
-      const rawHidden = localStorage.getItem('bethel_hidden_class_ids');
-      if (rawHidden && (rawHidden.includes('class-1') || rawHidden.includes('class-2') || rawHidden.includes('class-5'))) {
-        localStorage.removeItem('bethel_hidden_class_ids');
-      }
-    } catch {}
   }, []);
 
   // Multi-Engine Real-Time Sync Loop (WebSocket + SSE + Instant Long-Polling)

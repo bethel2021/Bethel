@@ -1041,11 +1041,19 @@ apiRouter.post('/classes/:id/visibility', async (req: Request, res: Response) =>
       return res.status(404).json({ error: '未找到指定班级' });
     }
 
+    const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
     res.json({
       success: true,
       class: updatedClass,
-      classes,
-      config: systemConfig,
+      classes: classes.map(c => ({
+        ...c,
+        isHiddenFromHome: hiddenIds.includes(c.id)
+      })),
+      hiddenClassIds: hiddenIds,
+      config: {
+        ...systemConfig,
+        hiddenClassIds: hiddenIds
+      },
       syncVersion,
       message: `班级【${updatedClass.name}】已成功设置为首页${isHiddenFromHome ? '隐藏' : '显示'}`
     });

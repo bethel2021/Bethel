@@ -242,11 +242,10 @@ export function getLocalData() {
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const config: SystemConfig = rawConfig ? { ...initialSystemConfig, ...JSON.parse(rawConfig) } : initialSystemConfig;
 
-    const hiddenSet = new Set(Array.isArray(config.hiddenClassIds) ? config.hiddenClassIds : []);
+    const localHiddenSet = getLocalHiddenClassIds();
+    const configHiddenSet = new Set(Array.isArray(config.hiddenClassIds) ? config.hiddenClassIds : []);
     classes = classes.map(c => {
-      const isHidden = Array.isArray(config.hiddenClassIds)
-        ? hiddenSet.has(c.id)
-        : (typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : false);
+      const isHidden = c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || localHiddenSet.has(c.id) || configHiddenSet.has(c.id);
       const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);
       return {
         ...c,
@@ -256,10 +255,10 @@ export function getLocalData() {
     });
     
     // Always persist normalized state
-    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
     const allHiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
     saveLocalHiddenClassIds(allHiddenIds);
     config.hiddenClassIds = allHiddenIds;
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
     localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
 
     const rawRecords = localStorage.getItem(STORAGE_KEYS.RECORDS);
