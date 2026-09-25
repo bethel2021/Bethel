@@ -979,7 +979,8 @@ export default function App() {
           method: 'manual_teacher',
           memoryVerseCompleted: !!data.memoryVerseCompleted,
           offeringCompleted: data.offeringCompleted,
-          notes: data.notes
+          notes: data.notes,
+          isTestMode: config.testMode ? true : undefined
         };
 
         optRecordCreated = newRecord;
@@ -1056,6 +1057,13 @@ export default function App() {
         saveLocalData({ config: merged });
         return merged;
       });
+      if (updated.testMode === false) {
+        setRecords(prev => {
+          const kept = prev.filter(r => !r.isTestMode);
+          saveLocalData({ records: kept });
+          return kept;
+        });
+      }
       notifyCrossTabSync();
     };
 
@@ -1077,7 +1085,15 @@ export default function App() {
           setConfig(data.config);
           saveLocalData({ config: data.config });
         }
-        showSyncNotification('✅ 系统设置已通过双向状态校验并成功保存！');
+        if (Array.isArray(data.records)) {
+          setRecords(data.records);
+          saveLocalData({ records: data.records });
+        }
+        if (data.message) {
+          showSyncNotification(`✅ ${data.message}`);
+        } else {
+          showSyncNotification('✅ 系统设置已通过双向状态校验并成功保存！');
+        }
       }
     } catch {
       // Offline fallback: already preserved locally in step 1

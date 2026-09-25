@@ -1291,8 +1291,53 @@ apiRouter.post('/config', async (req: Request, res: Response) => {
     }
 
     const updates = req.body;
-    await dataStore.saveSystemConfig(updates);
-    res.json({ success: true, config: systemConfig, message: '系统设置与默认选项已成功保存！' });
+    const { config, purgedTestRecordsCount } = await dataStore.saveSystemConfig(updates);
+    
+    if (purgedTestRecordsCount > 0) {
+      broadcastRealtimeState('records_updated');
+    }
+    broadcastRealtimeState('config_updated');
+
+    let msg = '系统设置与默认选项已成功保存！';
+    if (updates.testMode === false) {
+      msg = `已退出测试模式并恢复正常模式！已自动清理测试期间产生的 ${purgedTestRecordsCount} 条测试签到数据，保留正常模式下的所有正式签到记录。`;
+    } else if (purgedTestRecordsCount > 0) {
+      msg = `设置已保存，已重置清理 ${purgedTestRecordsCount} 条测试模式下的签到数据。`;
+    }
+
+    res.json({ 
+      success: true, 
+      config, 
+      records: dataStore.records,
+      purgedTestRecordsCount,
+      message: msg 
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Purge test mode records manually - 仅限总管理员
+apiRouter.post('/purge-test-records', async (req: Request, res: Response) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message });
+    }
+
+    const count = await dataStore.purgeTestModeRecords();
+    if (count > 0) {
+      broadcastRealtimeState('records_updated');
+    }
+
+    res.json({
+      success: true,
+      purgedCount: count,
+      records: dataStore.records,
+      message: count > 0 
+        ? `已成功清理重置 ${count} 条在测试模式下产生的测试签到数据！保留所有正常模式下的正式记录。`
+        : '当前没有需要在测试模式下清理的数据。'
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1584,7 +1629,7 @@ app.use('/api', (req: Request, res: Response) => {
     error: 'Endpoint not found',
     path: req.url,
     method: req.method,
-    validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/teachers', '/api/config', '/api/ai/status', '/api/ai/generate']
+    validEndpoints: ['/api/health', '/api/state', '/api/cloud-sync', '/api/sync-data', '/api/checkin', '/api/classes', '/api/students', '/api/teachers', '/api/config', '/api/purge-test-records', '/api/ai/status', '/api/ai/generate']
   });
 });
 
