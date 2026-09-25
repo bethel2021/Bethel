@@ -558,20 +558,25 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
 
         await Promise.resolve(client.from('deleted_attendance_records').upsert(deletedRows, { onConflict: 'id' }));
 
-        // Purge truly deleted matching records from attendance_records table
-        for (const item of deletedRows) {
-          if (item.student_id && item.date) {
-            await Promise.resolve(
-              client.from('attendance_records')
-                .delete()
-                .eq('student_id', item.student_id)
-                .eq('date', item.date)
-            );
-          } else if (item.id) {
-            await Promise.resolve(
-              client.from('attendance_records')
-                .delete()
-                .eq('id', item.id)
+        // Purge truly deleted matching records from attendance_records table in highly optimized batches
+        const recIdsToDelete = deletedRows.filter(item => !item.student_id || !item.date).map(item => item.id);
+        const compositeToDelete = deletedRows.filter(item => item.student_id && item.date);
+
+        if (recIdsToDelete.length > 0) {
+          await Promise.resolve(client.from('attendance_records').delete().in('id', recIdsToDelete));
+        }
+
+        if (compositeToDelete.length > 0) {
+          const batchSize = 30;
+          for (let i = 0; i < compositeToDelete.length; i += batchSize) {
+            const chunk = compositeToDelete.slice(i, i + batchSize);
+            await Promise.all(
+              chunk.map(item =>
+                client.from('attendance_records')
+                  .delete()
+                  .eq('student_id', item.student_id)
+                  .eq('date', item.date)
+              )
             );
           }
         }

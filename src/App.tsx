@@ -855,19 +855,48 @@ export default function App() {
       return;
     }
     const mutationKey = `${newRecord.studentId}_KEY_SPLIT_${newRecord.date}`;
+    
+    // Parse incoming and compare against existing states to prevent out-of-order overwrites
+    const incomingTime = newRecord.timestamp ? new Date(newRecord.timestamp).getTime() : Date.now();
+    
+    // Check against recent local action
+    const lastMutation = recentRecordMutationsRef.current.get(mutationKey);
+    if (lastMutation && lastMutation.record) {
+      const localMutationTime = lastMutation.timestamp;
+      const lastMutationServerTime = lastMutation.record.timestamp ? new Date(lastMutation.record.timestamp).getTime() : 0;
+      
+      // If we performed a very recent mutation and the incoming payload is older than that, ignore it
+      if (Date.now() - localMutationTime < 5000 && lastMutationServerTime > incomingTime) {
+        console.log(`[Anti-Regression] Stale network payload ignored for ${student.name}`);
+        return;
+      }
+    }
+
     recentRecordMutationsRef.current.set(mutationKey, {
       record: newRecord,
       timestamp: Date.now()
     });
+
     setRecords(prev => {
-      const existing = prev.findIndex(r => r.id === newRecord.id || (r.studentId === newRecord.studentId && r.date === newRecord.date));
+      const existingIdx = prev.findIndex(r => r.id === newRecord.id || (r.studentId === newRecord.studentId && r.date === newRecord.date));
       let updated: AttendanceRecord[];
-      if (existing !== -1) {
+      
+      if (existingIdx !== -1) {
+        const existingRecord = prev[existingIdx];
+        const existingTime = existingRecord.timestamp ? new Date(existingRecord.timestamp).getTime() : 0;
+        
+        // Only overwrite if the incoming record's timestamp is newer or equal to the displayed state
+        if (incomingTime < existingTime) {
+          console.log(`[Anti-Regression] Stale incoming state ignored in setRecords for ${student.name}`);
+          return prev;
+        }
+        
         updated = [...prev];
-        updated[existing] = newRecord;
+        updated[existingIdx] = newRecord;
       } else {
         updated = [...prev, newRecord];
       }
+      
       saveLocalData({ records: updated });
       return updated;
     });

@@ -1495,7 +1495,16 @@ export async function saveAttendanceRecord(record: AttendanceRecord, extra?: any
   } catch (err) {
     console.warn('[Storage Error] supabaseUpsertAttendanceRecord failed:', err);
   }
-  await saveDataToSupabase();
+  
+  // Persist to local disk cache synchronously (zero-latency consistency)
+  try {
+    const filePath = getStoragePath();
+    fs.writeFileSync(filePath, JSON.stringify(getFullStatePayload(), null, 2), 'utf-8');
+  } catch (err) {}
+
+  // Defer heavy full state snapshot save to the background
+  scheduleSupabaseSnapshotSave(1000);
+
   notifyDataChange(extra || {
     action: 'checkin',
     record,
@@ -1535,7 +1544,16 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
   } catch (err) {
     console.warn('[Storage Error] supabaseDeleteAttendanceRecord failed:', err);
   }
-  await saveDataToSupabase();
+
+  // Persist to local disk cache synchronously (zero-latency consistency)
+  try {
+    const filePath = getStoragePath();
+    fs.writeFileSync(filePath, JSON.stringify(getFullStatePayload(), null, 2), 'utf-8');
+  } catch (err) {}
+
+  // Defer heavy full state snapshot save to the background
+  scheduleSupabaseSnapshotSave(1000);
+
   notifyDataChange(extra || {
     action: 'absent',
     studentId,
