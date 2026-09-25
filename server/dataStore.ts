@@ -33,6 +33,8 @@ export const classes: ClassGroup[] = [...initialClasses];
 export const students: Student[] = [...initialStudents];
 export const records: AttendanceRecord[] = [];
 export const deletedRecordKeys = new Set<string>();
+export const deletedStudentIds = new Set<string>();
+export const deletedTeacherIds = new Set<string>();
 export const systemConfig: SystemConfig = { ...initialSystemConfig };
 
 export function addDeletedRecordKey(key: string) {
@@ -159,6 +161,8 @@ export function getFullStatePayload(): ChurchStatePayload {
     students,
     records,
     deletedRecordKeys: Array.from(deletedRecordKeys),
+    deletedStudentIds: Array.from(deletedStudentIds),
+    deletedTeacherIds: Array.from(deletedTeacherIds),
     adminAccounts,
     activeSunday,
     syncVersion,
@@ -344,15 +348,8 @@ export function generateHistoricalRecords() {
 let isInitialized = false;
 
 export function reconcileInitialStudents(): boolean {
-  let changed = false;
-  for (const initStu of initialStudents) {
-    const exists = students.some(s => s.id === initStu.id || (s.name === initStu.name && s.classId === initStu.classId));
-    if (!exists) {
-      students.push({ ...initStu });
-      changed = true;
-    }
-  }
-  return changed;
+  // Permanently disabled: user modifications and deletions must be authoritative and never reverted!
+  return false;
 }
 
 function sanitizeYageData() {
@@ -384,7 +381,6 @@ function sanitizeYageData() {
     }
   });
 
-  reconcileInitialStudents();
   hashAllPasswordsIfNeeded();
 }
 
@@ -484,14 +480,26 @@ export function loadFromDisk(): boolean {
           if (typeof k === 'string') deletedRecordKeys.add(k);
         });
       }
+      if (Array.isArray(data.deletedStudentIds)) {
+        deletedStudentIds.clear();
+        data.deletedStudentIds.forEach((id: string) => {
+          if (typeof id === 'string') deletedStudentIds.add(id);
+        });
+      }
+      if (Array.isArray(data.deletedTeacherIds)) {
+        deletedTeacherIds.clear();
+        data.deletedTeacherIds.forEach((id: string) => {
+          if (typeof id === 'string') deletedTeacherIds.add(id);
+        });
+      }
       if (Array.isArray(data.adminAccounts) && data.adminAccounts.length > 0) {
         adminAccounts.length = 0;
         adminAccounts.push(...data.adminAccounts);
       }
-      if (Array.isArray(data.teachers) && data.teachers.length >= 27) {
+      if (Array.isArray(data.teachers) && data.teachers.length > 0) {
         teachers.length = 0;
         teachers.push(...data.teachers);
-      } else {
+      } else if (teachers.length === 0) {
         teachers.length = 0;
         teachers.push(...initialTeachers);
       }
@@ -504,9 +512,6 @@ export function loadFromDisk(): boolean {
       if (typeof data.syncVersion === 'number') syncVersion = data.syncVersion;
       if (data.updatedAt) lastModifiedTimestamp = data.updatedAt;
       sanitizeYageData();
-      if (reconcileInitialStudents()) {
-        setTimeout(() => saveDataToFile(), 100);
-      }
       return true;
     } else if (hiddenSet.size > 0) {
       const mappedClasses = classes.map(c => ({
@@ -650,13 +655,23 @@ export async function initOrLoadDataAsync(force = false) {
             }
           }
         }
-        if (Array.isArray(cloudData.teachers) && cloudData.teachers.length >= 27) {
+        if (Array.isArray(cloudData.teachers) && cloudData.teachers.length > 0) {
           teachers.length = 0;
           teachers.push(...cloudData.teachers);
-        } else {
+        } else if (teachers.length === 0) {
           teachers.length = 0;
           teachers.push(...initialTeachers);
           scheduleSupabaseSnapshotSave(2000);
+        }
+        if (Array.isArray(cloudData.deletedStudentIds)) {
+          cloudData.deletedStudentIds.forEach(id => {
+            if (typeof id === 'string') deletedStudentIds.add(id);
+          });
+        }
+        if (Array.isArray(cloudData.deletedTeacherIds)) {
+          cloudData.deletedTeacherIds.forEach(id => {
+            if (typeof id === 'string') deletedTeacherIds.add(id);
+          });
         }
         const authoritativeHiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
         if (cloudData.systemConfig) {
@@ -668,11 +683,6 @@ export async function initOrLoadDataAsync(force = false) {
         syncVersion = cloudData.syncVersion;
         if (cloudData.updatedAt) lastModifiedTimestamp = cloudData.updatedAt;
         sanitizeYageData();
-
-        if (reconcileInitialStudents()) {
-          console.log('[Roster Sync] Reconciled initial students into Supabase DB state.');
-          await saveDataToSupabase();
-        }
 
         // Write local backup copy purely for offline migration compatibility
         try {
@@ -886,24 +896,12 @@ export function mergeClientData(payload: SyncPayload): {
     classes.push(...mergedClasses);
   }
 
-  // 2. Merge students (by ID)
-  if (Array.isArray(payload.students) && payload.students.length > 0) {
-    const studentMap = new Map<string, Student>(students.map(s => [s.id, s]));
-    for (const s of payload.students) {
-      if (!studentMap.has(s.id)) {
-        studentMap.set(s.id, s);
-        changed = true;
-      } else {
-        const existing = studentMap.get(s.id)!;
-        if (JSON.stringify(existing) !== JSON.stringify(s)) {
-          studentMap.set(s.id, { ...existing, ...s });
-          changed = true;
-        }
-      }
-    }
-    const mergedStudents = Array.from(studentMap.values());
-    students.length = 0;
-    students.push(...mergedStudents);
+  // 2. Students are server-authoritative and master-managed via /api/students.
+  // We do NOT allow blind client push to overwrite newer server student data or resurrect deleted students.
+  if (students.length === 0 && Array.isArray(payload.students) && payload.students.length > 0) {
+    const validStudents = payload.students.filter(s => s && s.id && !deletedStudentIds.has(s.id));
+    students.push(...validStudents);
+    changed = true;
   }
 
   // 3. Merge attendance records (keyed by studentId + date to guarantee exactly one authoritative record per student per Sunday)
@@ -978,23 +976,11 @@ export function mergeClientData(payload: SyncPayload): {
   // 4. System config & classes are server-authoritative and master-managed via /api/config & /api/classes
 
   // Teachers are server-authoritative and master-managed via /api/teachers.
-  // We do NOT let the client overwrite existing server teacher records to prevent stale client syncs from reverting server-side edits.
-  // We only add teachers if they do not exist on the server (e.g. initial setup fallback).
-  if (Array.isArray((payload as any).teachers) && (payload as any).teachers.length > 0) {
-    const teacherMap = new Map<string, any>(teachers.map(t => [t.id, t]));
-    let teachersChanged = false;
-    for (const t of (payload as any).teachers) {
-      if (t && t.id && !teacherMap.has(t.id)) {
-        teacherMap.set(t.id, t);
-        teachersChanged = true;
-        changed = true;
-      }
-    }
-    if (teachersChanged) {
-      const mergedTeachers = Array.from(teacherMap.values());
-      teachers.length = 0;
-      teachers.push(...mergedTeachers);
-    }
+  // We do NOT let arbitrary client payloads overwrite existing server teacher records or resurrect deleted teachers.
+  if (teachers.length === 0 && Array.isArray((payload as any).teachers) && (payload as any).teachers.length > 0) {
+    const validTeachers = (payload as any).teachers.filter((t: any) => t && t.id && !deletedTeacherIds.has(t.id));
+    teachers.push(...validTeachers);
+    changed = true;
   }
 
   if (payload.activeSunday) {
@@ -1218,6 +1204,7 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
 }
 
 export async function saveStudent(student: Student): Promise<Student> {
+  if (student.id) deletedStudentIds.delete(student.id);
   const existingIdx = students.findIndex(s => s.id === student.id || (student.memberCode && s.memberCode === student.memberCode));
   let saved: Student;
   if (existingIdx >= 0) {
@@ -1230,12 +1217,20 @@ export async function saveStudent(student: Student): Promise<Student> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  supabaseUpsertStudent(saved).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  saveDataToFile();
+  try {
+    await supabaseUpsertStudent(saved);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseUpsertStudent failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return saved;
 }
 
 export async function saveStudentsBatch(newStudents: Student[]): Promise<Student[]> {
+  for (const s of newStudents) {
+    if (s.id) deletedStudentIds.delete(s.id);
+  }
   const existingIds = new Set(students.map(s => s.id));
   const toAppend: Student[] = [];
   for (const s of newStudents) {
@@ -1253,8 +1248,13 @@ export async function saveStudentsBatch(newStudents: Student[]): Promise<Student
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  supabaseUpsertStudentsBatch(newStudents).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  saveDataToFile();
+  try {
+    await supabaseUpsertStudentsBatch(newStudents);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseUpsertStudentsBatch failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return newStudents;
 }
 
@@ -1275,8 +1275,13 @@ export async function updateStudent(id: string, updates: Partial<Student>): Prom
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  supabaseUpsertStudent(updated).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  saveDataToFile();
+  try {
+    await supabaseUpsertStudent(updated);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseUpsertStudent failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return updated;
 }
 
@@ -1285,6 +1290,8 @@ export async function deleteStudent(id: string): Promise<Student | null> {
   const existingIdx = students.findIndex(s => s.id === id || s.memberCode === id || s.name === id);
   if (existingIdx === -1) return null;
   const [removed] = students.splice(existingIdx, 1);
+  if (removed.id) deletedStudentIds.add(removed.id);
+  deletedStudentIds.add(id);
   
   // Clean up all attendance records for this student and track deleted keys
   const studentRecords = records.filter(r => r.studentId === removed.id || r.studentName === removed.name);
@@ -1299,9 +1306,14 @@ export async function deleteStudent(id: string): Promise<Student | null> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
+  saveDataToFile();
 
-  supabaseDeleteStudent(removed.id).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  try {
+    await supabaseDeleteStudent(removed.id);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseDeleteStudent failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return removed;
 }
 
@@ -1364,6 +1376,8 @@ export async function saveTeacher(teacher: any): Promise<any> {
   const teacherId = (teacher.id && String(teacher.id).trim()) || `t-${Date.now().toString().slice(-6)}`;
   const cleanName = teacher.name ? String(teacher.name).trim().replace(/\s*老师$/, '') : '';
 
+  if (teacherId) deletedTeacherIds.delete(teacherId);
+
   const existingIdx = teachers.findIndex(t => (t.id && t.id === teacherId) || (cleanName && t.name === cleanName));
   let savedTeacher: any;
   if (existingIdx >= 0) {
@@ -1386,8 +1400,13 @@ export async function saveTeacher(teacher: any): Promise<any> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  supabaseUpsertTeacher(savedTeacher).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  saveDataToFile();
+  try {
+    await supabaseUpsertTeacher(savedTeacher);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseUpsertTeacher failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return savedTeacher;
 }
 
@@ -1398,8 +1417,13 @@ export async function updateTeacher(id: string, updates: any): Promise<any | nul
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  supabaseUpsertTeacher(teachers[existingIdx]).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  saveDataToFile();
+  try {
+    await supabaseUpsertTeacher(teachers[existingIdx]);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseUpsertTeacher failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return teachers[existingIdx];
 }
 
@@ -1407,11 +1431,18 @@ export async function deleteTeacher(id: string): Promise<any | null> {
   const existingIdx = teachers.findIndex(t => t.id === id || t.name === id);
   if (existingIdx === -1) return null;
   const removed = teachers.splice(existingIdx, 1)[0];
+  if (removed.id) deletedTeacherIds.add(removed.id);
+  deletedTeacherIds.add(id);
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  supabaseDeleteTeacher(removed.id).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  saveDataToFile();
+  try {
+    await supabaseDeleteTeacher(removed.id);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseDeleteTeacher failed:', err);
+  }
+  scheduleSupabaseSnapshotSave(500);
   return removed;
 }
 

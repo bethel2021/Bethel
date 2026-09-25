@@ -15,6 +15,8 @@ export interface ChurchStatePayload {
   activeSunday: string;
   syncVersion: number;
   deletedRecordKeys: string[];
+  deletedStudentIds?: string[];
+  deletedTeacherIds?: string[];
   hiddenClassIds?: string[];
   updatedAt: string;
 }
@@ -187,6 +189,13 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
         hiddenClassIds: Array.isArray(rawConfig?.hidden_class_ids) ? rawConfig.hidden_class_ids : (rawConfig?.config?.hiddenClassIds || [])
       };
 
+      const deletedStudentIds = Array.isArray(rawConfig?.deleted_student_ids) 
+        ? rawConfig.deleted_student_ids 
+        : (Array.isArray(rawConfig?.config?.deletedStudentIds) ? rawConfig.config.deletedStudentIds : []);
+      const deletedTeacherIds = Array.isArray(rawConfig?.deleted_teacher_ids)
+        ? rawConfig.deleted_teacher_ids
+        : (Array.isArray(rawConfig?.config?.deletedTeacherIds) ? rawConfig.config.deletedTeacherIds : []);
+
       return {
         classes: mappedClasses,
         students: mappedStudents,
@@ -197,6 +206,8 @@ export async function loadFromSupabase(): Promise<ChurchStatePayload | null> {
         activeSunday,
         syncVersion,
         deletedRecordKeys: combinedDeletedKeys,
+        deletedStudentIds,
+        deletedTeacherIds,
         updatedAt: rawSyncState?.updated_at || rawConfig?.updated_at || new Date().toISOString()
       };
     }
@@ -500,7 +511,11 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
         enable_checkin_popup: cfg.enableCheckinPopup ?? true,
         admin_password: cfg.adminPassword || 'bethel2026',
         hidden_class_ids: cfg.hiddenClassIds || [],
-        config: cfg,
+        config: {
+          ...cfg,
+          deletedStudentIds: payload.deletedStudentIds || [],
+          deletedTeacherIds: payload.deletedTeacherIds || []
+        },
         active_sunday: payload.activeSunday,
         sync_version: payload.syncVersion,
         updated_at: payload.updatedAt || new Date().toISOString()
