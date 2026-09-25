@@ -582,6 +582,12 @@ export async function initOrLoadDataAsync(force = false) {
       const cloudData = await loadFromSupabase();
       lastSupabaseFetchTime = Date.now();
       if (cloudData && typeof cloudData.syncVersion === 'number') {
+        // Anti-Rollback State Protection: Never overwrite local in-memory data with an older/stale DB snapshot
+        if (!force && cloudData.syncVersion < syncVersion) {
+          console.log(`[Supabase DB] Stale database snapshot ignored (DB Version: ${cloudData.syncVersion}, Memory Version: ${syncVersion}) to prevent race condition rollbacks.`);
+          return;
+        }
+
         // Apply cloud Supabase PostgreSQL data
         if (Array.isArray(cloudData.classes) && cloudData.classes.length > 0) {
           const cloudHiddenList = Array.isArray(cloudData.systemConfig?.hiddenClassIds) 
