@@ -572,10 +572,15 @@ export async function initOrLoadDataAsync(force = false) {
     isInitialized = true;
   }
 
+  // Fast-path: If memory state is already hot and valid, do not block API calls on network DB reads unless forced
+  if (!force && isInitialized && (students.length > 0 || classes.length > 0)) {
+    return;
+  }
+
   // If Supabase is configured, Supabase PostgreSQL is the sole authoritative persistent database
   if (isSupabaseConfigured()) {
     const now = Date.now();
-    if (!force && lastSupabaseFetchTime > 0 && (now - lastSupabaseFetchTime < 15000)) {
+    if (!force && lastSupabaseFetchTime > 0 && (now - lastSupabaseFetchTime < 30000)) {
       return;
     }
 
@@ -1074,7 +1079,7 @@ export async function getClassById(id: string): Promise<ClassGroup | undefined> 
 }
 
 export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   
   const teachersToValidate = [
     cls.teacher?.replace(/\s*老师$/, ''), 
@@ -1099,14 +1104,13 @@ export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseUpsertClass(saved).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return saved;
 }
 
 export async function updateClass(id: string, updates: Partial<ClassGroup>): Promise<ClassGroup | null> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const existingIdx = classes.findIndex(c => c.id === id || c.name === id);
   if (existingIdx === -1) return null;
   
@@ -1123,14 +1127,13 @@ export async function updateClass(id: string, updates: Partial<ClassGroup>): Pro
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseUpsertClass(updated).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return updated;
 }
 
 export async function saveClassVisibility(classId: string, isHidden: boolean, clientHiddenIds?: string[]): Promise<void> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const idx = classes.findIndex(c => c.id === classId);
   if (idx !== -1) {
     classes[idx] = {
@@ -1156,7 +1159,6 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
 
   const changedClasses = classes.filter(c => c.id === classId || (Array.isArray(clientHiddenIds) && clientHiddenIds.includes(c.id)));
   
@@ -1165,7 +1167,7 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
     supabaseUpsertSystemConfig(systemConfig)
   ]).catch(() => {});
 
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
 }
 
 export async function deleteClass(id: string): Promise<boolean> {
@@ -1189,16 +1191,15 @@ export async function deleteClass(id: string): Promise<boolean> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
 
   supabaseDeleteClass(clsId).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return true;
 }
 
 // --- Students ---
 export async function getStudents(classId?: string, assignedClassId?: string): Promise<Student[]> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   let res = [...students];
   if (assignedClassId) {
     res = res.filter(s => s.classId === assignedClassId);
@@ -1210,7 +1211,7 @@ export async function getStudents(classId?: string, assignedClassId?: string): P
 }
 
 export async function getStudentById(id: string): Promise<Student | undefined> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   return students.find(s => s.id === id || s.memberCode === id || s.name === id);
 }
 
@@ -1227,9 +1228,8 @@ export async function saveStudent(student: Student): Promise<Student> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseUpsertStudent(saved).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return saved;
 }
 
@@ -1251,9 +1251,8 @@ export async function saveStudentsBatch(newStudents: Student[]): Promise<Student
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseUpsertStudentsBatch(newStudents).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return newStudents;
 }
 
@@ -1272,9 +1271,8 @@ export async function updateStudent(id: string, updates: Partial<Student>): Prom
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseUpsertStudent(updated).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return updated;
 }
 
@@ -1287,9 +1285,8 @@ export async function deleteStudent(id: string): Promise<Student | null> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseDeleteStudent(removed.id).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return removed;
 }
 
@@ -1338,13 +1335,13 @@ export function sortTeachersList(teachersList: any[]): any[] {
 }
 
 export async function getTeachers(classId?: string): Promise<any[]> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   const list = classId ? teachers.filter(t => t.classId === classId) : [...teachers];
   return sortTeachersList(list);
 }
 
 export async function getTeacherById(id: string): Promise<any | undefined> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   return teachers.find(t => t.id === id || t.name === id);
 }
 
@@ -1374,9 +1371,8 @@ export async function saveTeacher(teacher: any): Promise<any> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseUpsertTeacher(savedTeacher).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return savedTeacher;
 }
 
@@ -1387,9 +1383,8 @@ export async function updateTeacher(id: string, updates: any): Promise<any | nul
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseUpsertTeacher(teachers[existingIdx]).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return teachers[existingIdx];
 }
 
@@ -1400,15 +1395,14 @@ export async function deleteTeacher(id: string): Promise<any | null> {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseDeleteTeacher(removed.id).catch(() => {});
-  scheduleSupabaseSnapshotSave();
+  scheduleSupabaseSnapshotSave(2000);
   return removed;
 }
 
 // --- Attendance Records ---
 export async function getAttendanceRecords(filter?: { date?: string; studentId?: string; classId?: string }, assignedClassId?: string): Promise<AttendanceRecord[]> {
-  await initOrLoadDataAsync(true);
+  await initOrLoadDataAsync(false);
   let res = [...records];
   if (assignedClassId) {
     res = res.filter(r => r.classId === assignedClassId);
@@ -1432,9 +1426,8 @@ export async function saveAttendanceRecord(record: AttendanceRecord): Promise<At
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseUpsertAttendanceRecord(record).catch(() => {});
-  scheduleSupabaseSnapshotSave(1500);
+  scheduleSupabaseSnapshotSave(2000);
   return record;
 }
 
@@ -1458,9 +1451,8 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
-  saveDataToFile().catch(() => {});
   supabaseDeleteAttendanceRecord(studentId, date, recId).catch(() => {});
-  scheduleSupabaseSnapshotSave(1500);
+  scheduleSupabaseSnapshotSave(2000);
   return true;
 }
 

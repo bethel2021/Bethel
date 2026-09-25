@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   method TEXT DEFAULT 'attendance',
   memory_verse_completed BOOLEAN DEFAULT FALSE,
   offering_completed BOOLEAN DEFAULT FALSE,
+  is_test_mode BOOLEAN DEFAULT FALSE,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

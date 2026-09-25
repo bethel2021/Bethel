@@ -47,6 +47,7 @@ export interface AttendanceRecord {
   memoryVerseCompleted: boolean;
   offeringCompleted?: boolean;
   notes?: string;
+  isTestMode?: boolean; // 是否为测试模式下产生的测试签到记录
 }
 
 export interface SystemConfig {
