@@ -573,6 +573,24 @@ export async function initOrLoadDataAsync(force = false) {
 
   // If Supabase is configured, Supabase PostgreSQL is the sole authoritative persistent database
   if (isSupabaseConfigured()) {
+    // Ultra-fast lightweight DB version check to invalidate cache across multiple serverless instances
+    if (!force) {
+      try {
+        const client = getSupabase();
+        if (client) {
+          const { data: dbState } = await client.from('app_sync_state').select('sync_version').eq('id', 'bethel_sync_state').maybeSingle();
+          if (dbState && typeof dbState.sync_version === 'number') {
+            if (dbState.sync_version > syncVersion) {
+              console.log(`[Supabase Cache Invalidation] Database has a newer version (${dbState.sync_version} > ${syncVersion}). Invalidating local cache and forcing reload.`);
+              force = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Supabase Cache Invalidation Check Failed]:', err);
+      }
+    }
+
     const now = Date.now();
     if (!force && lastSupabaseFetchTime > 0 && (now - lastSupabaseFetchTime < 30000)) {
       return;
