@@ -1129,36 +1129,47 @@ export async function saveClassVisibility(classId: string, isHidden: boolean, cl
     };
   }
 
-  if (Array.isArray(clientHiddenIds)) {
-    const reconciledSet = new Set<string>(clientHiddenIds.map(item => String(item)));
-    if (isHidden) {
-      reconciledSet.add(classId);
-    } else {
-      reconciledSet.delete(classId);
-    }
-    classes.forEach(c => {
-      if (c.id === classId) {
-        c.isHiddenFromHome = isHidden;
-      } else {
-        c.isHiddenFromHome = reconciledSet.has(c.id);
-      }
-    });
+  const targetHiddenSet = new Set<string>(
+    Array.isArray(clientHiddenIds)
+      ? clientHiddenIds.map(item => String(item))
+      : classes.filter(c => c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true').map(c => c.id)
+  );
+
+  if (isHidden) {
+    targetHiddenSet.add(classId);
+  } else {
+    targetHiddenSet.delete(classId);
   }
 
-  const hiddenIds = classes.filter(c => c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true').map(c => c.id);
-  setSystemConfig({ ...systemConfig, hiddenClassIds: hiddenIds });
+  // Atomically synchronize all classes in memory
+  classes.forEach(c => {
+    c.isHiddenFromHome = targetHiddenSet.has(c.id);
+  });
+
+  const finalHiddenList = Array.from(targetHiddenSet);
+  systemConfig.hiddenClassIds = finalHiddenList;
+  if (systemConfig.config) {
+    systemConfig.config = {
+      ...systemConfig.config,
+      hiddenClassIds: finalHiddenList
+    };
+  }
+
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   notifyDataChange();
   saveDataToFile();
 
+  // Atomically persist to Supabase relational tables & church state snapshot
   try {
+    const payload = getFullStatePayload();
     await Promise.all([
       ...classes.map(c => supabaseUpsertClass(c)),
-      supabaseUpsertSystemConfig(systemConfig)
+      supabaseUpsertSystemConfig(systemConfig, activeSunday, syncVersion),
+      saveToSupabase(payload)
     ]);
   } catch (err) {
-    console.warn('[Storage Error] saveClassVisibility Supabase upsert failed:', err);
+    console.warn('[Storage Error] saveClassVisibility Supabase atomic sync failed:', err);
   }
 
   scheduleSupabaseSnapshotSave(500);

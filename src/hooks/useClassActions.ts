@@ -131,6 +131,7 @@ export function useClassActions(params: {
       hiddenSet.delete(classId);
     }
     saveLocalHiddenClassIds(hiddenSet);
+    const nextHiddenArray = Array.from(hiddenSet);
 
     // 2. Protect with in-flight mutation ref
     const mutationTimestamp = Date.now();
@@ -141,38 +142,24 @@ export function useClassActions(params: {
     } as any);
     syncVersionRef.current = (syncVersionRef.current || 0) + 1;
 
-    // 3. Memory state consistency check for hiddenClassIds & classes
-    const nextHiddenArray = Array.from(hiddenSet);
-
-    setConfig(prev => {
-      const mergedHiddenIds = Array.from(new Set([
-        ...(Array.isArray(prev?.hiddenClassIds) ? prev.hiddenClassIds : []),
-        ...nextHiddenArray
-      ])).filter(id => isHiddenFromHome ? true : id !== classId);
-      return {
-        ...prev,
-        hiddenClassIds: mergedHiddenIds
-      };
+    // 3. Atomically synchronize React state and local storage
+    const updatedClasses = classes.map(c => {
+      if (c.id === classId) {
+        return { ...c, isHiddenFromHome };
+      }
+      return { ...c, isHiddenFromHome: hiddenSet.has(c.id) };
     });
 
-    setClasses(prev => {
-      const updated = prev.map(c => {
-        if (c.id === classId) {
-          return { ...c, isHiddenFromHome };
-        }
-        return c;
-      });
+    const updatedConfig: SystemConfig = {
+      ...config,
+      hiddenClassIds: nextHiddenArray
+    };
 
-      const validatedHiddenIds = updated.filter(c => c.isHiddenFromHome === true).map(c => c.id);
-
-      saveLocalData({
-        classes: updated,
-        config: {
-          ...config,
-          hiddenClassIds: validatedHiddenIds
-        }
-      });
-      return updated;
+    setClasses(updatedClasses);
+    setConfig(updatedConfig);
+    saveLocalData({
+      classes: updatedClasses,
+      config: updatedConfig
     });
 
     const safeDeletePending = () => {
