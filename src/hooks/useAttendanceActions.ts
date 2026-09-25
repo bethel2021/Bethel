@@ -59,13 +59,15 @@ export function useAttendanceActions(params: {
     }
 
     const now = Date.now();
-    const actionKey = `${data.studentId}_${data.status}`;
-    const lastTrigger = checkinLockRef.current.get(actionKey) || 0;
-    if (now - lastTrigger < 300) {
+    const studentLockKey = data.studentId;
+    const lastTrigger = checkinLockRef.current.get(studentLockKey) || 0;
+    // Per-student 250ms debounce lock to prevent duplicate concurrent network dispatch
+    if (now - lastTrigger < 250) {
       return;
     }
-    checkinLockRef.current.set(actionKey, now);
+    checkinLockRef.current.set(studentLockKey, now);
 
+    // Housekeep old lock entries
     if (checkinLockRef.current.size > 200) {
       for (const [id, time] of checkinLockRef.current.entries()) {
         if (now - time > 10000) {
@@ -79,9 +81,11 @@ export function useAttendanceActions(params: {
     pendingMutationsRef.current.add(mutationKey);
 
     let optRecordCreated: AttendanceRecord | null = null;
+    let backupPrevRecords: AttendanceRecord[] = [];
 
     const updateLocally = () => {
       setRecords(prev => {
+        backupPrevRecords = prev;
         const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
 
         if (data.status === 'absent') {
@@ -188,7 +192,22 @@ export function useAttendanceActions(params: {
             return updated;
           });
         }
+      } else if (!res.ok) {
+        // Rollback optimistic update on server rejection
+        if (backupPrevRecords.length > 0) {
+          setRecords(backupPrevRecords);
+          saveLocalData({ records: backupPrevRecords });
+        }
+        recentRecordMutationsRef.current.delete(mutationKey);
+        throw new Error((res as any)?.error || '签到记录更新失败，请重试');
       }
+    } catch (err) {
+      if (backupPrevRecords.length > 0) {
+        setRecords(backupPrevRecords);
+        saveLocalData({ records: backupPrevRecords });
+      }
+      recentRecordMutationsRef.current.delete(mutationKey);
+      throw err;
     } finally {
       pendingMutationsRef.current.delete(mutationKey);
       notifyCrossTabSync();
