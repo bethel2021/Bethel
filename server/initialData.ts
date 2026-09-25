@@ -189,44 +189,31 @@ export const initialAdminAccounts: ServerAdminAccount[] = [
 
 // Initial Teachers for Bethel Church
 export const initialTeachers: any[] = [
-  // 1. 小小班 (class-1)
-  { id: 't-1-1', name: '春来', gender: 'girl', phone: '13812345671', wechat: 'chunlai_teacher', classId: 'class-1', roleTitle: '班级负责', joinDate: '2026-01-01' },
-  { id: 't-1-2', name: '洁如', gender: 'girl', phone: '13812345681', wechat: 'jieru_teacher', classId: 'class-1', roleTitle: '上课老师', joinDate: '2026-01-01' },
-  { id: 't-1-3', name: '彩霞', gender: 'girl', phone: '13812345691', wechat: 'caixia_teacher', classId: 'class-1', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-
-  // 2. 小班 (class-2)
-  { id: 't-2-1', name: '秋娟', gender: 'girl', phone: '13812345672', wechat: 'qiujuan_teacher', classId: 'class-2', roleTitle: '班级负责', joinDate: '2026-01-01' },
-  { id: 't-2-2', name: '雪峰', gender: 'boy', phone: '13812345682', wechat: 'xuefeng_teacher', classId: 'class-2', roleTitle: '上课老师', joinDate: '2026-01-01' },
-  { id: 't-2-3', name: '勤洁', gender: 'girl', phone: '13812345692', wechat: 'qinjie_teacher', classId: 'class-2', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-  { id: 't-2-4', name: '贴柔', gender: 'girl', phone: '13812345693', wechat: 'tierou_teacher', classId: 'class-2', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-
-  // 3. 中班 (class-3)
-  { id: 't-3-1', name: '若雪', gender: 'girl', phone: '13812345673', wechat: 'ruoxue_teacher', classId: 'class-3', roleTitle: '班级负责', joinDate: '2026-01-01' },
-  { id: 't-3-2', name: '约斯', gender: 'boy', phone: '13812345683', wechat: 'yuesi_teacher', classId: 'class-3', roleTitle: '上课老师', joinDate: '2026-01-01' },
-  { id: 't-3-3', name: '怡欣', gender: 'girl', phone: '13812345694', wechat: 'yixin_teacher', classId: 'class-3', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-  { id: 't-3-4', name: '佩帆', gender: 'girl', phone: '13812345695', wechat: 'peifan_teacher', classId: 'class-3', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-
-  // 4. 大班 (class-4)
-  { id: 't-4-1', name: '上好', gender: 'girl', phone: '13812345674', wechat: 'shanghao_teacher', classId: 'class-4', roleTitle: '班级负责', joinDate: '2026-01-01' },
-  { id: 't-4-2', name: '琴玲', gender: 'girl', phone: '13812345684', wechat: 'qinling_teacher', classId: 'class-4', roleTitle: '上课老师', joinDate: '2026-01-01' },
-  { id: 't-4-3', name: '依蕾', gender: 'girl', phone: '13812345696', wechat: 'yilei_teacher', classId: 'class-4', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-  { id: 't-4-4', name: '恩溢', gender: 'boy', phone: '13812345697', wechat: 'enyi_teacher', classId: 'class-4', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-
-  // 5. 初中班 (class-5)
-  { id: 't-5-1', name: '雪成', gender: 'girl', phone: '13812345675', wechat: 'xuecheng_teacher', classId: 'class-5', roleTitle: '班级负责', joinDate: '2026-01-01' },
-  { id: 't-5-2', name: '金若', gender: 'girl', phone: '13812345685', wechat: 'jinruo_teacher', classId: 'class-5', roleTitle: '上课老师', joinDate: '2026-01-01' },
-  { id: 't-5-3', name: '洋洋', gender: 'boy', phone: '13812345698', wechat: 'yangyang_teacher', classId: 'class-5', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-  { id: 't-5-4', name: '督军', gender: 'boy', phone: '13812345699', wechat: 'dujun_teacher', classId: 'class-5', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-
-  // 6. 高中班 (class-6)
-  { id: 't-6-1', name: '任志安', gender: 'boy', phone: '13812345676', wechat: 'zhian_teacher', classId: 'class-6', roleTitle: '班级负责', joinDate: '2026-01-01' },
-  { id: 't-6-2', name: '陈师母', gender: 'girl', phone: '13812345686', wechat: 'chenshim_teacher', classId: 'class-6', roleTitle: '上课老师', joinDate: '2026-01-01' },
-  { id: 't-6-3', name: '显美', gender: 'girl', phone: '13812345700', wechat: 'xianmei_teacher', classId: 'class-6', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-  { id: 't-6-4', name: '周妹', gender: 'girl', phone: '13812345701', wechat: 'zhoumei_teacher', classId: 'class-6', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-
-  // 7. 以斯拉团契 (class-7)
-  { id: 't-7-1', name: '毛东丽', gender: 'girl', phone: '13812345677', wechat: 'dongli_teacher', classId: 'class-7', roleTitle: '班级负责', joinDate: '2026-01-01' },
-  { id: 't-7-2', name: '陈海伟牧师', gender: 'boy', phone: '13812345687', wechat: 'haiwei_pastor', classId: 'class-7', roleTitle: '上课老师', joinDate: '2026-01-01' },
-  { id: 't-7-3', name: '来俊', gender: 'boy', phone: '13812345702', wechat: 'laijun_teacher', classId: 'class-7', roleTitle: '辅助老师', joinDate: '2026-01-01' },
-  { id: 't-7-4', name: '张国', gender: 'boy', phone: '13812345703', wechat: 'zhangguo_teacher', classId: 'class-7', roleTitle: '辅助老师', joinDate: '2026-01-01' }
+  { id: 't-1', name: '胡春来', gender: 'girl', phone: '13888889999', wechat: '', classId: 'class-1', roleTitle: '班主任', joinDate: '2026-01-01' },
+  { id: 't-997860', name: '戴洁如', gender: 'girl', phone: '', wechat: '', classId: 'class-1', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-030776', name: '梅彩霞', gender: 'girl', phone: '', wechat: '', classId: 'class-1', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-2', name: '戴秋娟', gender: 'girl', phone: '13812345672', wechat: '', classId: 'class-2', roleTitle: '班主任', joinDate: '2026-01-01' },
+  { id: 't-642536', name: '林雪峰', gender: 'girl', phone: '', wechat: '', classId: 'class-2', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-665889', name: '戴贴柔', gender: 'girl', phone: '', wechat: '', classId: 'class-2', roleTitle: '辅助', joinDate: '2026-09-23' },
+  { id: 't-693298', name: '姜勤洁', gender: 'girl', phone: '', wechat: '', classId: 'class-2', roleTitle: '辅助', joinDate: '2026-09-23' },
+  { id: 't-3', name: '翁若雪', gender: 'girl', phone: '13812345673', wechat: '', classId: 'class-3', roleTitle: '班主任', joinDate: '2026-01-01' },
+  { id: 't-733717', name: '徐约斯', gender: 'girl', phone: '', wechat: '', classId: 'class-3', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-750778', name: '陈怡欣', gender: 'girl', phone: '', wechat: '', classId: 'class-3', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-776531', name: '陈佩帆', gender: 'girl', phone: '', wechat: '', classId: 'class-3', roleTitle: '辅助', joinDate: '2026-09-23' },
+  { id: 't-4', name: '陈上好', gender: 'girl', phone: '13812345674', wechat: '', classId: 'class-4', roleTitle: '班主任', joinDate: '2026-01-01' },
+  { id: 't-822782', name: '李琴玲', gender: 'girl', phone: '', wechat: '', classId: 'class-4', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-861782', name: '徐依蕾', gender: 'girl', phone: '', wechat: '', classId: 'class-4', roleTitle: '辅助', joinDate: '2026-09-23' },
+  { id: 't-874954', name: '陈恩溢', gender: 'boy', phone: '', wechat: '', classId: 'class-4', roleTitle: '辅助', joinDate: '2026-09-23' },
+  { id: 't-5', name: '林雪成', gender: 'girl', phone: '13812345675', wechat: '', classId: 'class-5', roleTitle: '班主任', joinDate: '2026-01-01' },
+  { id: 't-902518', name: '金若', gender: 'girl', phone: '', wechat: '', classId: 'class-5', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-919736', name: '陈洋洋', gender: 'girl', phone: '', wechat: '', classId: 'class-5', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-943990', name: '朱督军', gender: 'boy', phone: '', wechat: '', classId: 'class-5', roleTitle: '辅助', joinDate: '2026-09-23' },
+  { id: 't-6', name: '任志安', gender: 'boy', phone: '3273778891', wechat: '', classId: 'class-6', roleTitle: '班主任', joinDate: '2026-01-01' },
+  { id: 't-964711', name: '傅丽敏', gender: 'girl', phone: '', wechat: '', classId: 'class-6', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-979816', name: '王显美', gender: 'girl', phone: '', wechat: '', classId: 'class-6', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-996536', name: '周妹', gender: 'girl', phone: '', wechat: '', classId: 'class-6', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-7', name: '毛东丽', gender: 'girl', phone: '3518818858', wechat: '', classId: 'class-7', roleTitle: '班主任', joinDate: '2026-01-01' },
+  { id: 't-019975', name: '陈海伟牧师', gender: 'boy', phone: '', wechat: '', classId: 'class-7', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-033752', name: '叶来俊', gender: 'boy', phone: '', wechat: '', classId: 'class-7', roleTitle: '上课', joinDate: '2026-09-23' },
+  { id: 't-044781', name: '张国', gender: 'boy', phone: '', wechat: '', classId: 'class-7', roleTitle: '上课', joinDate: '2026-09-23' }
 ];

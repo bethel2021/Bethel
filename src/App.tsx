@@ -277,7 +277,6 @@ export default function App() {
       const serverHiddenIds = new Set<string>([
         ...(Array.isArray(data.hiddenClassIds) ? data.hiddenClassIds : []),
         ...(Array.isArray(data.config?.hiddenClassIds) ? data.config.hiddenClassIds : []),
-        ...Array.from(getLocalHiddenClassIds())
       ]);
 
       const mergedClasses = data.classes.map((c: any) => {
@@ -289,12 +288,12 @@ export default function App() {
             ...pending,
             isHiddenFromHome: pending.isHiddenFromHome !== undefined 
               ? !!pending.isHiddenFromHome 
-              : (c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || serverHiddenIds.has(c.id))
+              : (serverHiddenIds.has(c.id) || c.isHiddenFromHome === true)
           };
         }
 
-        // 2. Class hidden status:
-        const isHidden = c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true' || serverHiddenIds.has(c.id);
+        // 2. Class hidden status is server-authoritative
+        const isHidden = serverHiddenIds.has(c.id) || (c.isHiddenFromHome === true && (!data.hiddenClassIds || serverHiddenIds.has(c.id)));
 
         return {
           ...c,
@@ -302,8 +301,8 @@ export default function App() {
         };
       });
 
-      // Synchronize persistent hidden class IDs with authoritative merged result
-      const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => c.isHiddenFromHome === true || String(c.isHiddenFromHome) === 'true').map((c: any) => c.id as string));
+      // Synchronize persistent hidden class IDs with authoritative server result
+      const newHiddenSet = new Set<string>(mergedClasses.filter((c: any) => c.isHiddenFromHome === true).map((c: any) => c.id as string));
       saveLocalHiddenClassIds(newHiddenSet);
 
       const filteredClasses = mergedClasses.filter((c: any) => !recentDeletionsRef.current.has(c.id));
@@ -587,6 +586,13 @@ export default function App() {
 
   useEffect(() => {
     document.title = '伯特利主日学与团契IMS';
+    // One-time self-healing check: purge legacy poisoned hidden class storage
+    try {
+      const rawHidden = localStorage.getItem('bethel_hidden_class_ids');
+      if (rawHidden && (rawHidden.includes('class-1') || rawHidden.includes('class-2') || rawHidden.includes('class-5'))) {
+        localStorage.removeItem('bethel_hidden_class_ids');
+      }
+    } catch {}
   }, []);
 
   // Multi-Engine Real-Time Sync Loop (WebSocket + SSE + Instant Long-Polling)

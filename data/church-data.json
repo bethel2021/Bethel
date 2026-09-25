@@ -738,7 +738,7 @@
     }
   ],
   "activeSunday": "2026-09-27",
-  "syncVersion": 638,
+  "syncVersion": 639,
   "hiddenClassIds": [
     "class-1",
     "class-2",
@@ -749,12 +749,22 @@
   ],
   "teachers": [
     {
-      "id": "t-019975",
-      "name": "陈海伟牧师",
-      "gender": "boy",
+      "id": "t-1",
+      "name": "胡春来",
+      "gender": "girl",
+      "phone": "13888889999",
+      "wechat": "",
+      "classId": "class-1",
+      "roleTitle": "班主任",
+      "joinDate": "2026-01-01"
+    },
+    {
+      "id": "t-997860",
+      "name": "戴洁如",
+      "gender": "girl",
       "phone": "",
       "wechat": "",
-      "classId": "class-7",
+      "classId": "class-1",
       "roleTitle": "上课",
       "joinDate": "2026-09-23"
     },
@@ -769,83 +779,12 @@
       "joinDate": "2026-09-23"
     },
     {
-      "id": "t-033752",
-      "name": "叶来俊",
-      "gender": "boy",
-      "phone": "",
-      "wechat": "",
-      "classId": "class-7",
-      "roleTitle": "上课",
-      "joinDate": "2026-09-23"
-    },
-    {
-      "id": "t-044781",
-      "name": "张国",
-      "gender": "boy",
-      "phone": "",
-      "wechat": "",
-      "classId": "class-7",
-      "roleTitle": "上课",
-      "joinDate": "2026-09-23"
-    },
-    {
-      "id": "t-1",
-      "name": "胡春来",
-      "gender": "girl",
-      "phone": "13888889999",
-      "wechat": "",
-      "classId": "class-1",
-      "roleTitle": "班主任",
-      "joinDate": "2026-01-01",
-      "notes": "修改测试备注_1790147655674"
-    },
-    {
       "id": "t-2",
       "name": "戴秋娟",
       "gender": "girl",
       "phone": "13812345672",
       "wechat": "",
       "classId": "class-2",
-      "roleTitle": "班主任",
-      "joinDate": "2026-01-01"
-    },
-    {
-      "id": "t-3",
-      "name": "翁若雪",
-      "gender": "girl",
-      "phone": "13812345673",
-      "wechat": "",
-      "classId": "class-3",
-      "roleTitle": "班主任",
-      "joinDate": "2026-01-01"
-    },
-    {
-      "id": "t-4",
-      "name": "陈上好",
-      "gender": "girl",
-      "phone": "13812345674",
-      "wechat": "",
-      "classId": "class-4",
-      "roleTitle": "班主任",
-      "joinDate": "2026-01-01"
-    },
-    {
-      "id": "t-5",
-      "name": "林雪成",
-      "gender": "girl",
-      "phone": "13812345675",
-      "wechat": "",
-      "classId": "class-5",
-      "roleTitle": "班主任",
-      "joinDate": "2026-01-01"
-    },
-    {
-      "id": "t-6",
-      "name": "任志安",
-      "gender": "boy",
-      "phone": "3273778891",
-      "wechat": "",
-      "classId": "class-6",
       "roleTitle": "班主任",
       "joinDate": "2026-01-01"
     },
@@ -880,12 +819,12 @@
       "joinDate": "2026-09-23"
     },
     {
-      "id": "t-7",
-      "name": "毛东丽",
+      "id": "t-3",
+      "name": "翁若雪",
       "gender": "girl",
-      "phone": "3518818858",
+      "phone": "13812345673",
       "wechat": "",
-      "classId": "class-7",
+      "classId": "class-3",
       "roleTitle": "班主任",
       "joinDate": "2026-01-01"
     },
@@ -920,6 +859,16 @@
       "joinDate": "2026-09-23"
     },
     {
+      "id": "t-4",
+      "name": "陈上好",
+      "gender": "girl",
+      "phone": "13812345674",
+      "wechat": "",
+      "classId": "class-4",
+      "roleTitle": "班主任",
+      "joinDate": "2026-01-01"
+    },
+    {
       "id": "t-822782",
       "name": "李琴玲",
       "gender": "girl",
@@ -948,6 +897,16 @@
       "classId": "class-4",
       "roleTitle": "辅助",
       "joinDate": "2026-09-23"
+    },
+    {
+      "id": "t-5",
+      "name": "林雪成",
+      "gender": "girl",
+      "phone": "13812345675",
+      "wechat": "",
+      "classId": "class-5",
+      "roleTitle": "班主任",
+      "joinDate": "2026-01-01"
     },
     {
       "id": "t-902518",
@@ -980,6 +939,16 @@
       "joinDate": "2026-09-23"
     },
     {
+      "id": "t-6",
+      "name": "任志安",
+      "gender": "boy",
+      "phone": "3273778891",
+      "wechat": "",
+      "classId": "class-6",
+      "roleTitle": "班主任",
+      "joinDate": "2026-01-01"
+    },
+    {
       "id": "t-964711",
       "name": "傅丽敏",
       "gender": "girl",
@@ -1010,15 +979,45 @@
       "joinDate": "2026-09-23"
     },
     {
-      "id": "t-997860",
-      "name": "戴洁如",
+      "id": "t-7",
+      "name": "毛东丽",
       "gender": "girl",
+      "phone": "3518818858",
+      "wechat": "",
+      "classId": "class-7",
+      "roleTitle": "班主任",
+      "joinDate": "2026-01-01"
+    },
+    {
+      "id": "t-019975",
+      "name": "陈海伟牧师",
+      "gender": "boy",
       "phone": "",
       "wechat": "",
-      "classId": "class-1",
+      "classId": "class-7",
+      "roleTitle": "上课",
+      "joinDate": "2026-09-23"
+    },
+    {
+      "id": "t-033752",
+      "name": "叶来俊",
+      "gender": "boy",
+      "phone": "",
+      "wechat": "",
+      "classId": "class-7",
+      "roleTitle": "上课",
+      "joinDate": "2026-09-23"
+    },
+    {
+      "id": "t-044781",
+      "name": "张国",
+      "gender": "boy",
+      "phone": "",
+      "wechat": "",
+      "classId": "class-7",
       "roleTitle": "上课",
       "joinDate": "2026-09-23"
     }
   ],
-  "updatedAt": "2026-09-25T09:08:08.284Z"
+  "updatedAt": "2026-09-25T09:29:11.810Z"
 }

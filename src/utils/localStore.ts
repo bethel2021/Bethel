@@ -242,10 +242,11 @@ export function getLocalData() {
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const config: SystemConfig = rawConfig ? { ...initialSystemConfig, ...JSON.parse(rawConfig) } : initialSystemConfig;
 
+    const hiddenSet = new Set(Array.isArray(config.hiddenClassIds) ? config.hiddenClassIds : []);
     classes = classes.map(c => {
-      const isHidden = typeof c.isHiddenFromHome === 'boolean'
-        ? c.isHiddenFromHome
-        : (Array.isArray(config.hiddenClassIds) ? config.hiddenClassIds.includes(c.id) : false);
+      const isHidden = Array.isArray(config.hiddenClassIds)
+        ? hiddenSet.has(c.id)
+        : (typeof c.isHiddenFromHome === 'boolean' ? c.isHiddenFromHome : false);
       const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);
       return {
         ...c,
