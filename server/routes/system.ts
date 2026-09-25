@@ -187,8 +187,7 @@ systemRouter.post('/cloud-sync', async (req: Request, res: Response) => {
     }
     await dataStore.initOrLoadDataAsync(false);
     const merged = mergeClientData(payload);
-    notifyDataChange();
-    scheduleSupabaseSnapshotSave(2000);
+    await saveDataToSupabase();
     res.json({
       success: true,
       message: '多设备终端云端数据已成功双向同步！',

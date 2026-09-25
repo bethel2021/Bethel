@@ -335,9 +335,7 @@ attendanceRouter.post('/batch-checkin', async (req: Request, res: Response) => {
       updatedCount++;
     });
 
-    notifyDataChange();
-    saveDataToFile();
-    scheduleSupabaseSnapshotSave(500);
+    await saveDataToFile();
 
     res.json({
       success: true,

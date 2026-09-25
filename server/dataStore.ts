@@ -1088,14 +1088,12 @@ export async function saveClass(cls: ClassGroup): Promise<ClassGroup> {
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
   try {
     await supabaseUpsertClass(saved);
   } catch (err) {
     console.warn('[Storage Error] supabaseUpsertClass failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return saved;
 }
 
@@ -1116,14 +1114,12 @@ export async function updateClass(id: string, updates: Partial<ClassGroup>): Pro
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
   try {
     await supabaseUpsertClass(updated);
   } catch (err) {
     console.warn('[Storage Error] supabaseUpsertClass failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return updated;
 }
 
@@ -1214,10 +1210,10 @@ export async function deleteClass(id: string): Promise<boolean> {
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-
-  supabaseDeleteClass(clsId).catch(() => {});
-  scheduleSupabaseSnapshotSave(2000);
+  try {
+    await supabaseDeleteClass(clsId);
+  } catch (err) {}
+  await saveDataToSupabase();
   return true;
 }
 
@@ -1252,14 +1248,12 @@ export async function saveStudent(student: Student): Promise<Student> {
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
   try {
     await supabaseUpsertStudent(saved);
   } catch (err) {
     console.warn('[Storage Error] supabaseUpsertStudent failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return saved;
 }
 
@@ -1283,14 +1277,12 @@ export async function saveStudentsBatch(newStudents: Student[]): Promise<Student
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
   try {
     await supabaseUpsertStudentsBatch(newStudents);
   } catch (err) {
     console.warn('[Storage Error] supabaseUpsertStudentsBatch failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return newStudents;
 }
 
@@ -1310,14 +1302,12 @@ export async function updateStudent(id: string, updates: Partial<Student>): Prom
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
   try {
     await supabaseUpsertStudent(updated);
   } catch (err) {
     console.warn('[Storage Error] supabaseUpsertStudent failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return updated;
 }
 
@@ -1341,15 +1331,12 @@ export async function deleteStudent(id: string): Promise<Student | null> {
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
-
   try {
     await supabaseDeleteStudent(removed.id);
   } catch (err) {
     console.warn('[Storage Error] supabaseDeleteStudent failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return removed;
 }
 
@@ -1435,14 +1422,12 @@ export async function saveTeacher(teacher: any): Promise<any> {
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
   try {
     await supabaseUpsertTeacher(savedTeacher);
   } catch (err) {
     console.warn('[Storage Error] supabaseUpsertTeacher failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return savedTeacher;
 }
 
@@ -1452,14 +1437,12 @@ export async function updateTeacher(id: string, updates: any): Promise<any | nul
   teachers[existingIdx] = { ...teachers[existingIdx], ...updates };
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
   try {
     await supabaseUpsertTeacher(teachers[existingIdx]);
   } catch (err) {
     console.warn('[Storage Error] supabaseUpsertTeacher failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return teachers[existingIdx];
 }
 
@@ -1471,14 +1454,12 @@ export async function deleteTeacher(id: string): Promise<any | null> {
   deletedTeacherIds.add(id);
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
-  saveDataToFile();
   try {
     await supabaseDeleteTeacher(removed.id);
   } catch (err) {
     console.warn('[Storage Error] supabaseDeleteTeacher failed:', err);
   }
-  scheduleSupabaseSnapshotSave(500);
+  await saveDataToSupabase();
   return removed;
 }
 
@@ -1509,7 +1490,12 @@ export async function saveAttendanceRecord(record: AttendanceRecord, extra?: any
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
+  try {
+    await supabaseUpsertAttendanceRecord(record);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseUpsertAttendanceRecord failed:', err);
+  }
+  await saveDataToSupabase();
   notifyDataChange(extra || {
     action: 'checkin',
     record,
@@ -1518,8 +1504,6 @@ export async function saveAttendanceRecord(record: AttendanceRecord, extra?: any
     classId: record.classId,
     status: record.status
   });
-  supabaseUpsertAttendanceRecord(record).catch(() => {});
-  scheduleSupabaseSnapshotSave(500);
   return record;
 }
 
@@ -1546,7 +1530,12 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
+  try {
+    await supabaseDeleteAttendanceRecord(studentId, date, recId);
+  } catch (err) {
+    console.warn('[Storage Error] supabaseDeleteAttendanceRecord failed:', err);
+  }
+  await saveDataToSupabase();
   notifyDataChange(extra || {
     action: 'absent',
     studentId,
@@ -1555,8 +1544,6 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
     status: 'absent',
     date
   });
-  supabaseDeleteAttendanceRecord(studentId, date, recId).catch(() => {});
-  scheduleSupabaseSnapshotSave(500);
   return true;
 }
 
@@ -1613,9 +1600,10 @@ export async function saveAdminAccount(account: ServerAdminAccount): Promise<Ser
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertAdminAccount(targetAccount);
-  scheduleSupabaseSnapshotSave();
+  try {
+    await supabaseUpsertAdminAccount(targetAccount);
+  } catch (err) {}
+  await saveDataToSupabase();
   return targetAccount;
 }
 
@@ -1628,9 +1616,10 @@ export async function updateAdminAccount(username: string, updates: Partial<Serv
   adminAccounts[existingIdx] = { ...adminAccounts[existingIdx], ...updates };
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpsertAdminAccount(adminAccounts[existingIdx]);
-  scheduleSupabaseSnapshotSave();
+  try {
+    await supabaseUpsertAdminAccount(adminAccounts[existingIdx]);
+  } catch (err) {}
+  await saveDataToSupabase();
   return adminAccounts[existingIdx];
 }
 
@@ -1644,9 +1633,10 @@ export async function updateAccountPassword(username: string, newPassword: strin
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  saveDataToFile();
-  await supabaseUpdateAccountPassword(username, hashed);
-  scheduleSupabaseSnapshotSave();
+  try {
+    await supabaseUpdateAccountPassword(username, hashed);
+  } catch (err) {}
+  await saveDataToSupabase();
   return true;
 }
 
@@ -1656,9 +1646,10 @@ export async function deleteAdminAccount(username: string): Promise<ServerAdminA
   const deleted = adminAccounts.splice(existingIdx, 1)[0];
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  await saveDataToFile();
-  await supabaseDeleteAdminAccount(username);
-  scheduleSupabaseSnapshotSave();
+  try {
+    await supabaseDeleteAdminAccount(username);
+  } catch (err) {}
+  await saveDataToSupabase();
   return deleted;
 }
 
