@@ -29,6 +29,9 @@ import {
   getLastModifiedTimestamp,
   mergeClientData,
   onDataChange,
+  notifyDataChange,
+  bumpSyncVersion,
+  scheduleSupabaseSnapshotSave,
   teachers,
   deletedRecordKeys,
   addDeletedRecordKey,
@@ -38,6 +41,7 @@ import {
   comparePassword,
   dataStore
 } from './dataStore.js';
+import { supabaseUpsertAttendanceRecord } from './supabaseDb.js';
 import { isGeminiConfigured, generateDevotionalOrSummary } from './geminiService.js';
 
 const app = express();
@@ -926,29 +930,40 @@ apiRouter.post('/batch-checkin', async (req: Request, res: Response) => {
     targetStudents.forEach(stu => {
       removeDeletedRecordKey(`${stu.id}_${targetDate}`);
       const existingIdx = records.findIndex(r => r.studentId === stu.id && r.date === targetDate);
+      const recId = existingIdx !== -1 ? records[existingIdx].id : `rec-${targetDate}-${stu.id}-${Date.now()}`;
+      removeDeletedRecordKey(recId);
+
+      const recordItem: AttendanceRecord = {
+        id: recId,
+        studentId: stu.id,
+        studentName: stu.name,
+        classId: stu.classId,
+        date: targetDate,
+        timestamp: now.toISOString(),
+        timeStr,
+        status: finalStatus,
+        method: 'manual_teacher',
+        memoryVerseCompleted: systemConfig.defaultMemoryVerseChecked,
+        offeringCompleted: systemConfig.defaultOfferingChecked,
+        isTestMode: systemConfig.testMode ? true : undefined
+      };
+
       if (existingIdx !== -1) {
-        records[existingIdx].status = finalStatus;
+        records[existingIdx] = recordItem;
       } else {
-        records.push({
-          id: `rec-${targetDate}-${stu.id}-${Date.now()}`,
-          studentId: stu.id,
-          studentName: stu.name,
-          classId: stu.classId,
-          date: targetDate,
-          timestamp: now.toISOString(),
-          timeStr,
-          status: finalStatus,
-          method: 'manual_teacher',
-          memoryVerseCompleted: systemConfig.defaultMemoryVerseChecked,
-          offeringCompleted: systemConfig.defaultOfferingChecked
-        });
+        records.push(recordItem);
       }
+      supabaseUpsertAttendanceRecord(recordItem).catch(() => {});
       updatedCount++;
     });
 
-    await saveDataToSupabase();
+    bumpSyncVersion();
+    notifyDataChange();
+    saveDataToFile().catch(() => {});
+    scheduleSupabaseSnapshotSave(1500);
+    broadcastRealtimeState('records_updated');
 
-    res.json({ success: true, message: `已成功为 ${updatedCount} 位学员登记到校！` });
+    res.json({ success: true, updatedCount, records, message: `已成功为 ${updatedCount} 位学员登记到校！` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

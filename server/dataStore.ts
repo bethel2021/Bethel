@@ -54,6 +54,12 @@ export function getSyncVersion(): number {
   return syncVersion;
 }
 
+export function bumpSyncVersion(): number {
+  syncVersion++;
+  lastModifiedTimestamp = new Date().toISOString();
+  return syncVersion;
+}
+
 export function getLastModifiedTimestamp(): string {
   return lastModifiedTimestamp;
 }
@@ -1658,6 +1664,9 @@ export const dataStore = {
   deleteAdminAccount,
 
   // State & Sync
+  bumpSyncVersion,
+  notifyDataChange,
+  scheduleSupabaseSnapshotSave,
   resetAllData,
   getFullState: getFullStatePayload,
   initOrLoadDataAsync,

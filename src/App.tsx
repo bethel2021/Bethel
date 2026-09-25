@@ -331,69 +331,62 @@ export default function App() {
       setActiveSunday(prev => prev === data.activeSunday ? prev : data.activeSunday);
     }
 
+    // Build active deletedSet reconciled against incoming server data
+    let activeDeletedSet = getLocalDeletedRecordKeys();
     if (Array.isArray(data.deletedRecordKeys)) {
-      const serverDeletedKeys = new Set(data.deletedRecordKeys.filter((k: any) => typeof k === 'string' && k));
-      // Remove any keys of active incoming records from deleted keys
-      if (Array.isArray(data.records)) {
-        data.records.forEach((r: any) => {
-          if (r) {
-            if (r.id) {
-              serverDeletedKeys.delete(r.id);
-              removeLocalDeletedRecordKey(r.id);
-            }
-            if (r.studentId && r.date) {
-              serverDeletedKeys.delete(`${r.studentId}_${r.date}`);
-              removeLocalDeletedRecordKey(`${r.studentId}_${r.date}`);
-            }
-          }
-        });
-      }
-      try {
-        localStorage.setItem('bethel_deleted_record_keys', JSON.stringify(Array.from(serverDeletedKeys)));
-      } catch {}
-    } else if (Array.isArray(data.records)) {
+      activeDeletedSet = new Set(data.deletedRecordKeys.filter((k: any) => typeof k === 'string' && k));
+    }
+
+    if (Array.isArray(data.records)) {
       data.records.forEach((r: any) => {
         if (r) {
-          if (r.id) removeLocalDeletedRecordKey(r.id);
-          if (r.studentId && r.date) removeLocalDeletedRecordKey(`${r.studentId}_${r.date}`);
+          if (r.id) {
+            activeDeletedSet.delete(r.id);
+            removeLocalDeletedRecordKey(r.id);
+          }
+          if (r.studentId && r.date) {
+            activeDeletedSet.delete(`${r.studentId}_${r.date}`);
+            removeLocalDeletedRecordKey(`${r.studentId}_${r.date}`);
+          }
         }
       });
+      try {
+        localStorage.setItem('bethel_deleted_record_keys', JSON.stringify(Array.from(activeDeletedSet)));
+      } catch {}
     }
 
     let mergedRecordsForCache: AttendanceRecord[] | undefined;
     if (Array.isArray(data.records)) {
       const now = Date.now();
-      // Clean up mutations older than 8s or that have already settled in incoming server data
+      // Clean up mutations older than 3s or that have already settled in incoming server data
       for (const [key, meta] of recentRecordMutationsRef.current.entries()) {
         const [sId, dStr] = key.split('_KEY_SPLIT_');
         const serverRec = data.records.find((r: any) => r.studentId === sId && r.date === dStr);
         if (meta.record) {
           if (serverRec && serverRec.status === meta.record.status) {
             recentRecordMutationsRef.current.delete(key);
-          } else if (now - meta.timestamp > 8000) {
+          } else if (now - meta.timestamp > 3000) {
             recentRecordMutationsRef.current.delete(key);
           }
         } else {
           if (!serverRec) {
             recentRecordMutationsRef.current.delete(key);
-          } else if (now - meta.timestamp > 8000) {
+          } else if (now - meta.timestamp > 3000) {
             recentRecordMutationsRef.current.delete(key);
           }
         }
       }
 
       setRecords(prev => {
-        const deletedSet = getLocalDeletedRecordKeys();
         let incomingRecords: AttendanceRecord[] = data.records.filter((r: any) => 
-          !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
+          !activeDeletedSet.has(r.id) && !activeDeletedSet.has(`${r.studentId}_${r.date}`)
         );
 
-        // Anti-Rollback & Anti-Bounce Protection:
-        // Merge recent optimistic mutations (within 8s window or currently in flight)
+        // Anti-Rollback & Anti-Bounce Protection for active in-flight local mutations
         if (recentRecordMutationsRef.current.size > 0 || pendingMutationsRef.current.size > 0) {
           const merged = [...incomingRecords];
 
-          // 1. Apply recent local mutations (highest priority against stale server snapshots)
+          // 1. Apply recent local mutations
           recentRecordMutationsRef.current.forEach((meta, key) => {
             const [sId, dStr] = key.split('_KEY_SPLIT_');
             const idx = merged.findIndex(r => r.studentId === sId && r.date === dStr);
@@ -416,9 +409,7 @@ export default function App() {
             }
           });
 
-          incomingRecords = merged.filter((r: any) => 
-            !deletedSet.has(r.id) && !deletedSet.has(`${r.studentId}_${r.date}`)
-          );
+          incomingRecords = merged;
         }
 
         mergedRecordsForCache = incomingRecords;
