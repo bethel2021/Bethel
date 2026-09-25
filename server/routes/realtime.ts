@@ -76,6 +76,9 @@ export function broadcastRealtimeState(eventType: string = 'state_update', extra
   for (const res of Array.from(sseClients)) {
     try {
       res.write(`event: update\ndata: ${jsonString}\n\n`);
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
     } catch (err) {
       sseClients.delete(res);
     }
@@ -95,8 +98,8 @@ export function broadcastRealtimeState(eventType: string = 'state_update', extra
 }
 
 // Automatically broadcast whenever server data changes
-onDataChange(() => {
-  broadcastRealtimeState('data_change');
+onDataChange((changeData) => {
+  broadcastRealtimeState('data_change', changeData.extra);
 });
 
 export function registerWebSocketClient(ws: any) {
@@ -130,8 +133,9 @@ export function registerWebSocketClient(ws: any) {
 
 // 1.2 Real-time Server-Sent Events (SSE) Stream (<50ms ultra-low latency push)
 realtimeRouter.get('/realtime-stream', (req: Request, res: Response) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -144,16 +148,22 @@ realtimeRouter.get('/realtime-stream', (req: Request, res: Response) => {
   // Send initial full state immediately upon connection
   const initialData = JSON.stringify(getCurrentStatePayload('sse_init'));
   res.write(`event: initial\ndata: ${initialData}\n\n`);
+  if (typeof (res as any).flush === 'function') {
+    (res as any).flush();
+  }
 
-  // Adaptive ping interval: send keep-alive comment every 25 seconds
+  // Adaptive ping interval: send keep-alive comment every 15 seconds
   const pingInterval = setInterval(() => {
     try {
       res.write(': ping\n\n');
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
     } catch {
       clearInterval(pingInterval);
       sseClients.delete(res);
     }
-  }, 25000);
+  }, 15000);
 
   req.on('close', () => {
     clearInterval(pingInterval);

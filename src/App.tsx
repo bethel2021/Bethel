@@ -369,6 +369,7 @@ export default function App() {
     let mergedRecordsForCache: AttendanceRecord[] | undefined;
     if (Array.isArray(data.records)) {
       const now = Date.now();
+
       // Clean up mutations older than 8s or that have already settled in incoming server data
       for (const [key, meta] of recentRecordMutationsRef.current.entries()) {
         const [sId, dStr] = key.split('_KEY_SPLIT_');

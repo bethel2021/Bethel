@@ -17,8 +17,22 @@ async function startServer() {
 
   const server = http.createServer(app);
 
-  // Initialize WebSocket server on /ws
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  // Initialize WebSocket server on /ws with explicit upgrade handler
+  const wss = new WebSocketServer({ noServer: true });
+  
+  server.on('upgrade', (request, socket, head) => {
+    try {
+      const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+      if (url.pathname === '/ws') {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit('connection', ws, request);
+        });
+      }
+    } catch {
+      // Allow other upgrade handlers (like Vite) to proceed
+    }
+  });
+
   wss.on('connection', (ws: WebSocket) => {
     registerWebSocketClient(ws);
   });

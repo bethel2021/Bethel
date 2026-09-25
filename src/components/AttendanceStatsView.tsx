@@ -843,7 +843,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
               <span>主日考勤统计与成长档案</span>
             </h2>
             <p className="text-xs text-slate-500">
-              包含月度考勤明细矩阵、班级报表及年度学年成绩与荣誉结业证书
+              包含月度考勤明细矩阵、班级报表及学年荣誉证书
             </p>
           </div>
         </div>
@@ -871,7 +871,7 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
             }`}
           >
             <Award className="w-3.5 h-3.5 text-amber-700" />
-            <span>年度学年成绩与荣誉</span>
+            <span>学年荣誉证书</span>
           </button>
         </div>
       </div>
@@ -937,11 +937,12 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
               <select
                 value={filterClassId}
                 onChange={e => setFilterClassId(e.target.value)}
-                className="h-9 w-44 px-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white focus:bg-white text-slate-700 text-xs font-semibold text-center cursor-pointer transition-colors shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 appearance-none"
+                className="h-9 w-44 px-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white focus:bg-white text-slate-700 text-xs font-semibold text-center [text-align-last:center] cursor-pointer transition-colors shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 appearance-none"
+                style={{ textAlign: 'center', textAlignLast: 'center' }}
               >
-                <option value="all">全部班级 ({students.length}人)</option>
+                <option value="all" className="text-center" style={{ textAlign: 'center' }}>全部班级 ({students.length}人)</option>
                 {classes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id} className="text-center" style={{ textAlign: 'center' }}>{c.name}</option>
                 ))}
               </select>
 
@@ -1714,11 +1715,12 @@ export const AttendanceStatsView: React.FC<AttendanceStatsViewProps> = ({
                 <select
                   value={filterClassId}
                   onChange={(e) => setFilterClassId(e.target.value)}
-                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 text-center [text-align-last:center] focus:outline-hidden focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                  style={{ textAlign: 'center', textAlignLast: 'center' }}
                 >
-                  <option value="all">全部班级汇总</option>
+                  <option value="all" className="text-center" style={{ textAlign: 'center' }}>全部班级汇总</option>
                   {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.teacherName})</option>
+                    <option key={c.id} value={c.id} className="text-center" style={{ textAlign: 'center' }}>{c.name} ({c.teacherName})</option>
                   ))}
                 </select>
               </div>

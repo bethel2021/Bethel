@@ -188,6 +188,7 @@ type DataChangeListener = (data: {
   syncVersion: number;
   lastModifiedTimestamp: string;
   teachers?: any[];
+  extra?: any;
 }) => void;
 
 const changeListeners = new Set<DataChangeListener>();
@@ -197,7 +198,7 @@ export function onDataChange(listener: DataChangeListener): () => void {
   return () => changeListeners.delete(listener);
 }
 
-export function notifyDataChange() {
+export function notifyDataChange(extra?: any) {
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   for (const listener of changeListeners) {
@@ -212,7 +213,8 @@ export function notifyDataChange() {
         activeSunday,
         syncVersion,
         lastModifiedTimestamp,
-        teachers
+        teachers,
+        extra
       });
     } catch (err) {
       console.warn('[Realtime Sync Error] Listener callback failed:', err);
@@ -1487,7 +1489,7 @@ export async function getAttendanceRecords(filter?: { date?: string; studentId?:
   return res;
 }
 
-export async function saveAttendanceRecord(record: AttendanceRecord): Promise<AttendanceRecord> {
+export async function saveAttendanceRecord(record: AttendanceRecord, extra?: any): Promise<AttendanceRecord> {
   removeDeletedRecordKey(record.id);
   removeDeletedRecordKey(`${record.studentId}_${record.date}`);
 
@@ -1499,22 +1501,31 @@ export async function saveAttendanceRecord(record: AttendanceRecord): Promise<At
   }
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
+  notifyDataChange(extra || {
+    action: 'checkin',
+    record,
+    studentId: record.studentId,
+    studentName: record.studentName,
+    classId: record.classId,
+    status: record.status
+  });
   supabaseUpsertAttendanceRecord(record).catch(() => {});
   scheduleSupabaseSnapshotSave(2000);
   return record;
 }
 
-export async function updateAttendanceRecord(record: AttendanceRecord): Promise<AttendanceRecord> {
-  return saveAttendanceRecord(record);
+export async function updateAttendanceRecord(record: AttendanceRecord, extra?: any): Promise<AttendanceRecord> {
+  return saveAttendanceRecord(record, extra);
 }
 
-export async function deleteAttendanceRecord(studentId: string, date: string, recordId?: string): Promise<boolean> {
+export async function deleteAttendanceRecord(studentId: string, date: string, recordId?: string, extra?: any): Promise<boolean> {
   const recId = recordId || records.find(r => r.studentId === studentId && r.date === date)?.id || `rec-del-${studentId}-${date}`;
   const studentDateKey = `${studentId}_${date}`;
 
   addDeletedRecordKey(recId);
   addDeletedRecordKey(studentDateKey);
+
+  const existingRecord = records.find(r => r.id === recId || (r.studentId === studentId && r.date === date));
 
   setRecords(records.filter(r => {
     if (r.id === recId) return false;
@@ -1524,7 +1535,14 @@ export async function deleteAttendanceRecord(studentId: string, date: string, re
 
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
-  notifyDataChange();
+  notifyDataChange(extra || {
+    action: 'absent',
+    studentId,
+    studentName: existingRecord?.studentName,
+    classId: existingRecord?.classId,
+    status: 'absent',
+    date
+  });
   supabaseDeleteAttendanceRecord(studentId, date, recId).catch(() => {});
   scheduleSupabaseSnapshotSave(2000);
   return true;
