@@ -118,7 +118,13 @@ export function calculateAge(birthDate?: string, fallbackAge?: number): number {
 
 // Initial Students / Fellowship Members for Bethel Church (with 出生年月日)
 export const initialStudents: Student[] = [
-  // 高中班 (从照片数据全新导入，共 27 位学员)
+  // 中班 (class-3, 9-10岁) - 只保留 任玮祎
+  { id: 's-1790196484064', name: '任玮祎(Vicky)', gender: 'girl', birthDate: '2017-08-16', age: 9, classId: 'class-3', parentName: '毛东丽', parentPhone: '3518818858', memberCode: 'BTL-29', joinDate: '2026-09-23' },
+
+  // 初中班 (class-5, 13-14岁) - 只保留 任玮琛
+  { id: 's-1790196426992', name: '任玮琛(Willson)', gender: 'boy', birthDate: '2014-06-06', age: 12, classId: 'class-5', parentName: '任志安', parentPhone: '3273778891', memberCode: 'BTL-28', joinDate: '2026-09-23' },
+
+  // 高中班 (class-6, 共 27 位学员全量保留)
   { id: 's-601', name: '潘恩言 (Lucia)', gender: 'girl', birthDate: '2012-03-04', age: 14, classId: 'class-6', parentName: '柯献利', parentPhone: '3778364308', memberCode: 'BTL-14', joinDate: '2026-09-01' },
   { id: 's-602', name: '涂意豪 (Matteo)', gender: 'boy', birthDate: '2010-07-08', age: 16, classId: 'class-6', parentName: '戴少萍', parentPhone: '3312696885', memberCode: 'BTL-15', joinDate: '2026-09-01' },
   { id: 's-603', name: '周铭哲 (Andy)', gender: 'boy', birthDate: '2012-09-07', age: 14, classId: 'class-6', parentName: '家长', parentPhone: '3274786535', memberCode: 'BTL-16', joinDate: '2026-09-01' },
