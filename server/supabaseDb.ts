@@ -367,7 +367,6 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
         method: r.method || 'attendance',
         memory_verse_completed: Boolean(r.memoryVerseCompleted),
         offering_completed: Boolean(r.offeringCompleted),
-        is_test_mode: Boolean(r.isTestMode),
         notes: r.notes || null,
         updated_at: new Date().toISOString()
       }));
@@ -819,7 +818,6 @@ export async function supabaseUpsertAttendanceRecord(r: AttendanceRecord): Promi
       method: r.method || 'attendance',
       memory_verse_completed: Boolean(r.memoryVerseCompleted),
       offering_completed: Boolean(r.offeringCompleted),
-      is_test_mode: Boolean(r.isTestMode),
       notes: r.notes || null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'id' });
