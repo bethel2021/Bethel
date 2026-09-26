@@ -35,6 +35,37 @@ export function getSupabase(): SupabaseClient | null {
           persistSession: false,
           autoRefreshToken: false,
           detectSessionInUrl: false
+        },
+        global: {
+          fetch: async (input, init) => {
+            let attempt = 0;
+            const maxAttempts = 3;
+            let delay = 100; // ms
+            while (attempt < maxAttempts) {
+              try {
+                attempt++;
+                const response = await fetch(input, init);
+                // If it is a transient server error (502 Gateway, 503 Service Unavailable, 504 Gateway Timeout), retry
+                if ([502, 503, 504].includes(response.status) && attempt < maxAttempts) {
+                  console.warn(`[Supabase DB Connection Retry] Received HTTP ${response.status}. Retrying in ${delay}ms (Attempt ${attempt}/${maxAttempts})...`);
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                  delay *= 2;
+                  continue;
+                }
+                return response;
+              } catch (err: any) {
+                // Retry on transient network/reset/timeout errors
+                if (attempt < maxAttempts) {
+                  console.warn(`[Supabase Network Retry] Attempt ${attempt}/${maxAttempts} failed: ${err.message || err}. Retrying in ${delay}ms...`);
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                  delay *= 2;
+                  continue;
+                }
+                throw err;
+              }
+            }
+            throw new Error('Supabase request failed after max retry attempts');
+          }
         }
       });
       if (!hasLoggedConfigStatus) {

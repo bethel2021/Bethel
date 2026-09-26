@@ -201,18 +201,93 @@ export function useAttendanceActions(params: {
         recentRecordMutationsRef.current.delete(mutationKey);
         throw new Error((res as any)?.error || '签到记录更新失败，请重试');
       }
-    } catch (err) {
-      if (backupPrevRecords.length > 0) {
-        setRecords(backupPrevRecords);
-        saveLocalData({ records: backupPrevRecords });
+    } catch (err: any) {
+      // Robust Offline Guard: Do NOT rollback if it is a transient network timeout/connectivity issue
+      const isNetworkError = !navigator.onLine || 
+        String(err.message || '').toLowerCase().includes('fetch') ||
+        String(err.message || '').toLowerCase().includes('network') ||
+        String(err.message || '').toLowerCase().includes('timeout') ||
+        String(err.message || '').toLowerCase().includes('failed to load') ||
+        String(err.message || '').toLowerCase().includes('unreachable');
+
+      if (isNetworkError) {
+        console.warn('[Offline Mode] Network connectivity issue detected. Saving check-in locally and queuing for auto-sync.');
+        setIsServerAvailable(false);
+        
+        // Cache the offline action to localStorage for later synchronization
+        try {
+          const raw = localStorage.getItem('bethel_offline_actions') || '[]';
+          const queue = JSON.parse(raw);
+          // Check if this student and date is already queued to avoid duplicates
+          const isDup = queue.some((q: any) => q.studentId === data.studentId && q.date === data.date);
+          if (!isDup) {
+            queue.push({ ...data, timestamp: Date.now() });
+            localStorage.setItem('bethel_offline_actions', JSON.stringify(queue));
+          }
+        } catch (queueErr) {
+          console.error('[Offline Mode] Failed to queue offline action:', queueErr);
+        }
+      } else {
+        // Rollback on non-network hard code/validation errors
+        if (backupPrevRecords.length > 0) {
+          setRecords(backupPrevRecords);
+          saveLocalData({ records: backupPrevRecords });
+        }
+        recentRecordMutationsRef.current.delete(mutationKey);
+        throw err;
       }
-      recentRecordMutationsRef.current.delete(mutationKey);
-      throw err;
     } finally {
       pendingMutationsRef.current.delete(mutationKey);
       notifyCrossTabSync();
     }
   }, [currentUser, config, students, setRecords, checkinLockRef, pendingMutationsRef, recentRecordMutationsRef, setIsLoginModalOpen, setIsServerAvailable, notifyCrossTabSync]);
+
+  // Online Background Replayer
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncOfflineQueue = async () => {
+      if (!navigator.onLine) return;
+      try {
+        const raw = localStorage.getItem('bethel_offline_actions');
+        if (!raw) return;
+        const queue = JSON.parse(raw);
+        if (!Array.isArray(queue) || queue.length === 0) return;
+
+        console.log(`[Offline Sync] Replaying ${queue.length} cached offline check-ins...`);
+        const remainingQueue = [];
+
+        for (const action of queue) {
+          try {
+            await attendanceService.manualCheckin(action);
+            console.log(`[Offline Sync] Successfully uploaded offline action for student ${action.studentId}`);
+          } catch (err) {
+            console.error(`[Offline Sync] Failed to upload action for student ${action.studentId}:`, err);
+            remainingQueue.push(action);
+          }
+        }
+
+        if (remainingQueue.length > 0) {
+          localStorage.setItem('bethel_offline_actions', JSON.stringify(remainingQueue));
+        } else {
+          localStorage.removeItem('bethel_offline_actions');
+          console.log('[Offline Sync] All cached check-ins successfully synced to Supabase!');
+          setIsServerAvailable(true);
+        }
+      } catch (err) {
+        console.error('[Offline Sync] Error replaying cached queue:', err);
+      }
+    };
+
+    window.addEventListener('online', syncOfflineQueue);
+    if (navigator.onLine) {
+      syncOfflineQueue();
+    }
+
+    return () => {
+      window.removeEventListener('online', syncOfflineQueue);
+    };
+  }, [setIsServerAvailable]);
 
   return {
     handleManualUpdate,
