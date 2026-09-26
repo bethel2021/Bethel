@@ -30,8 +30,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     const targetAccount = adminAccounts.find(a => a.username.toLowerCase() === trimmedUser.toLowerCase());
 
     if (targetAccount) {
-      const isMatch = comparePassword(cleanPassword, targetAccount.password) ||
-        (targetAccount.role === 'superadmin' && comparePassword(cleanPassword, systemConfig.adminPassword || 'bethel2026'));
+      const isMatch = comparePassword(cleanPassword, targetAccount.password);
 
       if (isMatch) {
         const userSession: AdminUser = {
@@ -50,22 +49,6 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         return res.json({ success: true, user: userSession, message: `欢迎登录，${userSession.displayName}！` });
       }
       return res.status(401).json({ error: '密码错误，请核对后重试' });
-    }
-
-    // Generic match if user enters custom username with correct admin password
-    if (comparePassword(cleanPassword, systemConfig.adminPassword || 'bethel2026')) {
-      const userSession: AdminUser = {
-        username: trimmedUser,
-        displayName: `伯特利教会管理员 (${trimmedUser})`,
-        role: 'superadmin',
-        token: generateSecureToken({
-          username: trimmedUser,
-          displayName: `伯特利教会管理员 (${trimmedUser})`,
-          role: 'superadmin'
-        })
-      };
-      activeSessions.set(userSession.token, userSession);
-      return res.json({ success: true, user: userSession, message: '登录成功！' });
     }
 
     return res.status(401).json({ error: '账号不存在或密码错误，请核对后重试' });
