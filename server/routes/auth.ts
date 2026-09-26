@@ -8,6 +8,7 @@ import {
   comparePassword,
   initOrLoadDataAsync,
   verifyAnyAdminPermission,
+  generateSecureToken,
   dataStore
 } from '../dataStore.js';
 import { broadcastRealtimeState } from './realtime.js';
@@ -37,7 +38,12 @@ authRouter.post('/login', async (req: Request, res: Response) => {
           displayName: targetAccount.displayName,
           role: targetAccount.role,
           assignedClassId: targetAccount.assignedClassId,
-          token: `btl_session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+          token: generateSecureToken({
+            username: targetAccount.username,
+            displayName: targetAccount.displayName,
+            role: targetAccount.role,
+            assignedClassId: targetAccount.assignedClassId
+          })
         };
         activeSessions.set(userSession.token, userSession);
         return res.json({ success: true, user: userSession, message: `欢迎登录，${userSession.displayName}！` });
@@ -51,7 +57,11 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         username: trimmedUser,
         displayName: `伯特利教会管理员 (${trimmedUser})`,
         role: 'superadmin',
-        token: `btl_session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+        token: generateSecureToken({
+          username: trimmedUser,
+          displayName: `伯特利教会管理员 (${trimmedUser})`,
+          role: 'superadmin'
+        })
       };
       activeSessions.set(userSession.token, userSession);
       return res.json({ success: true, user: userSession, message: '登录成功！' });

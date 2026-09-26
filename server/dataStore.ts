@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import type { Request } from 'express';
 import bcrypt from 'bcryptjs';
 import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../src/types.js';
@@ -730,53 +731,71 @@ export async function initOrLoadDataAsync(force = false) {
   }
 }
 
-// Helper to verify if requester is superadmin
+const TOKEN_SECRET = process.env.SESSION_SECRET || 'bethel_church_sunday_ims_2026_salt';
+
+export function generateSecureToken(payload: { username: string; displayName: string; role: string; assignedClassId?: string }): string {
+  const data = JSON.stringify({
+    ...payload,
+    exp: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days session limit
+  });
+  const dataBase64 = Buffer.from(data).toString('base64url');
+  const hmac = crypto.createHmac('sha256', TOKEN_SECRET).update(dataBase64).digest('base64url');
+  return `btl_session_${dataBase64}.${hmac}`;
+}
+
+export function verifyAndDecodeToken(token: string): any | null {
+  if (!token || !token.startsWith('btl_session_')) return null;
+  const parts = token.substring(12).split('.');
+  if (parts.length !== 2) return null;
+  const [dataBase64, signature] = parts;
+  
+  const expectedHmac = crypto.createHmac('sha256', TOKEN_SECRET).update(dataBase64).digest('base64url');
+  if (signature !== expectedHmac) {
+    console.warn('[Security Warning] Session token signature mismatch or tampering detected!');
+    return null;
+  }
+  
+  try {
+    const payloadJson = Buffer.from(dataBase64, 'base64url').toString('utf8');
+    const payload = JSON.parse(payloadJson);
+    if (payload.exp && Date.now() > payload.exp) {
+      console.warn(`[Security Warning] Session token expired for user ${payload.username}`);
+      return null;
+    }
+    return payload;
+  } catch (err) {
+    return null;
+  }
+}
+
+// Helper to verify if requester is superadmin (verified cryptographically)
 export function verifySuperAdminPermission(req: Request): { allowed: boolean; role: string; message?: string } {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') 
     ? authHeader.substring(7).trim() 
     : ((req.headers['x-admin-token'] || req.headers['x-token']) as string);
-  const userRoleHeader = (((req.headers['x-user-role'] || req.headers['x-admin-role'] || req.headers['role']) as string) || '').toLowerCase();
-  const usernameHeader = (((req.headers['x-username'] || req.headers['x-admin-username'] || req.headers['username']) as string) || '').toLowerCase();
 
-  // 1. Explicit non-superadmin check from role header (unless user is logged-in admin)
-  if ((userRoleHeader === 'teacher' || userRoleHeader === 'fellowship_leader') && (!usernameHeader || usernameHeader !== 'admin')) {
-    return {
-      allowed: false,
-      role: userRoleHeader,
-      message: '权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加或删除班级与学生的权限！'
-    };
-  }
-
-  // 2. Check session token if present in activeSessions
+  // 1. Check in activeSessions first (fast path)
   if (token && activeSessions.has(token)) {
     const session = activeSessions.get(token)!;
     if (session.role === 'superadmin' || session.username.toLowerCase() === 'admin') {
       return { allowed: true, role: 'superadmin' };
     }
-    return {
-      allowed: false,
-      role: session.role,
-      message: '权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加或删除班级与学生的权限！'
+  }
+
+  // 2. Cryptographically verify and reconstruct session on container restart
+  const decoded = verifyAndDecodeToken(token);
+  if (decoded && (decoded.role === 'superadmin' || decoded.username.toLowerCase() === 'admin')) {
+    // Lazily restore the active session so subsequent queries don't need decryption
+    const restoredSession: AdminUser = {
+      username: decoded.username,
+      displayName: decoded.displayName,
+      role: decoded.role,
+      assignedClassId: decoded.assignedClassId,
+      token: token
     };
-  }
-
-  // 3. Superadmin check (e.g. token format from admin login or headers)
-  if (userRoleHeader === 'superadmin' || usernameHeader === 'admin') {
+    activeSessions.set(token, restoredSession);
     return { allowed: true, role: 'superadmin' };
-  }
-
-  // 4. Token format check (valid session prefix from client that logged in as admin)
-  if (token && token.startsWith('btl_session_')) {
-    return { allowed: true, role: 'superadmin' };
-  }
-
-  // 5. Also check if username matches a known account with superadmin role
-  if (usernameHeader) {
-    const acc = adminAccounts.find(a => a.username.toLowerCase() === usernameHeader);
-    if (acc && acc.role === 'superadmin') {
-      return { allowed: true, role: 'superadmin' };
-    }
   }
 
   return {
@@ -792,10 +811,8 @@ export function verifyAnyAdminPermission(req: Request): { allowed: boolean; role
   const token = authHeader?.startsWith('Bearer ') 
     ? authHeader.substring(7).trim() 
     : ((req.headers['x-admin-token'] || req.headers['x-token']) as string);
-  const userRoleHeader = (((req.headers['x-user-role'] || req.headers['x-admin-role'] || req.headers['role']) as string) || '').toLowerCase();
-  const usernameHeader = (((req.headers['x-username'] || req.headers['x-admin-username'] || req.headers['username']) as string) || '').toLowerCase();
 
-  // 1. Check session token if present in activeSessions
+  // 1. Check in activeSessions first (fast path)
   if (token && activeSessions.has(token)) {
     const session = activeSessions.get(token)!;
     if (session.role === 'superadmin' || session.role === 'teacher' || session.role === 'fellowship_leader') {
@@ -803,22 +820,19 @@ export function verifyAnyAdminPermission(req: Request): { allowed: boolean; role
     }
   }
 
-  // 2. Explicit roles check
-  if (userRoleHeader === 'superadmin' || userRoleHeader === 'teacher' || userRoleHeader === 'fellowship_leader') {
-    return { allowed: true, role: userRoleHeader };
-  }
-
-  // 3. Username fallback in header
-  if (usernameHeader) {
-    const acc = adminAccounts.find(a => a.username.toLowerCase() === usernameHeader);
-    if (acc) {
-      return { allowed: true, role: acc.role };
-    }
-  }
-
-  // 4. Token format fallback
-  if (token && token.startsWith('btl_session_')) {
-    return { allowed: true, role: 'superadmin' };
+  // 2. Cryptographically verify and reconstruct session on container restart
+  const decoded = verifyAndDecodeToken(token);
+  if (decoded && (decoded.role === 'superadmin' || decoded.role === 'teacher' || decoded.role === 'fellowship_leader')) {
+    // Lazily restore the active session so subsequent queries don't need decryption
+    const restoredSession: AdminUser = {
+      username: decoded.username,
+      displayName: decoded.displayName,
+      role: decoded.role,
+      assignedClassId: decoded.assignedClassId,
+      token: token
+    };
+    activeSessions.set(token, restoredSession);
+    return { allowed: true, role: decoded.role };
   }
 
   return {
