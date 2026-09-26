@@ -590,7 +590,7 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
     }
 
     // --------------------------------------------------------------------------
-    // Step 8: Upsert 'app_sync_state' table (Global version and state hub)
+    // Step 8: Upsert 'app_sync_state' table (Global version and state hub - snapshot is omitted to save storage)
     // --------------------------------------------------------------------------
     await Promise.resolve(
       client.from('app_sync_state').upsert({
@@ -598,17 +598,17 @@ export async function saveToSupabase(payload: ChurchStatePayload): Promise<boole
         sync_version: payload.syncVersion,
         active_sunday: payload.activeSunday,
         last_sync_time: new Date().toISOString(),
-        snapshot: payload,
+        snapshot: null, // Set to null to save 500MB free-tier space and bandwidth
         updated_at: payload.updatedAt || new Date().toISOString()
       }, { onConflict: 'id' })
     );
 
-    // Backward-compatibility: also update church_app_state
+    // Backward-compatibility: also update church_app_state (omitting heavy state blob)
     try {
       await Promise.resolve(
         client.from('church_app_state').upsert({
           id: 'bethel_church_data',
-          state: payload,
+          state: null, // Set to null to save 500MB free-tier space and bandwidth
           sync_version: payload.syncVersion,
           updated_at: payload.updatedAt || new Date().toISOString()
         }, { onConflict: 'id' })
