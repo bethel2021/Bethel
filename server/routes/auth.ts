@@ -18,7 +18,8 @@ export const authRouter = Router();
 // 2. Admin Authentication Login
 authRouter.post('/login', async (req: Request, res: Response) => {
   try {
-    await initOrLoadDataAsync(false);
+    // Force a live, real-time fetch from Supabase to completely bypass 15s cache lag on authentication
+    await initOrLoadDataAsync(true);
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: '请输入用户名和登录密码' });
