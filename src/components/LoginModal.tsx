@@ -39,27 +39,39 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
     try {
       let loggedUser: AdminUser | null = null;
+      let isServerReachable = false;
+      let serverError = '';
+
       try {
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
         });
+        isServerReachable = true;
         if (res.ok) {
           const data = await res.json();
           loggedUser = data.user;
+        } else {
+          const data = await res.json().catch(() => ({}));
+          serverError = data.error || data.message || '账号或密码错误';
         }
       } catch (networkErr) {
-        // Network or offline
+        console.warn('[LoginModal] Server is unreachable, falling back to local offline validation...', networkErr);
+        isServerReachable = false;
       }
 
-      // If server response didn't yield a user, try local credentials
-      if (!loggedUser) {
+      // If server is unreachable, fall back to local offline storage credentials
+      if (!isServerReachable) {
         loggedUser = localLogin(username, password);
-      }
-
-      if (!loggedUser) {
-        throw new Error('登录失败：账号或密码错误，请核对后重试');
+        if (!loggedUser) {
+          throw new Error('离线登录失败：本地未找到匹配的缓存账号，或密码错误。请联网后重试。');
+        }
+      } else {
+        // Server was reachable and explicitly rejected or returned nothing
+        if (!loggedUser) {
+          throw new Error(serverError || '登录失败：账号或密码错误，请核对后重试');
+        }
       }
 
       onLoginSuccess(loggedUser);
