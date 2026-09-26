@@ -232,6 +232,22 @@ export function bumpSyncVersion(): number {
 export let lastSupabaseFetchTime = 0;
 
 export async function saveDataToSupabase(): Promise<boolean> {
+  // Optimistic Concurrency Control: Prevent stale write / deletion resurrection across multiple serverless instances
+  if (isSupabaseConfigured()) {
+    try {
+      const client = getSupabase();
+      if (client) {
+        const { data: dbState } = await client.from('app_sync_state').select('sync_version').eq('id', 'bethel_sync_state').maybeSingle();
+        if (dbState && typeof dbState.sync_version === 'number' && dbState.sync_version > syncVersion) {
+          console.log(`[Supabase OCC] Stale write prevented! Cloud database has a newer version (${dbState.sync_version} > ${syncVersion}). Re-syncing database before writing.`);
+          await initOrLoadDataAsync(true);
+        }
+      }
+    } catch (err) {
+      console.warn('[Supabase OCC Check Failed]:', err);
+    }
+  }
+
   syncVersion++;
   lastModifiedTimestamp = new Date().toISOString();
   const hiddenIds = classes.filter(c => c.isHiddenFromHome === true).map(c => c.id);
